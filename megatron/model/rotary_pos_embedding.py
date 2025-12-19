@@ -54,22 +54,38 @@ def apply_rotary_pos_emb(t, freqs):
     """
     input tensor t is of shape [seq_length, ..., dim]
     rotary positional embeding tensor freqs is of shape [seq_length, ..., dim]
+    or freqs is a list [cos, sin] from RotaryEmbedding
     check https://kexue.fm/archives/8265 for detailed formulas
     """
-    rot_dim = freqs.shape[-1]
-    t_pass = None
-    if t.shape[-1] != rot_dim:
-        # ideally t_pass is empty so rotary pos embedding is applied to all tensor t
-        t, t_pass = t[..., :rot_dim], t[..., rot_dim:]
+    # Handle both list [cos, sin] and tensor formats
+    if isinstance(freqs, (list, tuple)):
+        cos_emb, sin_emb = freqs
+        rot_dim = cos_emb.shape[-1]
+        t_pass = None
+        if t.shape[-1] != rot_dim:
+            t, t_pass = t[..., :rot_dim], t[..., rot_dim:]
+        
+        # Slice to match sequence length
+        cos_emb = cos_emb[:t.shape[0]].to(t.dtype)
+        sin_emb = sin_emb[:t.shape[0]].to(t.dtype)
+        
+        t = (t * cos_emb) + (_rotate_half(t) * sin_emb)
+        if t_pass is None:
+            return t
+        return torch.cat((t, t_pass), dim=-1)
+    else:
+        # Original tensor format
+        rot_dim = freqs.shape[-1]
+        t_pass = None
+        if t.shape[-1] != rot_dim:
+            t, t_pass = t[..., :rot_dim], t[..., rot_dim:]
 
-    global cos_cached, sin_cached
-    if cos_cached is None or sin_cached is None or t.shape[0] != cos_cached.shape[0]:
-        freqs_ = freqs[:t.shape[0]]
-        cos_cached = freqs_.cos().to(t.dtype)
-        sin_cached = freqs_.sin().to(t.dtype)
-    # first part is cosine component
-    # second part is sine component, need to change signs with _rotate_half method
-    t = (t * cos_cached) + (_rotate_half(t) * sin_cached)
-    if t_pass is None:
-        return t
-    return torch.cat((t, t_pass), dim=-1)
+        global cos_cached, sin_cached
+        if cos_cached is None or sin_cached is None or t.shape[0] != cos_cached.shape[0]:
+            freqs_ = freqs[:t.shape[0]]
+            cos_cached = freqs_.cos().to(t.dtype)
+            sin_cached = freqs_.sin().to(t.dtype)
+        t = (t * cos_cached) + (_rotate_half(t) * sin_cached)
+        if t_pass is None:
+            return t
+        return torch.cat((t, t_pass), dim=-1)
