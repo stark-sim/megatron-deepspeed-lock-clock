@@ -990,6 +990,23 @@ def _add_training_args(parser):
                        dest='gradient_accumulation_fusion')
     group.add_argument('--use-dataset-only', type=bool, required=False, default=False,
                        help='If set to True, only use the megatron dataset for external trainer ')
+    
+    # GPU frequency scaling for communication
+    group.add_argument('--enable-comm-freq-scaling', action='store_true',
+                       help='Enable GPU frequency scaling during NCCL communication '
+                       'to save energy. Requires root/sudo privileges.')
+    group.add_argument('--comm-low-freq', type=int, default=800,
+                       help='Low GPU frequency (MHz) during communication. Default: 800')
+    group.add_argument('--comm-high-freq', type=int, default=None,
+                       help='High GPU frequency (MHz) during computation. '
+                       'Default: None (use default application clock)')
+    group.add_argument('--comm-freq-dry-run', action='store_true',
+                       help='Dry run mode: keep wrap function logic but do not execute '
+                       'actual frequency scaling. Useful for measuring overhead.')
+    group.add_argument('--comm-min-elements', type=int, default=100*1024*1024,
+                       help='Minimum tensor elements to trigger frequency scaling. '
+                       'Default: 100M (104857600). Larger values reduce switching overhead.')
+    
     return parser
 
 

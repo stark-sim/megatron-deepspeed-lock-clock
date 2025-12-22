@@ -150,5 +150,7 @@ export TORCH_DISTRIBUTED_DEBUG=OFF
     --no-masked-softmax-fusion \
     --no-bias-gelu-fusion \
     --no-bias-dropout-fusion \
+    --enable-comm-freq-scaling \
+    --comm-low-freq 800 \
     $ds_args \
-    2>&1 | tee ${BASE_PATH}/logs/train_$(date +%Y%m%d_%H%M%S).log
+    2>&1 | tee ${BASE_PATH}/logs/train_freq_scaling_$(date +%Y%m%d_%H%M%S).log

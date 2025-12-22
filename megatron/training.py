@@ -5,6 +5,7 @@
 
 from datetime import datetime
 import math
+import os
 import sys
 import time
 import json
@@ -48,6 +49,8 @@ from megatron.data.data_samplers import build_pretraining_data_loader
 from megatron.utils import calc_params_l2_norm
 from megatron.core.pipeline_parallel import get_forward_backward_func
 from megatron.utils import report_memory, throughput_calculator, checkpoint_throughput_calculator, update_rotary_pos_emb
+from megatron.power_monitor import start_power_monitoring, stop_power_monitoring, save_power_checkpoint, get_power_monitor, log_interval_energy, start_zeus_monitoring, stop_zeus_monitoring
+from megatron.gpu_freq_manager import init_freq_manager, shutdown_freq_manager, get_freq_manager, patch_torch_distributed, unpatch_torch_distributed
 from megatron.model.vision.knn_monitor import compute_feature_bank
 from megatron.arguments import core_transformer_config_from_args
 from megatron.profiler import setup_profiler, trigger, on_step_begin, on_step_end
@@ -674,7 +677,11 @@ def train_step(forward_step_func, data_iterator,
     if args.deepspeed and args.ds_pipeline_enabled:
         num_zeros_in_grad = 0
         assert isinstance(model[0], deepspeed.PipelineEngine)
+        
+        # 频率管理：train_batch 包含计算+通信，暂时不在此处降频
+        # TODO: 需要更细粒度的 hook 来只在纯通信阶段降频
         loss = model[0].train_batch(data_iter=data_iterator)
+        
         additional_losses = model[0].get_additional_losses()
         loss_key = 'lm loss' if additional_losses is None else 'loss'  # use "lm loss" for backward compatibility
         loss_dict = OrderedDict({loss_key: loss})
@@ -1192,11 +1199,19 @@ def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
             report_memory_flag = False
         timers.log(timers_to_log, normalizer=args.log_interval)
 
+    # 每50步统计一次功耗
+    if iteration % 50 == 0 and is_rank_0():
+        try:
+            log_interval_energy(iteration, interval_steps=50)
+        except Exception as e:
+            pass  # 忽略功耗统计错误
+
     return report_memory_flag
 
 
 def save_checkpoint_and_time(iteration, model, optimizer, opt_param_scheduler):
     timers = get_timers()
+    args = get_args()
     # Extra barrier is added to make sure
     # all ranks report the max time.
     timers('save-checkpoint', log_level=0).start(barrier=True)
@@ -1204,6 +1219,13 @@ def save_checkpoint_and_time(iteration, model, optimizer, opt_param_scheduler):
     timers('save-checkpoint').stop(barrier=True)
     checkpoint_throughput_calculator(model, timers('save-checkpoint').elapsed(reset=False))
     timers.log(['save-checkpoint'])
+    
+    # Save power consumption stats with checkpoint
+    if is_rank_0() and args.save:
+        try:
+            save_power_checkpoint(args.save, iteration)
+        except Exception as e:
+            print_rank_0(f'Warning: Failed to save power stats: {e}')
 
 
 def train(forward_step_func, model, optimizer, opt_param_scheduler,
@@ -1217,6 +1239,50 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
     write_args_to_tensorboard()
 
     setup_profiler(args, get_accelerator().device_name())
+    
+    # Start GPU power monitoring (only on rank 0)
+    # 注意：关闭 custom 监控，只使用 Zeus 监控
+    if is_rank_0():
+        # try:
+        #     log_dir = args.save if args.save else "/home/sd/Megatron-DeepSpeed/logs"
+        #     start_power_monitoring(sample_interval=5.0, log_dir=log_dir)
+        #     print_rank_0("GPU power monitoring started")
+        # except Exception as e:
+        #     print_rank_0(f"Warning: Failed to start power monitoring: {e}")
+        
+        # 只启动 Zeus 监控
+        try:
+            start_zeus_monitoring(gpu_indices=list(range(torch.cuda.device_count())))
+            print_rank_0("Zeus power monitoring started")
+        except Exception as e:
+            print_rank_0(f"Warning: Failed to start Zeus monitoring: {e}")
+        
+    # 启动 GPU 频率管理（local_rank=0 管理所有 GPU，使用并行调频）
+    # 策略：只对大通信操作（>阈值元素）降频，小通信跳过
+    local_rank = int(os.environ.get('LOCAL_RANK', 0))
+    if local_rank == 0 and getattr(args, 'enable_comm_freq_scaling', False):
+        try:
+            low_freq = getattr(args, 'comm_low_freq', 800)
+            high_freq = getattr(args, 'comm_high_freq', None)
+            dry_run = getattr(args, 'comm_freq_dry_run', False)
+            min_elements = getattr(args, 'comm_min_elements', 100*1024*1024)
+            # local_rank=0 管理所有 GPU，使用 ThreadPoolExecutor 并行调频
+            manager = init_freq_manager(
+                gpu_indices=None,  # None = 自动检测所有物理 GPU
+                low_freq=low_freq,
+                high_freq=high_freq,
+                enabled=True,
+                dry_run=dry_run,
+                min_elements=min_elements,
+            )
+            if manager and manager.enabled:
+                # Monkey-patch torch.distributed，只对大通信降频
+                patch_torch_distributed()
+                mode_str = "DRY-RUN" if dry_run else "ACTIVE"
+                print(f"[Node {os.environ.get('NODE_RANK', 0)}] GPU freq scaling enabled [{mode_str}] "
+                      f"(low={low_freq} MHz, threshold={manager.min_elements/1e6:.0f}M, parallel)")
+        except Exception as e:
+            print(f"[Node {os.environ.get('NODE_RANK', 0)}] Warning: Failed to enable freq scaling: {e}")
 
     if args.random_ltd:
         # random-ltd requires different randomness on each rank
