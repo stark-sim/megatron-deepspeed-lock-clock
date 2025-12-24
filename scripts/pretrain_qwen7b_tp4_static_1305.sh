@@ -1,15 +1,14 @@
 #!/bin/bash
-# Qwen2.5-7B Single Node Training with Freq Scaling
-# TP=4, PP=1, DP=4 on 1 node (16 GPUs)
+# Qwen2.5-7B Single Node Training with STATIC 1305MHz
+# 全程锁定 1305MHz
 set -ex
 
 BASE_PATH=/home/sd/Megatron-DeepSpeed
 DS_CONFIG=${BASE_PATH}/scripts/ds_config_7b_tp4.json
 DATASET="${BASE_PATH}/data/chinese_wiki_megatron_text_document"
-CHECKPOINT_PATH=${BASE_PATH}/checkpoints/qwen7b_tp4
+CHECKPOINT_PATH=${BASE_PATH}/checkpoints/qwen7b_tp4_static_1305
 TOKENIZER_PATH=/home/sd/.cache/huggingface/hub/models--Qwen--Qwen2.5-14B/snapshots/97e1e76335b7017d8f67c08a19d103c0504298c9
 
-# 单节点配置: TP=4, PP=1, DP=4
 TP=4
 PP=1
 ZERO_STAGE=1
@@ -20,8 +19,6 @@ NODE_RANK=0
 MASTER_ADDR=localhost
 MASTER_PORT=29500
 
-# Qwen2.5-7B 模型架构
-# NUM_HEADS=28, NUM_KV_HEADS=4, 需要 TP 能整除
 HIDDEN_SIZE=3584
 FFN_HIDDEN_SIZE=18944
 NUM_LAYERS=28
@@ -29,7 +26,6 @@ NUM_HEADS=28
 NUM_KV_HEADS=4
 SEQ_LENGTH=2048
 
-# 训练参数
 MICRO_BATCH_SIZE=1
 GLOBAL_BATCH_SIZE=16
 TRAIN_STEPS=500
@@ -38,6 +34,20 @@ MIN_LR=1e-6
 
 mkdir -p ${CHECKPOINT_PATH}
 mkdir -p ${BASE_PATH}/logs
+
+# 训练开始前锁定所有 GPU 到 1305MHz
+echo "Locking all GPUs to 1305MHz..."
+python3 -c "
+import sys
+sys.path.insert(0, '/home/sd/.local/lib/python3.10/site-packages')
+import pynvml
+pynvml.nvmlInit()
+for i in range(16):
+    h = pynvml.nvmlDeviceGetHandleByIndex(i)
+    pynvml.nvmlDeviceSetGpuLockedClocks(h, 1305, 1305)
+    print(f'GPU {i} locked to 1305MHz')
+pynvml.nvmlShutdown()
+"
 
 cat <<EOT > $DS_CONFIG
 {
@@ -57,8 +67,9 @@ cat <<EOT > $DS_CONFIG
 EOT
 
 WORLD_SIZE=$((GPUS_PER_NODE * NNODES))
-echo "Single node training: TP=$TP, PP=$PP, DP=$((WORLD_SIZE / TP / PP))"
+echo "Single node training (STATIC 1305MHz): TP=$TP, PP=$PP, DP=$((WORLD_SIZE / TP / PP))"
 
+# 运行训练（不启用动态调频）
 /home/sd/.local/bin/torchrun \
     --nproc_per_node $GPUS_PER_NODE \
     --nnodes $NNODES \
@@ -113,13 +124,25 @@ echo "Single node training: TP=$TP, PP=$PP, DP=$((WORLD_SIZE / TP / PP))"
     --no-masked-softmax-fusion \
     --no-bias-gelu-fusion \
     --no-bias-dropout-fusion \
-    --enable-comm-freq-scaling \
-    --comm-low-freq 1200 \
-    --comm-min-elements 300000000 \
     --recompute-granularity full \
     --recompute-method uniform \
     --deepspeed-activation-checkpointing \
     --zero-stage=${ZERO_STAGE} \
     --deepspeed_config=${DS_CONFIG} \
-    --deepspeed \
-    2>&1 | tee ${BASE_PATH}/logs/qwen7b_tp4_freq_$(date +%Y%m%d_%H%M%S).log
+    --deepspeed
+
+# 训练结束后恢复默认频率
+echo "Resetting GPU frequencies to default..."
+python3 -c "
+import sys
+sys.path.insert(0, '/home/sd/.local/lib/python3.10/site-packages')
+import pynvml
+pynvml.nvmlInit()
+for i in range(16):
+    h = pynvml.nvmlDeviceGetHandleByIndex(i)
+    pynvml.nvmlDeviceResetGpuLockedClocks(h)
+    pynvml.nvmlDeviceResetApplicationsClocks(h)
+    print(f'GPU {i} reset to default')
+pynvml.nvmlShutdown()
+"
+echo "Done!"
