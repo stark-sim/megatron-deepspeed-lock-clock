@@ -1006,7 +1006,15 @@ def _add_training_args(parser):
     group.add_argument('--comm-min-elements', type=int, default=100*1024*1024,
                        help='Minimum tensor elements to trigger frequency scaling. '
                        'Default: 100M (104857600). Larger values reduce switching overhead.')
-    
+    group.add_argument('--experiment-run-id', type=str, default=None,
+                       help='Stable run identifier shared by command, logs, JSON artifacts, '
+                       'and Markdown notes for the same experiment.')
+    group.add_argument('--experiment-name', type=str, default=None,
+                       help='Human-readable experiment name for grouping baseline and comparison runs.')
+    group.add_argument('--experiment-root-dir', type=str, default=None,
+                       help='Directory that stores per-run experiment artifacts. '
+                       'Defaults to MEGATRON_EXPERIMENT_ROOT or ./experiments.')
+
     return parser
 
 
