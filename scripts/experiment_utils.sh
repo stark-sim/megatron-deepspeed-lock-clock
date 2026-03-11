@@ -90,7 +90,7 @@ lock_gpu_clocks() {
     local gpu_indices_csv="$1"
     local clock_mhz="$2"
 
-    python3 - "$gpu_indices_csv" "$clock_mhz" <<'PY'
+    sudo -n python3 - "$gpu_indices_csv" "$clock_mhz" <<'PY'
 import sys
 
 sys.path.insert(0, '/home/sd/.local/lib/python3.10/site-packages')
@@ -114,7 +114,7 @@ PY
 reset_gpu_clocks() {
     local gpu_indices_csv="$1"
 
-    python3 - "$gpu_indices_csv" <<'PY'
+    sudo -n python3 - "$gpu_indices_csv" <<'PY'
 import sys
 
 sys.path.insert(0, '/home/sd/.local/lib/python3.10/site-packages')
@@ -145,7 +145,7 @@ assert_static_clock_supported() {
     local gpu_indices_csv="$1"
     local clock_mhz="$2"
 
-    python3 - "$gpu_indices_csv" "$clock_mhz" <<'PY'
+    sudo -n python3 - "$gpu_indices_csv" "$clock_mhz" <<'PY'
 import sys
 
 sys.path.insert(0, '/home/sd/.local/lib/python3.10/site-packages')

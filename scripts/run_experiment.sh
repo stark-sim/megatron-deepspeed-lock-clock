@@ -22,6 +22,7 @@ TOKENIZER_PATH="${TOKENIZER_PATH:-/home/sd/.cache/huggingface/hub/models--Qwen--
 CHECKPOINT_ROOT="${CHECKPOINT_ROOT:-${BASE_PATH}/checkpoints/${EXPERIMENT_NAME}}"
 LOAD_CHECKPOINT="${LOAD_CHECKPOINT:-0}"
 VALIDATE_ONLY="${VALIDATE_ONLY:-0}"
+DISABLE_CHECKPOINT="${DISABLE_CHECKPOINT:-0}"
 
 HIDDEN_SIZE="${HIDDEN_SIZE:-3584}"
 FFN_HIDDEN_SIZE="${FFN_HIDDEN_SIZE:-18944}"
@@ -34,6 +35,10 @@ GLOBAL_BATCH_SIZE="${GLOBAL_BATCH_SIZE:-16}"
 TRAIN_STEPS="${TRAIN_STEPS:-500}"
 LR="${LR:-1e-5}"
 MIN_LR="${MIN_LR:-1e-6}"
+LR_WARMUP_ITERS="${LR_WARMUP_ITERS:-}"
+SAVE_INTERVAL="${SAVE_INTERVAL:-$TRAIN_STEPS}"
+EVAL_INTERVAL="${EVAL_INTERVAL:-100}"
+EVAL_ITERS="${EVAL_ITERS:-10}"
 ZERO_STAGE="${ZERO_STAGE:-1}"
 PRECISION_MODE="${PRECISION_MODE:-bf16}"
 
@@ -41,6 +46,20 @@ STATIC_CLOCK_MHZ="${STATIC_CLOCK_MHZ:-}"
 COMM_LOW_FREQ="${COMM_LOW_FREQ:-1200}"
 COMM_HIGH_FREQ="${COMM_HIGH_FREQ:-}"
 COMM_MIN_ELEMENTS="${COMM_MIN_ELEMENTS:-300000000}"
+
+if [[ -z "$LR_WARMUP_ITERS" ]]; then
+    if (( TRAIN_STEPS <= 1 )); then
+        LR_WARMUP_ITERS=0
+    elif (( TRAIN_STEPS <= 50 )); then
+        LR_WARMUP_ITERS=$(( TRAIN_STEPS - 1 ))
+    else
+        LR_WARMUP_ITERS=50
+    fi
+fi
+
+if (( EVAL_ITERS <= 0 )) && (( EVAL_INTERVAL <= 0 )); then
+    EVAL_INTERVAL=$(( TRAIN_STEPS + 1 ))
+fi
 
 LOCAL_GPU_INDICES="$(parse_cuda_visible_devices)"
 LOCAL_GPU_COUNT="$(count_csv_items "$LOCAL_GPU_INDICES")"
@@ -50,7 +69,14 @@ setup_experiment_run "${BASE_PATH}" "${EXPERIMENT_NAME}"
 
 RUN_DS_CONFIG="${RUN_DIR}/ds_config.json"
 CHECKPOINT_PATH="${CHECKPOINT_PATH:-${CHECKPOINT_ROOT}/${RUN_ID}}"
-mkdir -p "${CHECKPOINT_PATH}"
+if [[ "$DISABLE_CHECKPOINT" == "1" ]]; then
+    CHECKPOINT_PATH=""
+    SAVE_INTERVAL=0
+    LOAD_CHECKPOINT=0
+    echo "[Checkpoint] DISABLE_CHECKPOINT=1; skipping checkpoint save/load"
+else
+    mkdir -p "${CHECKPOINT_PATH}"
+fi
 
 export EXPERIMENT_NAME RUN_ID RUN_DIR RUN_LOG_DIR EXPERIMENT_ROOT
 export MEGATRON_RUN_ID="${RUN_ID}"
@@ -272,7 +298,6 @@ TRAIN_CMD=(
     --seq-length "$SEQ_LENGTH"
     --max-position-embeddings "$SEQ_LENGTH"
     --train-iters "$TRAIN_STEPS"
-    --save "$CHECKPOINT_PATH"
     --data-path "$DATASET"
     --data-impl mmap
     --tokenizer-type HFTokenizer
@@ -284,15 +309,15 @@ TRAIN_CMD=(
     --min-lr "$MIN_LR"
     --weight-decay 0.01
     --clip-grad 1.0
-    --lr-warmup-iters 50
+    --lr-warmup-iters "$LR_WARMUP_ITERS"
     --optimizer adam
     --adam-beta1 0.9
     --adam-beta2 0.95
     --adam-eps 1e-8
     --log-interval 1
-    --save-interval "$TRAIN_STEPS"
-    --eval-interval 100
-    --eval-iters 10
+    --save-interval "$SAVE_INTERVAL"
+    --eval-interval "$EVAL_INTERVAL"
+    --eval-iters "$EVAL_ITERS"
     --no-query-key-layer-scaling
     --attention-dropout 0
     --hidden-dropout 0
@@ -315,6 +340,10 @@ TRAIN_CMD=(
     --experiment-name "${EXPERIMENT_NAME}"
     --experiment-root-dir "${EXPERIMENT_ROOT}"
 )
+
+if [[ "$DISABLE_CHECKPOINT" != "1" ]]; then
+    TRAIN_CMD+=(--save "$CHECKPOINT_PATH")
+fi
 
 if [[ "$PRECISION_MODE" == "bf16" ]]; then
     TRAIN_CMD+=(--bf16)

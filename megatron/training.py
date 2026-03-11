@@ -49,7 +49,7 @@ from megatron.data.data_samplers import build_pretraining_data_loader
 from megatron.utils import calc_params_l2_norm
 from megatron.core.pipeline_parallel import get_forward_backward_func
 from megatron.utils import report_memory, throughput_calculator, checkpoint_throughput_calculator, update_rotary_pos_emb
-from megatron.power_monitor import start_power_monitoring, stop_power_monitoring, save_power_checkpoint, get_power_monitor, log_interval_energy, start_zeus_monitoring, stop_zeus_monitoring
+from megatron.power_monitor import start_power_monitoring, stop_power_monitoring, save_power_checkpoint, get_power_monitor, log_interval_energy, start_zeus_monitoring, stop_zeus_monitoring, get_last_power_metrics
 from megatron.gpu_freq_manager import init_freq_manager, shutdown_freq_manager, get_freq_manager, patch_torch_distributed, unpatch_torch_distributed
 from megatron.experiment_tracker import init_experiment_tracker, record_experiment_interval, record_experiment_checkpoint, finalize_experiment_tracker, build_frequency_scaling_snapshot
 from megatron.model.vision.knn_monitor import compute_feature_bank
@@ -285,6 +285,7 @@ def pretrain(train_valid_test_dataset_provider,
                         'consumed_train_tokens': args.consumed_train_tokens,
                     },
                     'frequency_scaling': build_frequency_scaling_snapshot(get_freq_manager()),
+                    'power_metrics': get_last_power_metrics(),
                 },
             )
         except Exception as e:
@@ -1243,7 +1244,13 @@ def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
     # 每50步统计一次功耗
     if iteration % 50 == 0 and is_rank_0():
         try:
-            interval_metrics = log_interval_energy(iteration, interval_steps=50)
+            interval_metrics = log_interval_energy(
+                iteration,
+                interval_steps=50,
+                consumed_train_samples=args.consumed_train_samples,
+                consumed_train_tokens=args.consumed_train_tokens,
+                reset=True,
+            )
             record_experiment_interval(
                 iteration,
                 interval_metrics=interval_metrics,
@@ -1276,6 +1283,7 @@ def save_checkpoint_and_time(iteration, model, optimizer, opt_param_scheduler):
                 extra={
                     'power_checkpoint_saved': power_checkpoint is not None,
                     'frequency_scaling': build_frequency_scaling_snapshot(get_freq_manager()),
+                    'power_metrics': get_last_power_metrics(),
                 },
             )
         except Exception as e:
@@ -1500,6 +1508,23 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
             print_datetime(f"Detected kill switch at {args.kill_switch_file}, "
                            f"iteration={iteration}. Exiting")
             sys.exit()
+
+    if is_rank_0() and iteration > 0 and iteration % 50 != 0:
+        try:
+            interval_metrics = log_interval_energy(
+                iteration,
+                interval_steps=iteration % 50,
+                consumed_train_samples=args.consumed_train_samples,
+                consumed_train_tokens=args.consumed_train_tokens,
+                reset=False,
+            )
+            record_experiment_interval(
+                iteration,
+                interval_metrics=interval_metrics,
+                freq_metrics=build_frequency_scaling_snapshot(get_freq_manager()),
+            )
+        except Exception as e:
+            print_rank_0(f'Warning: Failed to record final power interval: {e}')
 
     return iteration
 
