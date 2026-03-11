@@ -26,6 +26,120 @@ except ImportError:
     print("[GPUFreqManager] Warning: pynvml not available")
 
 
+def get_visible_gpu_indices_from_env() -> Optional[List[int]]:
+    cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if cuda_visible_devices is None or cuda_visible_devices.strip() == "":
+        return None
+
+    gpu_indices: List[int] = []
+    for item in cuda_visible_devices.split(","):
+        token = item.strip()
+        if token == "":
+            continue
+        if not token.isdigit():
+            return None
+        gpu_indices.append(int(token))
+    return gpu_indices if gpu_indices else None
+
+
+def _decode_nvml_name(value):
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def _try_nvml_call(fn, default=None):
+    try:
+        return fn()
+    except Exception:
+        return default
+
+
+def collect_nvml_device_snapshot(gpu_indices: List[int] = None) -> Dict:
+    """Collect a lightweight NVML snapshot for experiment metadata."""
+    if not NVML_AVAILABLE:
+        return {"available": False, "reason": "pynvml unavailable"}
+
+    if gpu_indices is None:
+        gpu_indices = get_visible_gpu_indices_from_env()
+
+    snapshot = {
+        "available": True,
+        "gpu_count": 0,
+        "gpu_indices": [],
+        "gpus": [],
+    }
+
+    try:
+        pynvml.nvmlInit()
+        device_count = pynvml.nvmlDeviceGetCount()
+        snapshot["gpu_count"] = device_count
+
+        if gpu_indices is None:
+            gpu_indices = list(range(device_count))
+
+        for idx in gpu_indices:
+            if idx >= device_count:
+                continue
+
+            handle = pynvml.nvmlDeviceGetHandleByIndex(idx)
+            power_limit_mw = _try_nvml_call(
+                lambda: pynvml.nvmlDeviceGetPowerManagementLimit(handle),
+                None,
+            )
+            default_power_limit_mw = _try_nvml_call(
+                lambda: pynvml.nvmlDeviceGetPowerManagementDefaultLimit(handle),
+                None,
+            )
+            current_graphics_clock = _try_nvml_call(
+                lambda: pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_GRAPHICS),
+                None,
+            )
+            current_memory_clock = _try_nvml_call(
+                lambda: pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_MEM),
+                None,
+            )
+            temperature = _try_nvml_call(
+                lambda: pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU),
+                None,
+            )
+            mem_clocks = _try_nvml_call(
+                lambda: pynvml.nvmlDeviceGetSupportedMemoryClocks(handle),
+                [],
+            )
+            supported_graphics_clocks = []
+            if mem_clocks:
+                supported_graphics_clocks = _try_nvml_call(
+                    lambda: pynvml.nvmlDeviceGetSupportedGraphicsClocks(handle, mem_clocks[0]),
+                    [],
+                )
+
+            gpu_info = {
+                "index": idx,
+                "name": _decode_nvml_name(_try_nvml_call(lambda: pynvml.nvmlDeviceGetName(handle), "unknown")),
+                "uuid": _decode_nvml_name(_try_nvml_call(lambda: pynvml.nvmlDeviceGetUUID(handle), None)),
+                "temperature_c": temperature,
+                "performance_state": _try_nvml_call(lambda: pynvml.nvmlDeviceGetPerformanceState(handle), None),
+                "power_limit_w": round(power_limit_mw / 1000.0, 3) if power_limit_mw is not None else None,
+                "default_power_limit_w": round(default_power_limit_mw / 1000.0, 3) if default_power_limit_mw is not None else None,
+                "current_graphics_clock_mhz": current_graphics_clock,
+                "current_memory_clock_mhz": current_memory_clock,
+                "supported_memory_clocks_mhz": mem_clocks,
+                "supported_graphics_clocks_mhz": supported_graphics_clocks,
+            }
+            snapshot["gpu_indices"].append(idx)
+            snapshot["gpus"].append(gpu_info)
+    except Exception as exc:
+        snapshot = {"available": False, "reason": str(exc)}
+    finally:
+        try:
+            pynvml.nvmlShutdown()
+        except Exception:
+            pass
+
+    return snapshot
+
+
 class GPUFreqManager:
     """GPU 频率管理器，用于在通信期间降低 GPU 频率"""
     
@@ -95,6 +209,8 @@ class GPUFreqManager:
         pynvml.nvmlInit()
         
         device_count = pynvml.nvmlDeviceGetCount()
+        if gpu_indices is None:
+            gpu_indices = get_visible_gpu_indices_from_env()
         if gpu_indices is None:
             gpu_indices = list(range(device_count))
         

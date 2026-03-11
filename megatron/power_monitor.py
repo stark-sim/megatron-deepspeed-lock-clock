@@ -365,9 +365,27 @@ def stop_power_monitoring():
 
 def save_power_checkpoint(checkpoint_dir: str, iteration: int):
     """保存功耗checkpoint"""
-    global _power_monitor
+    global _power_monitor, _last_power_metrics
     if _power_monitor is not None:
-        return _power_monitor.save_checkpoint(checkpoint_dir, iteration)
+        data = _power_monitor.save_checkpoint(checkpoint_dir, iteration)
+        if data is not None and _last_power_metrics:
+            data['power_metrics'] = _last_power_metrics
+            power_file = os.path.join(checkpoint_dir, f"power_stats_step{iteration}.json")
+            with open(power_file, 'w') as f:
+                json.dump(data, f, indent=2)
+        return data
+    if _last_power_metrics:
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        power_file = os.path.join(checkpoint_dir, f"power_stats_step{iteration}.json")
+        data = {
+            'iteration': iteration,
+            'timestamp': datetime.now().isoformat(),
+            'power_metrics': _last_power_metrics,
+        }
+        with open(power_file, 'w') as f:
+            json.dump(data, f, indent=2)
+        print(f"[PowerMonitor] Saved Zeus power stats to {power_file}")
+        return data
     return None
 
 
@@ -387,75 +405,159 @@ def get_interval_energy(reset: bool = True) -> Dict:
     return {}
 
 
-def log_interval_energy(iteration: int, interval_steps: int = 50):
+def log_interval_energy(iteration: int,
+                        interval_steps: int = 50,
+                        consumed_train_samples: Optional[int] = None,
+                        consumed_train_tokens: Optional[int] = None,
+                        reset: bool = True):
     """
-    记录并打印区间能耗（每N步调用一次）
-    
-    Args:
-        iteration: 当前迭代次数
-        interval_steps: 统计区间步数
+    记录并打印区间能耗（每N步调用一次，或训练结束时收口）
     """
-    global _power_monitor, _zeus_monitor
-    
+    global _power_monitor, _zeus_monitor, _last_power_metrics
+
     results = {}
-    
-    # 我们的监控
+
     if _power_monitor is not None:
-        stats = _power_monitor.get_interval_energy(reset=True)
+        stats = _power_monitor.get_interval_energy(reset=reset)
         if stats:
             print(f"[PowerMonitor] Steps {iteration-interval_steps+1}-{iteration}: "
                   f"Energy={stats['interval_energy_wh']:.2f} Wh, "
                   f"Avg Power={stats['interval_avg_power_w']:.1f} W, "
                   f"Total Energy={stats['total_energy_kwh']:.4f} kWh")
             results['custom'] = stats
-    
-    # Zeus 监控
+
     if _zeus_monitor is not None:
         try:
-            zeus_measurement = _zeus_monitor.end_window(f"interval_{iteration}")
-            zeus_energy_j = zeus_measurement.total_energy  # Joules
-            zeus_energy_wh = zeus_energy_j / 3600.0  # 转换为 Wh
-            zeus_time_s = zeus_measurement.time
-            zeus_avg_power_w = zeus_energy_j / zeus_time_s if zeus_time_s > 0 else 0
-            
-            print(f"[Zeus] Steps {iteration-interval_steps+1}-{iteration}: "
-                  f"Energy={zeus_energy_wh:.2f} Wh ({zeus_energy_j:.1f} J), "
-                  f"Avg Power={zeus_avg_power_w:.1f} W, "
-                  f"Time={zeus_time_s:.1f} s")
-            
-            results['zeus'] = {
-                'energy_j': zeus_energy_j,
-                'energy_wh': zeus_energy_wh,
-                'time_s': zeus_time_s,
-                'avg_power_w': zeus_avg_power_w,
-            }
-            
-            # 开始下一个区间
-            _zeus_monitor.begin_window(f"interval_{iteration + interval_steps}")
+            zeus_summary = _capture_zeus_window(
+                iteration,
+                consumed_train_samples=consumed_train_samples,
+                consumed_train_tokens=consumed_train_tokens,
+                reset=reset,
+            )
+            if zeus_summary is not None:
+                print(f"[Zeus] Steps {zeus_summary['step_start']}-{zeus_summary['step_end']}: "
+                      f"Energy={zeus_summary['energy_wh']:.2f} Wh ({zeus_summary['energy_j']:.1f} J), "
+                      f"Avg Power={zeus_summary['avg_power_w']:.1f} W, "
+                      f"Time={zeus_summary['time_s']:.1f} s, "
+                      f"Samples/Wh={zeus_summary.get('interval_samples_per_wh', 0):.3f}, "
+                      f"Tokens/J={zeus_summary.get('interval_tokens_per_j', 0):.3f}")
+                results['zeus'] = zeus_summary
         except Exception as e:
             print(f"[Zeus] Warning: {e}")
-    
-    # 打印对比
+
     if 'custom' in results and 'zeus' in results:
         custom_wh = results['custom']['interval_energy_wh']
         zeus_wh = results['zeus']['energy_wh']
         diff_pct = ((custom_wh - zeus_wh) / zeus_wh * 100) if zeus_wh > 0 else 0
         print(f"[对比] Custom={custom_wh:.2f} Wh, Zeus={zeus_wh:.2f} Wh, 差异={diff_pct:.1f}%")
-    
+
+    _last_power_metrics = results
     return results
 
 
 # Zeus 监控器
 _zeus_monitor = None
+_zeus_window_name: Optional[str] = None
+_zeus_window_start_iteration: int = 1
+_zeus_window_start_samples: int = 0
+_zeus_window_start_tokens: int = 0
+_zeus_total_energy_j: float = 0.0
+_zeus_total_time_s: float = 0.0
+_last_power_metrics: Dict = {}
+
+
+def _safe_rate(numerator: Optional[float], denominator: Optional[float]) -> Optional[float]:
+    if numerator is None or denominator in (None, 0):
+        return None
+    return numerator / denominator
+
+
+def _capture_zeus_window(iteration: int,
+                         consumed_train_samples: Optional[int] = None,
+                         consumed_train_tokens: Optional[int] = None,
+                         reset: bool = True):
+    global _zeus_monitor, _zeus_window_name, _zeus_window_start_iteration
+    global _zeus_window_start_samples, _zeus_window_start_tokens
+    global _zeus_total_energy_j, _zeus_total_time_s
+
+    if _zeus_monitor is None or _zeus_window_name is None:
+        return None
+
+    zeus_measurement = _zeus_monitor.end_window(_zeus_window_name)
+    zeus_energy_j = float(zeus_measurement.total_energy)
+    zeus_energy_wh = zeus_energy_j / 3600.0
+    zeus_time_s = float(zeus_measurement.time)
+    zeus_avg_power_w = zeus_energy_j / zeus_time_s if zeus_time_s > 0 else 0.0
+
+    interval_samples = None if consumed_train_samples is None else consumed_train_samples - _zeus_window_start_samples
+    interval_tokens = None if consumed_train_tokens is None else consumed_train_tokens - _zeus_window_start_tokens
+
+    _zeus_total_energy_j += zeus_energy_j
+    _zeus_total_time_s += zeus_time_s
+    total_energy_wh = _zeus_total_energy_j / 3600.0
+
+    summary = {
+        'window_name': _zeus_window_name,
+        'step_start': _zeus_window_start_iteration,
+        'step_end': iteration,
+        'num_steps': max(0, iteration - _zeus_window_start_iteration + 1),
+        'energy_j': zeus_energy_j,
+        'energy_wh': zeus_energy_wh,
+        'time_s': zeus_time_s,
+        'avg_power_w': zeus_avg_power_w,
+        'interval_samples': interval_samples,
+        'interval_tokens': interval_tokens,
+        'total_energy_j': _zeus_total_energy_j,
+        'total_energy_wh': total_energy_wh,
+        'total_time_s': _zeus_total_time_s,
+        'total_avg_power_w': (_zeus_total_energy_j / _zeus_total_time_s) if _zeus_total_time_s > 0 else 0.0,
+    }
+
+    if interval_samples is not None:
+        summary['interval_samples_per_wh'] = _safe_rate(interval_samples, zeus_energy_wh)
+    if interval_tokens is not None:
+        summary['interval_tokens_per_j'] = _safe_rate(interval_tokens, zeus_energy_j)
+        summary['interval_tokens_per_wh'] = _safe_rate(interval_tokens, zeus_energy_wh)
+    if consumed_train_samples is not None:
+        summary['total_samples'] = consumed_train_samples
+        summary['total_samples_per_wh'] = _safe_rate(consumed_train_samples, total_energy_wh)
+    if consumed_train_tokens is not None:
+        summary['total_tokens'] = consumed_train_tokens
+        summary['total_tokens_per_j'] = _safe_rate(consumed_train_tokens, _zeus_total_energy_j)
+        summary['total_tokens_per_wh'] = _safe_rate(consumed_train_tokens, total_energy_wh)
+
+    if reset:
+        _zeus_window_start_iteration = iteration + 1
+        _zeus_window_start_samples = consumed_train_samples or _zeus_window_start_samples
+        _zeus_window_start_tokens = consumed_train_tokens or _zeus_window_start_tokens
+        _zeus_window_name = f"interval_{_zeus_window_start_iteration}"
+        _zeus_monitor.begin_window(_zeus_window_name)
+    else:
+        _zeus_window_name = None
+
+    return summary
+
+
+def get_last_power_metrics() -> Dict:
+    return _last_power_metrics
 
 
 def start_zeus_monitoring(gpu_indices: List[int] = None):
     """启动 Zeus 功耗监控"""
-    global _zeus_monitor
+    global _zeus_monitor, _zeus_window_name, _zeus_window_start_iteration
+    global _zeus_window_start_samples, _zeus_window_start_tokens
+    global _zeus_total_energy_j, _zeus_total_time_s, _last_power_metrics
     try:
         from zeus.monitor import ZeusMonitor
         _zeus_monitor = ZeusMonitor(gpu_indices=gpu_indices)
-        _zeus_monitor.begin_window("interval_50")  # 开始第一个50步区间
+        _zeus_window_name = 'interval_1'
+        _zeus_window_start_iteration = 1
+        _zeus_window_start_samples = 0
+        _zeus_window_start_tokens = 0
+        _zeus_total_energy_j = 0.0
+        _zeus_total_time_s = 0.0
+        _last_power_metrics = {}
+        _zeus_monitor.begin_window(_zeus_window_name)
         print(f"[Zeus] Started monitoring GPUs: {gpu_indices or 'all'}")
         return _zeus_monitor
     except Exception as e:
@@ -465,14 +567,10 @@ def start_zeus_monitoring(gpu_indices: List[int] = None):
 
 def stop_zeus_monitoring():
     """停止 Zeus 功耗监控"""
-    global _zeus_monitor
+    global _zeus_monitor, _zeus_window_name
     if _zeus_monitor is not None:
-        try:
-            # 尝试结束所有打开的窗口
-            pass
-        except:
-            pass
         _zeus_monitor = None
+        _zeus_window_name = None
         print("[Zeus] Stopped")
 
 
