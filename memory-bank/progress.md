@@ -1,6 +1,11 @@
 # Progress
 
 ## Completed Features
+- [x] Added a two-band continuous-curve correction layer (low-frequency + smooth mid/high-frequency) and calibrated it directly on sampled-point `total_time` / `total_energy`; the latest rerun improves sampled-point MAPE to about `1.20%` for total time and `0.90%` for total energy, with fresh outputs under `.context/real-v100-tp2pp4dp2-rerun-20260315-corrected/`.
+- [x] Re-ran the full `TP=2, PP=4, DP=2` offline prediction with the updated PP-bubble proxy and confirmed the current model still fits observed `total_time` / `total_energy` well on sampled points (`MAPE≈1.73%` / `1.20%`), but its continuous default recommendation remains too low (`1020 MHz`).
+- [x] Refined the PP-bubble topology proxy so bubble exposure increases `PP` communication pressure as microbatches become scarce; focused freq-model tests now pass with `python -m pytest --noconftest -q tests/unit_tests/test_freq_model.py` (`12 passed`).
+- [x] Tightened offline predictor guards: workload consistency now covers `micro_batch_size` plus attention-shape metadata (`num_attention_heads`, `num_key_value_heads`, `swiglu`), and baseline-relative runs now fail fast when `baseline_root` does not match the static sample workload (`11 passed` on focused freq-model tests).
+- [x] Patched workload-consistency validation so mixed `micro_batch_size` runs are rejected before offline prediction, and added a focused regression test for that failure mode (`python -m pytest --noconftest -q tests/unit_tests/test_freq_model.py` now passes with `9 passed`).
 - [x] Full 11-point `TP=2, PP=4, DP=2` Pareto-first accuracy rerun completed; sampled-point prediction error is low (`runtime_ratio_mape≈1.77%`, `energy_ratio_mape≈1.05%`), but the unsampled continuous default still drifts toward `1027 MHz`, so curve-shape/extrapolation remains the main modeling issue.
 - [x] Pareto-first prediction reporting completed: CLI/report output now foregrounds the full frontier and an analytic observed-vs-predicted accuracy table for total-time / total-energy ratios, while keeping the default recommendation as a secondary summary.
 - [x] Updated the frequency recommendation objective to `total_energy` first and `total_time` second, while preserving the previous balanced sweet spot as a secondary comparator in prediction outputs and reports.
@@ -67,3 +72,7 @@
 
 - [2026-03-13] Synced the completed `1245/1252/1260 MHz` `TP=2, PP=4, DP=2` static runs into `.context/real-v100-tp2pp4dp2-static-20260312/` and generated `.context/real-v100-tp2pp4dp2-static-20260312/measured_vs_predicted_v2_pp_bubble_full.tsv` plus `final_analysis_v2_pp_bubble.md`.
 - [x] Waited for remote refinement sweep `power_tp2pp4dp2_static_refine_20260313_1238c` (`1185 / 1192 / 1207 / 1215 MHz`) to finish, synced the artifacts, and compared them against the previous `1200 MHz` best point.
+
+- [2026-03-15] Completed remote 50-step reality check for the corrected `TP=2, PP=4, DP=2` predictor at `1117/1125 MHz` on `sd@v100x16-1`. Absolute error on full-run runtime stayed near `~1.1-1.2%`, power error near `~1.6-2.2%`, and total-energy error near `~2.9-3.3%`; importantly, the model matched the local runtime tradeoff between the two discrete points but still predicted the `1117 -> 1125 MHz` energy change too optimistically.
+
+- [2026-03-15] Finished the full remote `1117/1125/1132 MHz` 50-step validation sequence for the corrected predictor. The three-point real-vs-predicted check shows good absolute fit for `total_time` and decent fit for `total_power`, while `total_energy` remains systematically optimistic by about `2.4-3.3%` in the current recommended band.

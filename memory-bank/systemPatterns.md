@@ -33,6 +33,8 @@
 - The training log remains the fallback truth source for final `[Zeus] Steps 1-20 ...` summaries.
 
 ## Predictive Modeling Pattern
+- [2026-03-15] The prediction layer should now be treated as a continuous `throughput(f)` / `power(f)` curve first, not a single sweet-spot picker. A lightweight two-band residual correction layer can sit on top of the hardware-first prior: one low-frequency band plus one smooth mid/high-frequency band blended by a sigmoid transition, with calibration targeted directly at sampled-point `total_time` and `total_energy` rather than only throughput/power magnitudes.
+- [2026-03-15] Refined the `PP` topology proxy so pipeline bubble exposure now inflates the `PP` share of communication pressure: keep the classic throughput-side bubble efficiency term `m / (m + PP - 1)`, but also scale the `PP` communication component by `1 + bubble_fraction`, where `bubble_fraction = (PP - 1) / (m + PP - 1)`. This keeps `PP=1` unchanged while making deeper pipelines and scarcer microbatches more strongly penalize low-frequency throughput.
 - 拓扑变更验证前，先检查模型结构约束是否允许目标 TP：对于当前 Qwen2.5-7B 配置，`num_attention_heads=28` / `num_key_value_heads=4` 使得 `TP=8` 在当前 Megatron 实现下不可行。
 - 如果首选拓扑因模型形状约束不可运行，应优先选择“同样改变 DP、且当前 analytic proxy 能区分”的最近可行拓扑；当前 16×V100/Qwen2.5-7B 的首选 fallback 是 `TP=2, PP=4, DP=2`。
 - 在 `DGX2-1` 这类带 `NvLink` 的单机拓扑上，pipeline/TP 通信惩罚不应默认按弱互联假设解释；如果 transfer 预测明显偏向过低频点，要优先检查是否把通信成本估高了。

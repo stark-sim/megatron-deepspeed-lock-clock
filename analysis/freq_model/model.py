@@ -18,6 +18,14 @@ class CalibrationParams:
     dynamic_power_w: float
     dynamic_power_exponent: float
     throughput_saturation_ratio: float = 1.0
+    correction_split_ratio: float = 0.72
+    correction_transition_width: float = 0.06
+    throughput_low_freq_correction: float = 0.0
+    throughput_high_freq_correction: float = 0.0
+    power_low_freq_correction: float = 0.0
+    power_high_freq_correction: float = 0.0
+    correction_topology_weight: float = 1.0
+    correction_communication_weight: float = 0.5
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -49,6 +57,14 @@ def _harmonic_blend(limits: Iterable[float], weights: Iterable[float]) -> float:
     for limit, weight in zip(limits, weights):
         denominator += weight / max(limit, 1e-9)
     return 1.0 / max(denominator, 1e-9)
+
+
+def _sigmoid(value: float) -> float:
+    if value >= 0:
+        z = math.exp(-value)
+        return 1.0 / (1.0 + z)
+    z = math.exp(value)
+    return z / (1.0 + z)
 
 
 def infer_initial_anchors(
@@ -88,6 +104,49 @@ def _compute_frequency_ratio(frequency_ratio: float, params: CalibrationParams) 
     return _clamp(frequency_ratio / saturation_ratio, 0.05, 1.0)
 
 
+def _correction_intensity(features: DerivedModelFeatures, params: CalibrationParams) -> float:
+    bubble_exposure = max(1.0 - features.pipeline_parallel_efficiency, 0.0)
+    return 1.0 + (params.correction_topology_weight * bubble_exposure) + (
+        params.correction_communication_weight * features.communication_share
+    )
+
+
+def _correction_positions(frequency_ratio: float, params: CalibrationParams) -> tuple[float, float, float, float]:
+    split_ratio = _clamp(params.correction_split_ratio, 0.55, 0.90)
+    transition_width = _clamp(params.correction_transition_width, 0.01, 0.20)
+    low_position = _clamp((split_ratio - frequency_ratio) / max(split_ratio, 1e-9), 0.0, 1.0)
+    high_position = _clamp((frequency_ratio - split_ratio) / max(1.0 - split_ratio, 1e-9), 0.0, 1.0)
+    gate_high = _sigmoid((frequency_ratio - split_ratio) / transition_width)
+    gate_low = 1.0 - gate_high
+    return low_position, high_position, gate_low, gate_high
+
+
+def _throughput_correction_factor(
+    frequency_ratio: float,
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    low_position, high_position, gate_low, gate_high = _correction_positions(frequency_ratio, params)
+    intensity = _correction_intensity(features, params)
+    low_factor = 1.0 + (intensity * params.throughput_low_freq_correction * low_position)
+    high_factor = 1.0 + (intensity * params.throughput_high_freq_correction * (high_position ** 2))
+    factor = (gate_low * low_factor) + (gate_high * high_factor)
+    return _clamp(factor, 0.75, 1.25)
+
+
+def _power_correction_factor(
+    frequency_ratio: float,
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    low_position, high_position, gate_low, gate_high = _correction_positions(frequency_ratio, params)
+    intensity = _correction_intensity(features, params)
+    low_factor = 1.0 + (intensity * params.power_low_freq_correction * low_position)
+    high_factor = 1.0 + (intensity * params.power_high_freq_correction * (high_position ** 2))
+    factor = (gate_low * low_factor) + (gate_high * high_factor)
+    return _clamp(factor, 0.85, 1.20)
+
+
 def predict_throughput_tokens_per_s(
     frequency_mhz: float,
     hardware: HardwareFeatures,
@@ -106,7 +165,9 @@ def predict_throughput_tokens_per_s(
         [compute_limit, memory_limit, communication_limit],
         [features.compute_weight, features.memory_weight, features.communication_weight],
     )
-    return throughput * max(features.pipeline_parallel_efficiency, 1e-9)
+    throughput *= max(features.pipeline_parallel_efficiency, 1e-9)
+    throughput *= _throughput_correction_factor(frequency_ratio, features, params)
+    return throughput
 
 
 def predict_power_w(
@@ -122,7 +183,9 @@ def predict_power_w(
     throughput = predict_throughput_tokens_per_s(frequency_mhz, hardware, features, params)
     utilization = _clamp(throughput / compute_limit, 0.05, 1.2)
     dynamic = params.dynamic_power_w * utilization * (frequency_ratio ** params.dynamic_power_exponent)
-    return params.static_power_w + dynamic
+    power_w = params.static_power_w + dynamic
+    power_w *= _power_correction_factor(frequency_ratio, features, params)
+    return power_w
 
 
 def predict_point(

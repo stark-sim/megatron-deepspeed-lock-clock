@@ -69,12 +69,20 @@ def derive_model_features(hardware: HardwareFeatures, workload: WorkloadFeatures
         float(workload.global_batch_size) / max(float(workload.micro_batch_size * workload.data_parallel_size), 1.0),
         1.0,
     )
+    pipeline_bubble_fraction = 0.0
+    if workload.pipeline_model_parallel_size > 1:
+        pipeline_bubble_fraction = max(
+            float(max(workload.pipeline_model_parallel_size - 1, 0))
+            / max(microbatches_per_step + max(workload.pipeline_model_parallel_size - 1, 0), 1.0),
+            0.0,
+        )
+    pp_communication_multiplier = 1.0 + pipeline_bubble_fraction
     communication_bytes = (
         tokens_per_step
         * workload.hidden_size
         * workload.num_layers
         * bytes_per_element
-        * ((2.0 * tp_penalty) + dp_penalty + (1.0 * pp_penalty))
+        * ((2.0 * tp_penalty) + dp_penalty + (pp_penalty * pp_communication_multiplier))
     )
 
     approx_memory_bytes_per_step = activation_bytes + (2.0 * parameter_bytes) + communication_bytes
