@@ -55,13 +55,17 @@ def _workload_signature(sample: LoadedRunSample) -> tuple:
         workload.num_layers,
         workload.hidden_size,
         workload.ffn_hidden_size,
+        workload.num_attention_heads,
+        workload.num_key_value_heads,
         workload.seq_length,
+        workload.micro_batch_size,
         workload.global_batch_size,
         workload.tensor_model_parallel_size,
         workload.pipeline_model_parallel_size,
         workload.data_parallel_size,
         workload.zero_stage,
         workload.precision_mode,
+        workload.swiglu,
     )
 
 
@@ -69,6 +73,15 @@ def _validate_workload_consistency(samples: List[LoadedRunSample]) -> None:
     signatures = {_workload_signature(sample) for sample in samples}
     if len(signatures) > 1:
         raise SystemExit("prediction currently expects equivalent workloads across selected runs")
+
+
+def _validate_baseline_compatibility(samples: List[LoadedRunSample], baseline_sample: LoadedRunSample | None) -> None:
+    if baseline_sample is None or not samples:
+        return
+    reference_signature = _workload_signature(samples[0])
+    baseline_signature = _workload_signature(baseline_sample)
+    if baseline_signature != reference_signature:
+        raise SystemExit("baseline workload must match selected experiment samples")
 
 
 def _default_output_dir(experiment_root: Path) -> Path:
@@ -282,6 +295,8 @@ def _write_report(output_path: Path, payload: dict) -> None:
         f"- power_mape: `{payload['calibration']['power_mape']:.4f}`",
         f"- runtime_ratio_mape: `{payload['calibration']['runtime_ratio_mape']:.4f}`",
         f"- energy_ratio_mape: `{payload['calibration']['energy_ratio_mape']:.4f}`",
+        f"- total_time_mape: `{payload['calibration']['total_time_mape']:.4f}`",
+        f"- total_energy_mape: `{payload['calibration']['total_energy_mape']:.4f}`",
         f"- objective: `{payload['calibration']['objective']:.4f}`",
     ])
     if balanced_sweet_spot is not None:
@@ -314,6 +329,7 @@ def main() -> None:
     derived_features = [derive_model_features(hardware, sample.workload) for sample in collection.samples]
     comparison_steps = _resolve_comparison_steps(first_sample, args.comparison_steps)
     baseline_sample = _load_baseline_sample(args.baseline_root, args.baseline_run_id)
+    _validate_baseline_compatibility(collection.samples, baseline_sample)
     calibration = calibrate_frequency_model(collection.samples, hardware, derived_features, baseline_sample=baseline_sample)
     analytic_prediction = build_prediction_bundle(
         hardware=hardware,
@@ -363,6 +379,8 @@ def main() -> None:
             "power_mape": calibration.power_mape,
             "runtime_ratio_mape": calibration.runtime_ratio_mape,
             "energy_ratio_mape": calibration.energy_ratio_mape,
+            "total_time_mape": calibration.total_time_mape,
+            "total_energy_mape": calibration.total_energy_mape,
             "objective": calibration.objective,
         },
         "prediction_accuracy": prediction_accuracy,

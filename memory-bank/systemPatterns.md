@@ -26,6 +26,7 @@
 - Keep model, tokenizer, data path, TP/PP/DP, ZeRO stage, and train steps constant across variants.
 - V100 short-run sweep baseline uses `TP=4`, `PP=1`, effective `DP=4`, `ZeRO-1`, `TRAIN_STEPS=20`.
 - Use log-derived steady-state iteration time plus Zeus metrics for direct comparison.
+- [2026-03-15] Clock cleanup for experiment runs should be layered: keep the in-process NVML reset in `megatron/gpu_freq_manager.py`, but also add a launcher-level `EXIT` trap in `scripts/run_experiment.sh` for any mode that may touch clocks (`static`, `dynamic`, `dryrun`) so node-local GPUs are unlocked even if the training process exits without reaching the normal Python shutdown path. Keep this path quiet on success and warn only on reset failures unless actively debugging clock cleanup.
 
 ## Artifact Pattern
 - `run.json` is the canonical run summary when finalize succeeds.
@@ -33,6 +34,12 @@
 - The training log remains the fallback truth source for final `[Zeus] Steps 1-20 ...` summaries.
 
 ## Predictive Modeling Pattern
+- [2026-03-16] For cross-topology transfer, keep the source topology's learned low/high curve shape, but do not inherit low-frequency correction amplitude blindly. Rescale low-frequency throughput correction on the target by its `pipeline_exposed_fraction` relative to the source topology: when pipeline-exposed waiting shrinks, low frequency should hurt throughput more, not less. Low-frequency power correction can be reduced more gently than throughput correction.
+- [2026-03-16] The topology-correction logic is now explicitly split into three interpretable channels in code: `pipeline_exposed_fraction` for exposed PP waiting/activation cost, `dp_overlapable_fraction` for mostly overlap-friendly DP/ZeRO cost, and `tp_sync_fraction` for TP synchronization pressure. Preserve these as long-lived concepts even if later coefficient tuning changes.
+- [2026-03-16] Low-frequency correction should be treated as a gate on exposed waiting, not a generic topology multiplier: PP-heavy topologies should receive stronger low-frequency correction pressure, while `PP=1` topologies should retain only a much weaker residual term from TP/DP.
+- [2026-03-16] Communication frequency sensitivity should use an exposed-communication proxy rather than raw `communication_share`, so aggregate communication volume and critical-path exposure stay separable in future model revisions.
+- [2026-03-15] The prediction layer should now be treated as a continuous `throughput(f)` / `power(f)` curve first, not a single sweet-spot picker. A lightweight two-band residual correction layer can sit on top of the hardware-first prior: one low-frequency band plus one smooth mid/high-frequency band blended by a sigmoid transition, with calibration targeted directly at sampled-point `total_time` and `total_energy` rather than only throughput/power magnitudes.
+- [2026-03-15] Refined the `PP` topology proxy so pipeline bubble exposure now inflates the `PP` share of communication pressure: keep the classic throughput-side bubble efficiency term `m / (m + PP - 1)`, but also scale the `PP` communication component by `1 + bubble_fraction`, where `bubble_fraction = (PP - 1) / (m + PP - 1)`. This keeps `PP=1` unchanged while making deeper pipelines and scarcer microbatches more strongly penalize low-frequency throughput.
 - 拓扑变更验证前，先检查模型结构约束是否允许目标 TP：对于当前 Qwen2.5-7B 配置，`num_attention_heads=28` / `num_key_value_heads=4` 使得 `TP=8` 在当前 Megatron 实现下不可行。
 - 如果首选拓扑因模型形状约束不可运行，应优先选择“同样改变 DP、且当前 analytic proxy 能区分”的最近可行拓扑；当前 16×V100/Qwen2.5-7B 的首选 fallback 是 `TP=2, PP=4, DP=2`。
 - 在 `DGX2-1` 这类带 `NvLink` 的单机拓扑上，pipeline/TP 通信惩罚不应默认按弱互联假设解释；如果 transfer 预测明显偏向过低频点，要优先检查是否把通信成本估高了。
@@ -40,6 +47,12 @@
 - 在当前 analytic proxy 中，`PP` 通信项不应被显著低估；更稳妥的做法是把 `PP` 与 `TP` 视为同数量级的通信压力来源，再额外乘上一个基于 `microbatches_per_step / (microbatches_per_step + PP - 1)` 的 pipeline bubble efficiency 去表达深层 `PP` 的吞吐折减。
 - 当连续模型给出的 balanced sweet spot 落在不可锁定的中间频点（例如 `~1250 MHz`）时，应把它解释为理论甜点，并再映射到最近的可锁定离散频点做实验验证，而不是强行把模型偏置到已有样本点。
 - 模型下一阶段验证应优先通过拓扑变化（例如 `TP=8, DP=2`）来测试泛化，而不是只在同一拓扑上继续微调到更贴合现有样本。
+- 在进入下一轮泛化验证时，应优先选择“结构可行且当前 analytic proxy 能区分”的 16-GPU 拓扑；对于已知会在 proxy 中退化成旧特征的分解（例如 `TP=4, PP=2, DP=2`），暂时不值得优先投入真实机测试。
+- [2026-03-15] 当前下一站泛化验证已具体落到 `TP=2, PP=2, DP=4`：它保持 16×V100 单机、结构可行，并且比 `TP=2, PP=4, DP=2` 明显减轻 pipeline bubble，适合检验当前 correction layer 是否会把 sweet spot 再次拉向过低频。
+- [2026-03-15] `TP=2, PP=2, DP=4` 结果说明：当前 correction layer 在“较浅 PP”拓扑上的 sweet-spot ranking 泛化明显更稳，能把 minimum-energy 点定位到正确的 `1080 MHz` 邻域；剩余误差主要是绝对 runtime/energy 规模仍偏保守，而不是频点排序方向错误。
+- [2026-03-15] 再下一站优先用 `TP=2, PP=1, DP=8`：它把 `PP` 从 2 降到 1，能进一步检验当前模型在“无 pipeline bubble、较高 DP”条件下是否还会保持正确的 sweet-spot 排序。
+- [2026-03-15] `TP=2, PP=1, DP=8` 结果表明：当前 correction layer 在 `PP=1` 的 no-bubble 拓扑上会再次把 sweet spot 拉得过低；虽然 baseline-relative 总能耗比值拟合仍很紧，但绝对 runtime / power 尺度偏保守，导致频点排序被错误地推向低频。
+- [2026-03-15] 长期设计概念应升级为“拓扑开销三分法”：把 distributed-training 开销拆成 `pipeline_exposed_cost`、`dp_overlapable_cost`、`tp_sync_cost`，并明确区分“通信体量”与“关键路径暴露度”。低频 correction 主要由 `pipeline_exposed_cost` 驱动，而不是由总 distributed complexity 驱动。详见 `docs/plans/2026-03-15-topology-explanatory-adjustment-design.md`。
 - Baseline-relative prediction should be the default review mode: estimate each static frequency as `runtime_ratio_vs_baseline` and `energy_ratio_vs_baseline`, then construct the Pareto skyline in that 2D ratio plane.
 - The hardware-first throughput prior now includes a calibrated throughput-saturation ratio: below the saturation knee, throughput scales analytically with effective clock; above it, extra clock mostly increases power while throughput plateaus.
 - Calibration candidate generation should be centered on observed throughput scale (effective utilization of hardware anchors), not on raw theoretical token/s anchors, so theory shapes the curve but samples still set the achievable magnitude.

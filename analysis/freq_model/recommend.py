@@ -209,6 +209,36 @@ def _nearest_frequency_index(supported_frequencies: List[int], target_frequency:
     return min(range(len(supported_frequencies)), key=lambda index: abs(supported_frequencies[index] - target_frequency))
 
 
+
+
+def _recommended_supported_frequencies(
+    supported_frequencies: List[int],
+    supported_frontier: List[Dict[str, Any]],
+    sweet_spot_supported: Dict[str, Any],
+    neighborhood: int,
+) -> List[int]:
+    target_frequency = int(sweet_spot_supported["frequency_mhz"])
+    desired_width = max(1, (2 * max(neighborhood, 0)) + 1)
+    frontier_frequencies = sorted(
+        {int(point["frequency_mhz"]) for point in supported_frontier},
+        key=lambda freq: (abs(freq - target_frequency), freq),
+    )
+    selected = frontier_frequencies[:desired_width]
+    if len(selected) < desired_width:
+        nearest_index = _nearest_frequency_index(supported_frequencies, target_frequency)
+        radius = 0
+        while len(selected) < desired_width and radius < len(supported_frequencies):
+            for index in [nearest_index - radius, nearest_index + radius]:
+                if 0 <= index < len(supported_frequencies):
+                    freq = supported_frequencies[index]
+                    if freq not in selected:
+                        selected.append(freq)
+                        if len(selected) >= desired_width:
+                            break
+            radius += 1
+    return sorted(selected)
+
+
 def build_prediction_bundle(
     hardware: HardwareFeatures,
     features: DerivedModelFeatures,
@@ -249,14 +279,12 @@ def build_prediction_bundle(
     balanced_sweet_spot_continuous = min(continuous_frontier, key=lambda point: _balanced_sweet_spot_score(point, baseline_reference))
     balanced_sweet_spot_supported = min(supported_frontier, key=lambda point: _balanced_sweet_spot_score(point, baseline_reference))
 
-    best_index = _nearest_frequency_index(supported_frequencies, int(sweet_spot_supported["frequency_mhz"]))
-    desired_width = max(1, (2 * max(neighborhood, 0)) + 1)
-    lower = max(0, best_index - max(neighborhood, 0))
-    upper = min(len(supported_frequencies), best_index + max(neighborhood, 0) + 1)
-    while (upper - lower) < desired_width and lower > 0:
-        lower -= 1
-    while (upper - lower) < desired_width and upper < len(supported_frequencies):
-        upper += 1
+    recommended_frequencies = _recommended_supported_frequencies(
+        supported_frequencies=supported_frequencies,
+        supported_frontier=supported_frontier,
+        sweet_spot_supported=sweet_spot_supported,
+        neighborhood=neighborhood,
+    )
 
     top_supported_predictions = sorted(
         annotated_supported,
@@ -291,7 +319,7 @@ def build_prediction_bundle(
         "supported_balanced_sweet_spot": balanced_sweet_spot_supported,
         "pareto_frontier_frequencies_mhz": [point["frequency_mhz"] for point in supported_frontier],
         "pareto_frontier_predictions": supported_frontier,
-        "recommended_frequencies_mhz": supported_frequencies[lower:upper],
+        "recommended_frequencies_mhz": recommended_frequencies,
         "supported_predictions": annotated_supported,
         "top_supported_predictions": top_supported_predictions[:5],
     }

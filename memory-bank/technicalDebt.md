@@ -7,6 +7,7 @@
 | Distributed teardown emits noisy TCPStore/NCCL warnings after successful completion | Low | Medium | Makes logs noisier and can obscure true failures | 2026-03-11 |
 | Remote launcher changes must be synced manually from local workspace | Medium | Low | Easy to forget and causes validation drift | 2026-03-11 |
 | Experiment comparison still relies on ad-hoc parsing commands | Medium | Medium | Slower analysis across many sweep points | 2026-03-11 |
+| Offline freq model still ignores `num_attention_heads` / `num_key_value_heads` / `swiglu` in analytic feature formulas | Medium | Medium | Guardrails now reject mixed workloads, but true cross-shape transfer still lacks explicit modeling | 2026-03-15 |
 
 ## Refactoring Priorities
 1. Add a small comparison/report script for multiple `run_id`s.

@@ -12,6 +12,7 @@ from analysis.freq_model.hardware import HardwareFeatures, build_hardware_featur
 from analysis.freq_model.model import CalibrationParams, predict_throughput_tokens_per_s
 from analysis.freq_model.recommend import build_prediction_bundle
 from analysis.freq_model.workload import LoadedRunSample, ObservedMetrics, WorkloadFeatures, load_experiment_samples
+from scripts.predict_freq_sweet_spot import _validate_baseline_compatibility, _validate_workload_consistency
 
 
 SUPPORTED_CLOCKS = [1000, 1200, 1400]
@@ -157,6 +158,9 @@ def test_prediction_bundle_reports_baseline_relative_tradeoff(tmp_path: Path):
         arithmetic_intensity_flops_per_byte=1.0,
         communication_share=0.0,
         pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.0,
+        dp_overlapable_fraction=0.0,
+        tp_sync_fraction=0.0,
         hardware_balance_flops_per_byte=1.0,
         compute_weight=1.0,
         memory_weight=0.0,
@@ -283,6 +287,8 @@ def test_load_calibrate_and_overlay_modes(tmp_path: Path):
     assert calibration.power_mape >= 0.0
     assert calibration.runtime_ratio_mape >= 0.0
     assert calibration.energy_ratio_mape >= 0.0
+    assert calibration.total_time_mape >= 0.0
+    assert calibration.total_energy_mape >= 0.0
     assert calibration.objective >= 0.0
 
     assert analytic_bundle["baseline_reference"]["run_id"] == "baseline_001"
@@ -357,6 +363,8 @@ def test_cli_writes_baseline_relative_outputs(tmp_path: Path):
     assert payload["prediction"]["pareto_frontier_frequencies_mhz"] == [1400, 1200, 1000]
     assert "runtime_ratio_mape" in payload["calibration"]
     assert "energy_ratio_mape" in payload["calibration"]
+    assert "total_time_mape" in payload["calibration"]
+    assert "total_energy_mape" in payload["calibration"]
     assert "efficiency_mape" not in payload["calibration"]
     assert "guardrail_penalty" not in payload["calibration"]
     assert payload["prediction_accuracy"]["source"] == "analytic_supported_predictions_without_overlay"
@@ -371,7 +379,7 @@ def test_cli_writes_baseline_relative_outputs(tmp_path: Path):
     assert payload["hardware"]["gpu_name"] == "Tesla V100-SXM3-32GB"
 
 
-def test_pipeline_parallel_proxy_matches_tp4_dp4_reference_scale():
+def test_pipeline_parallel_proxy_inflates_communication_pressure_for_deeper_pp():
     hardware = HardwareFeatures(
         gpu_name="synthetic",
         gpu_count=16,
@@ -422,8 +430,64 @@ def test_pipeline_parallel_proxy_matches_tp4_dp4_reference_scale():
     ref_features = derive_model_features(hardware, tp4_dp4)
     transfer_features = derive_model_features(hardware, tp2_pp4_dp2)
 
-    assert ref_features.approx_communication_bytes_per_step == transfer_features.approx_communication_bytes_per_step
-    assert ref_features.communication_share == transfer_features.communication_share
+    assert transfer_features.approx_communication_bytes_per_step > ref_features.approx_communication_bytes_per_step
+    assert transfer_features.communication_share > ref_features.communication_share
+
+
+def test_pipeline_bubble_fraction_raises_pp_communication_when_microbatches_are_scarce():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+
+    more_microbatches = WorkloadFeatures(
+        num_layers=28,
+        hidden_size=3584,
+        ffn_hidden_size=18944,
+        num_attention_heads=28,
+        num_key_value_heads=4,
+        seq_length=2048,
+        micro_batch_size=1,
+        global_batch_size=16,
+        train_iters=20,
+        tensor_model_parallel_size=2,
+        pipeline_model_parallel_size=4,
+        data_parallel_size=2,
+        zero_stage=1,
+        precision_mode="bf16",
+        swiglu=True,
+    )
+    fewer_microbatches = WorkloadFeatures(
+        num_layers=28,
+        hidden_size=3584,
+        ffn_hidden_size=18944,
+        num_attention_heads=28,
+        num_key_value_heads=4,
+        seq_length=2048,
+        micro_batch_size=2,
+        global_batch_size=16,
+        train_iters=20,
+        tensor_model_parallel_size=2,
+        pipeline_model_parallel_size=4,
+        data_parallel_size=2,
+        zero_stage=1,
+        precision_mode="bf16",
+        swiglu=True,
+    )
+
+    more_features = derive_model_features(hardware, more_microbatches)
+    fewer_features = derive_model_features(hardware, fewer_microbatches)
+
+    assert fewer_features.pipeline_parallel_efficiency < more_features.pipeline_parallel_efficiency
+    assert fewer_features.approx_communication_bytes_per_step > more_features.approx_communication_bytes_per_step
+    assert fewer_features.communication_share > more_features.communication_share
 
 
 def test_pipeline_parallel_efficiency_penalizes_deeper_pp():
@@ -479,6 +543,113 @@ def test_pipeline_parallel_efficiency_penalizes_deeper_pp():
 
     assert pp1_features.pipeline_parallel_efficiency == 1.0
     assert pp4_features.pipeline_parallel_efficiency < 1.0
+    assert pp1_features.pipeline_exposed_fraction == 0.0
+    assert pp4_features.pipeline_exposed_fraction > pp1_features.pipeline_exposed_fraction
+
+
+def test_validate_workload_consistency_rejects_mixed_micro_batch_sizes(tmp_path: Path):
+    experiment_root = tmp_path / "microbatch_mismatch"
+    _write_run(experiment_root, "run_1000", frequency_mhz=1000, throughput_tokens_per_s=1000.0, avg_power_w=171.0)
+    _write_run(experiment_root, "run_1200", frequency_mhz=1200, throughput_tokens_per_s=1200.0, avg_power_w=209.0)
+
+    run_1200_path = experiment_root / "run_1200" / "run.json"
+    payload = json.loads(run_1200_path.read_text(encoding="utf-8"))
+    payload["config"]["training"]["micro_batch_size"] = 2
+    run_1200_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    collection = load_experiment_samples(str(experiment_root), include_baseline=False)
+
+    with pytest.raises(SystemExit, match="equivalent workloads"):
+        _validate_workload_consistency(collection.samples)
+
+
+def test_validate_workload_consistency_rejects_mixed_attention_shape_metadata(tmp_path: Path):
+    experiment_root = tmp_path / "attention_shape_mismatch"
+    _write_run(experiment_root, "run_1000", frequency_mhz=1000, throughput_tokens_per_s=1000.0, avg_power_w=171.0)
+    _write_run(experiment_root, "run_1200", frequency_mhz=1200, throughput_tokens_per_s=1200.0, avg_power_w=209.0)
+
+    run_1200_path = experiment_root / "run_1200" / "run.json"
+    payload = json.loads(run_1200_path.read_text(encoding="utf-8"))
+    payload["config"]["model"]["num_attention_heads"] = 32
+    run_1200_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    collection = load_experiment_samples(str(experiment_root), include_baseline=False)
+
+    with pytest.raises(SystemExit, match="equivalent workloads"):
+        _validate_workload_consistency(collection.samples)
+
+
+def test_validate_baseline_compatibility_rejects_mismatched_baseline_workload(tmp_path: Path):
+    experiment_root = tmp_path / "static_bundle"
+    baseline_root = tmp_path / "baseline_bundle"
+    _write_run(experiment_root, "run_1000", frequency_mhz=1000, throughput_tokens_per_s=1000.0, avg_power_w=171.0)
+    _write_run(baseline_root, "baseline_001", throughput_tokens_per_s=1100.0, avg_power_w=220.0, mode="baseline")
+
+    baseline_run_path = baseline_root / "baseline_001" / "run.json"
+    payload = json.loads(baseline_run_path.read_text(encoding="utf-8"))
+    payload["config"]["training"]["global_batch_size"] = 32
+    baseline_run_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    collection = load_experiment_samples(str(experiment_root), include_baseline=False)
+    baseline_collection = load_experiment_samples(str(baseline_root), include_baseline=True)
+    baseline_sample = [sample for sample in baseline_collection.samples if sample.observed.frequency_mhz is None][0]
+
+    with pytest.raises(SystemExit, match="baseline workload must match"):
+        _validate_baseline_compatibility(collection.samples, baseline_sample)
+
+
+def test_pipeline_exposed_fraction_increases_when_microbatches_are_scarce():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+
+    more_microbatches = WorkloadFeatures(
+        num_layers=28,
+        hidden_size=3584,
+        ffn_hidden_size=18944,
+        num_attention_heads=28,
+        num_key_value_heads=4,
+        seq_length=2048,
+        micro_batch_size=1,
+        global_batch_size=16,
+        train_iters=20,
+        tensor_model_parallel_size=2,
+        pipeline_model_parallel_size=4,
+        data_parallel_size=2,
+        zero_stage=1,
+        precision_mode="bf16",
+        swiglu=True,
+    )
+    fewer_microbatches = WorkloadFeatures(
+        num_layers=28,
+        hidden_size=3584,
+        ffn_hidden_size=18944,
+        num_attention_heads=28,
+        num_key_value_heads=4,
+        seq_length=2048,
+        micro_batch_size=2,
+        global_batch_size=16,
+        train_iters=20,
+        tensor_model_parallel_size=2,
+        pipeline_model_parallel_size=4,
+        data_parallel_size=2,
+        zero_stage=1,
+        precision_mode="bf16",
+        swiglu=True,
+    )
+
+    more_features = derive_model_features(hardware, more_microbatches)
+    fewer_features = derive_model_features(hardware, fewer_microbatches)
+
+    assert fewer_features.pipeline_exposed_fraction > more_features.pipeline_exposed_fraction
 
 
 def test_pipeline_parallel_efficiency_matches_microbatch_bubble_formula():
@@ -519,6 +690,148 @@ def test_pipeline_parallel_efficiency_matches_microbatch_bubble_formula():
     assert features.pipeline_parallel_efficiency == pytest.approx(expected_efficiency)
 
 
+def test_low_freq_correction_is_weaker_without_pipeline_exposure():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    no_bubble = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=0.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.20,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.0,
+        dp_overlapable_fraction=0.18,
+        tp_sync_fraction=0.45,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=1.0,
+        memory_weight=0.0,
+        communication_weight=0.0,
+    )
+    bubbled = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=0.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.20,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.45,
+        dp_overlapable_fraction=0.18,
+        tp_sync_fraction=0.45,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=1.0,
+        memory_weight=0.0,
+        communication_weight=0.0,
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_saturation_ratio=0.9,
+        correction_split_ratio=0.72,
+        correction_transition_width=0.05,
+        throughput_low_freq_correction=-0.10,
+        correction_topology_weight=1.0,
+        correction_communication_weight=0.5,
+    )
+
+    low_freq = hardware.min_frequency_mhz
+
+    assert predict_throughput_tokens_per_s(low_freq, hardware, no_bubble, params) > predict_throughput_tokens_per_s(low_freq, hardware, bubbled, params)
+
+
+def test_two_band_correction_can_lower_low_freq_throughput_and_raise_high_freq_power():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    features = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=0.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.20,
+        pipeline_parallel_efficiency=0.70,
+        pipeline_exposed_fraction=0.45,
+        dp_overlapable_fraction=0.10,
+        tp_sync_fraction=0.35,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=1.0,
+        memory_weight=0.0,
+        communication_weight=0.0,
+    )
+    baseline = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_saturation_ratio=0.9,
+    )
+    corrected = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_saturation_ratio=0.9,
+        correction_split_ratio=0.72,
+        correction_transition_width=0.05,
+        throughput_low_freq_correction=-0.10,
+        throughput_high_freq_correction=0.0,
+        power_low_freq_correction=0.0,
+        power_high_freq_correction=0.06,
+        correction_topology_weight=1.0,
+        correction_communication_weight=0.5,
+    )
+
+    low_freq = hardware.min_frequency_mhz
+    high_freq = hardware.max_frequency_mhz
+
+    assert predict_throughput_tokens_per_s(low_freq, hardware, features, corrected) < predict_throughput_tokens_per_s(low_freq, hardware, features, baseline)
+    assert predict_throughput_tokens_per_s(high_freq, hardware, features, corrected) == pytest.approx(
+        predict_throughput_tokens_per_s(high_freq, hardware, features, baseline),
+        rel=0.03,
+    )
+    assert build_prediction_bundle(hardware, features, corrected, comparison_steps=1)["supported_predictions"][-1]["power_w"] > build_prediction_bundle(hardware, features, baseline, comparison_steps=1)["supported_predictions"][-1]["power_w"]
+
+
 def test_throughput_saturation_ratio_saturates_compute_limit_before_max_clock():
     hardware = HardwareFeatures(
         gpu_name="synthetic",
@@ -542,6 +855,9 @@ def test_throughput_saturation_ratio_saturates_compute_limit_before_max_clock():
         arithmetic_intensity_flops_per_byte=1.0,
         communication_share=0.0,
         pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.0,
+        dp_overlapable_fraction=0.0,
+        tp_sync_fraction=0.0,
         hardware_balance_flops_per_byte=1.0,
         compute_weight=1.0,
         memory_weight=0.0,

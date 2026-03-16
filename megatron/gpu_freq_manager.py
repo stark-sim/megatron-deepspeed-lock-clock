@@ -5,6 +5,7 @@ GPU 频率管理器
 
 使用 NVML API 进行频率控制，需要 root 权限
 """
+import atexit
 import os
 import sys
 import time
@@ -366,17 +367,21 @@ class GPUFreqManager:
         
         with self._lock:
             try:
+                reset_failures = []
                 for idx, handle in self._handles:
-                    # 重置 GPU 锁定时钟
                     try:
                         pynvml.nvmlDeviceResetGpuLockedClocks(handle)
-                    except pynvml.NVMLError:
-                        pass
-                    # 重置应用时钟（解除频率范围限制）
+                    except pynvml.NVMLError as e:
+                        reset_failures.append(f"GPU {idx} locked clocks reset failed: {e}")
                     try:
                         pynvml.nvmlDeviceResetApplicationsClocks(handle)
-                    except pynvml.NVMLError:
-                        pass
+                    except pynvml.NVMLError as e:
+                        reset_failures.append(f"GPU {idx} application clocks reset failed: {e}")
+
+                if reset_failures:
+                    for message in reset_failures:
+                        print(f"[GPUFreqManager] Warning: {message}")
+
                 self._current_freq = "high"
             except Exception as e:
                 print(f"[GPUFreqManager] Error in reset_to_default: {e}")
@@ -430,23 +435,36 @@ class GPUFreqManager:
     def shutdown(self):
         """关闭频率管理器"""
         if self._initialized:
-            self.reset_to_default()
-            self.print_stats()
             try:
-                pynvml.nvmlShutdown()
-            except:
-                pass
-            self._initialized = False
+                self.reset_to_default()
+                self.print_stats()
+            finally:
+                if self._executor is not None:
+                    self._executor.shutdown(wait=True)
+                    self._executor = None
+                try:
+                    pynvml.nvmlShutdown()
+                except Exception:
+                    pass
+                self._initialized = False
 
 
 # 全局频率管理器实例
 _freq_manager: Optional[GPUFreqManager] = None
+_freq_manager_atexit_registered = False
 
 
 def get_freq_manager() -> Optional[GPUFreqManager]:
     """获取全局频率管理器"""
     global _freq_manager
     return _freq_manager
+
+
+def _shutdown_freq_manager_on_exit():
+    try:
+        shutdown_freq_manager()
+    except Exception as exc:
+        print(f"[GPUFreqManager] Warning: atexit shutdown failed: {exc}")
 
 
 def init_freq_manager(
@@ -463,7 +481,7 @@ def init_freq_manager(
         dry_run: 如果为 True，保留 wrap 函数的判断逻辑但不执行实际调频
         min_elements: 触发调频的最小元素数阈值
     """
-    global _freq_manager
+    global _freq_manager, _freq_manager_atexit_registered
     _freq_manager = GPUFreqManager(
         gpu_indices=gpu_indices,
         high_freq=high_freq,
@@ -472,6 +490,9 @@ def init_freq_manager(
         dry_run=dry_run,
         min_elements=min_elements,
     )
+    if not _freq_manager_atexit_registered:
+        atexit.register(_shutdown_freq_manager_on_exit)
+        _freq_manager_atexit_registered = True
     return _freq_manager
 
 

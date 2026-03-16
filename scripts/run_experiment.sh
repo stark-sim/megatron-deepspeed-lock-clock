@@ -265,10 +265,20 @@ if [[ "$VALIDATE_ONLY" == "1" ]]; then
 fi
 
 cleanup() {
-    if [[ "$EXPERIMENT_MODE" == "static" && -n "$STATIC_CLOCK_MHZ" ]]; then
-        echo "[Cleanup] Resetting GPU clocks for ${LOCAL_GPU_INDICES}"
-        reset_gpu_clocks "$LOCAL_GPU_INDICES"
+    local exit_code=$?
+    if [[ -n "${LOCAL_GPU_INDICES:-}" ]]; then
+        case "$EXPERIMENT_MODE" in
+            static)
+                if [[ -n "$STATIC_CLOCK_MHZ" ]]; then
+                    reset_gpu_clocks "$LOCAL_GPU_INDICES" || echo "[Cleanup] Warning: Failed to reset GPU clocks for ${LOCAL_GPU_INDICES}" >&2
+                fi
+                ;;
+            dynamic|dryrun)
+                reset_gpu_clocks "$LOCAL_GPU_INDICES" || echo "[Cleanup] Warning: Failed to reset GPU clocks for ${LOCAL_GPU_INDICES}" >&2
+                ;;
+        esac
     fi
+    return "$exit_code"
 }
 trap cleanup EXIT
 
