@@ -104,10 +104,63 @@ def _compute_frequency_ratio(frequency_ratio: float, params: CalibrationParams) 
     return _clamp(frequency_ratio / saturation_ratio, 0.05, 1.0)
 
 
-def _correction_intensity(features: DerivedModelFeatures, params: CalibrationParams) -> float:
-    bubble_exposure = max(1.0 - features.pipeline_parallel_efficiency, 0.0)
-    return 1.0 + (params.correction_topology_weight * bubble_exposure) + (
-        params.correction_communication_weight * features.communication_share
+def _exposed_communication_share(features: DerivedModelFeatures) -> float:
+    exposure_mix = _clamp(
+        (0.60 * features.pipeline_exposed_fraction)
+        + (0.30 * features.tp_sync_fraction)
+        + (0.10 * features.dp_overlapable_fraction),
+        0.0,
+        1.0,
+    )
+    return features.communication_share * exposure_mix
+
+
+def _low_freq_topology_mix(features: DerivedModelFeatures) -> float:
+    return _clamp(
+        (0.85 * features.pipeline_exposed_fraction)
+        + (0.10 * features.tp_sync_fraction)
+        + (0.05 * features.dp_overlapable_fraction),
+        0.0,
+        1.0,
+    )
+
+
+def _high_freq_topology_mix(features: DerivedModelFeatures) -> float:
+    return _clamp(
+        (0.45 * features.pipeline_exposed_fraction)
+        + (0.40 * features.tp_sync_fraction)
+        + (0.15 * features.dp_overlapable_fraction),
+        0.0,
+        1.0,
+    )
+
+
+def _pipeline_low_freq_gate(features: DerivedModelFeatures) -> float:
+    return _clamp(
+        0.15 + (1.70 * features.pipeline_exposed_fraction),
+        0.15,
+        1.0,
+    )
+
+
+def _low_freq_correction_intensity(features: DerivedModelFeatures, params: CalibrationParams) -> float:
+    pipeline_gate = _pipeline_low_freq_gate(features)
+    return _clamp(
+        1.0
+        + (pipeline_gate * params.correction_topology_weight * _low_freq_topology_mix(features))
+        + (pipeline_gate * 0.35 * params.correction_communication_weight * _exposed_communication_share(features)),
+        1.0,
+        2.0,
+    )
+
+
+def _high_freq_correction_intensity(features: DerivedModelFeatures, params: CalibrationParams) -> float:
+    return _clamp(
+        1.0
+        + (params.correction_topology_weight * _high_freq_topology_mix(features))
+        + (params.correction_communication_weight * _exposed_communication_share(features)),
+        1.0,
+        2.5,
     )
 
 
@@ -127,9 +180,10 @@ def _throughput_correction_factor(
     params: CalibrationParams,
 ) -> float:
     low_position, high_position, gate_low, gate_high = _correction_positions(frequency_ratio, params)
-    intensity = _correction_intensity(features, params)
-    low_factor = 1.0 + (intensity * params.throughput_low_freq_correction * low_position)
-    high_factor = 1.0 + (intensity * params.throughput_high_freq_correction * (high_position ** 2))
+    low_intensity = _low_freq_correction_intensity(features, params)
+    high_intensity = _high_freq_correction_intensity(features, params)
+    low_factor = 1.0 + (low_intensity * params.throughput_low_freq_correction * low_position)
+    high_factor = 1.0 + (high_intensity * params.throughput_high_freq_correction * (high_position ** 2))
     factor = (gate_low * low_factor) + (gate_high * high_factor)
     return _clamp(factor, 0.75, 1.25)
 
@@ -140,9 +194,10 @@ def _power_correction_factor(
     params: CalibrationParams,
 ) -> float:
     low_position, high_position, gate_low, gate_high = _correction_positions(frequency_ratio, params)
-    intensity = _correction_intensity(features, params)
-    low_factor = 1.0 + (intensity * params.power_low_freq_correction * low_position)
-    high_factor = 1.0 + (intensity * params.power_high_freq_correction * (high_position ** 2))
+    low_intensity = _low_freq_correction_intensity(features, params)
+    high_intensity = _high_freq_correction_intensity(features, params)
+    low_factor = 1.0 + (low_intensity * params.power_low_freq_correction * low_position)
+    high_factor = 1.0 + (high_intensity * params.power_high_freq_correction * (high_position ** 2))
     factor = (gate_low * low_factor) + (gate_high * high_factor)
     return _clamp(factor, 0.85, 1.20)
 
@@ -158,8 +213,9 @@ def predict_throughput_tokens_per_s(
     compute_frequency_ratio = _compute_frequency_ratio(frequency_ratio, params)
     compute_limit = params.compute_limit_at_max_tokens_per_s * compute_frequency_ratio
     memory_limit = params.memory_limit_tokens_per_s
+    exposed_communication_share = _exposed_communication_share(features)
     communication_limit = params.communication_limit_tokens_per_s / (
-        1.0 + params.communication_penalty * features.communication_share * ((1.0 / frequency_ratio) - 1.0)
+        1.0 + params.communication_penalty * exposed_communication_share * ((1.0 / frequency_ratio) - 1.0)
     )
     throughput = _harmonic_blend(
         [compute_limit, memory_limit, communication_limit],
@@ -204,11 +260,12 @@ def predict_point(
     tokens_per_j = throughput_tokens_per_s / max(power_w, 1e-9)
     tokens_per_wh = tokens_per_j * 3600.0
     samples_per_wh = throughput_samples_per_s * 3600.0 / max(power_w, 1e-9)
+    exposed_communication_share = _exposed_communication_share(features)
     component_limits = {
         "compute_tokens_per_s": params.compute_limit_at_max_tokens_per_s * compute_frequency_ratio,
         "memory_tokens_per_s": params.memory_limit_tokens_per_s,
         "communication_tokens_per_s": params.communication_limit_tokens_per_s / (
-            1.0 + params.communication_penalty * features.communication_share * ((1.0 / frequency_ratio) - 1.0)
+            1.0 + params.communication_penalty * exposed_communication_share * ((1.0 / frequency_ratio) - 1.0)
         ),
     }
     return PredictionPoint(

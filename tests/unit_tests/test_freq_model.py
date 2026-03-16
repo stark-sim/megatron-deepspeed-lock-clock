@@ -158,6 +158,9 @@ def test_prediction_bundle_reports_baseline_relative_tradeoff(tmp_path: Path):
         arithmetic_intensity_flops_per_byte=1.0,
         communication_share=0.0,
         pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.0,
+        dp_overlapable_fraction=0.0,
+        tp_sync_fraction=0.0,
         hardware_balance_flops_per_byte=1.0,
         compute_weight=1.0,
         memory_weight=0.0,
@@ -540,6 +543,8 @@ def test_pipeline_parallel_efficiency_penalizes_deeper_pp():
 
     assert pp1_features.pipeline_parallel_efficiency == 1.0
     assert pp4_features.pipeline_parallel_efficiency < 1.0
+    assert pp1_features.pipeline_exposed_fraction == 0.0
+    assert pp4_features.pipeline_exposed_fraction > pp1_features.pipeline_exposed_fraction
 
 
 def test_validate_workload_consistency_rejects_mixed_micro_batch_sizes(tmp_path: Path):
@@ -593,6 +598,60 @@ def test_validate_baseline_compatibility_rejects_mismatched_baseline_workload(tm
         _validate_baseline_compatibility(collection.samples, baseline_sample)
 
 
+def test_pipeline_exposed_fraction_increases_when_microbatches_are_scarce():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+
+    more_microbatches = WorkloadFeatures(
+        num_layers=28,
+        hidden_size=3584,
+        ffn_hidden_size=18944,
+        num_attention_heads=28,
+        num_key_value_heads=4,
+        seq_length=2048,
+        micro_batch_size=1,
+        global_batch_size=16,
+        train_iters=20,
+        tensor_model_parallel_size=2,
+        pipeline_model_parallel_size=4,
+        data_parallel_size=2,
+        zero_stage=1,
+        precision_mode="bf16",
+        swiglu=True,
+    )
+    fewer_microbatches = WorkloadFeatures(
+        num_layers=28,
+        hidden_size=3584,
+        ffn_hidden_size=18944,
+        num_attention_heads=28,
+        num_key_value_heads=4,
+        seq_length=2048,
+        micro_batch_size=2,
+        global_batch_size=16,
+        train_iters=20,
+        tensor_model_parallel_size=2,
+        pipeline_model_parallel_size=4,
+        data_parallel_size=2,
+        zero_stage=1,
+        precision_mode="bf16",
+        swiglu=True,
+    )
+
+    more_features = derive_model_features(hardware, more_microbatches)
+    fewer_features = derive_model_features(hardware, fewer_microbatches)
+
+    assert fewer_features.pipeline_exposed_fraction > more_features.pipeline_exposed_fraction
+
+
 def test_pipeline_parallel_efficiency_matches_microbatch_bubble_formula():
     hardware = HardwareFeatures(
         gpu_name="synthetic",
@@ -631,6 +690,77 @@ def test_pipeline_parallel_efficiency_matches_microbatch_bubble_formula():
     assert features.pipeline_parallel_efficiency == pytest.approx(expected_efficiency)
 
 
+def test_low_freq_correction_is_weaker_without_pipeline_exposure():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    no_bubble = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=0.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.20,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.0,
+        dp_overlapable_fraction=0.18,
+        tp_sync_fraction=0.45,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=1.0,
+        memory_weight=0.0,
+        communication_weight=0.0,
+    )
+    bubbled = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=0.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.20,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.45,
+        dp_overlapable_fraction=0.18,
+        tp_sync_fraction=0.45,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=1.0,
+        memory_weight=0.0,
+        communication_weight=0.0,
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_saturation_ratio=0.9,
+        correction_split_ratio=0.72,
+        correction_transition_width=0.05,
+        throughput_low_freq_correction=-0.10,
+        correction_topology_weight=1.0,
+        correction_communication_weight=0.5,
+    )
+
+    low_freq = hardware.min_frequency_mhz
+
+    assert predict_throughput_tokens_per_s(low_freq, hardware, no_bubble, params) > predict_throughput_tokens_per_s(low_freq, hardware, bubbled, params)
+
+
 def test_two_band_correction_can_lower_low_freq_throughput_and_raise_high_freq_power():
     hardware = HardwareFeatures(
         gpu_name="synthetic",
@@ -654,6 +784,9 @@ def test_two_band_correction_can_lower_low_freq_throughput_and_raise_high_freq_p
         arithmetic_intensity_flops_per_byte=1.0,
         communication_share=0.20,
         pipeline_parallel_efficiency=0.70,
+        pipeline_exposed_fraction=0.45,
+        dp_overlapable_fraction=0.10,
+        tp_sync_fraction=0.35,
         hardware_balance_flops_per_byte=1.0,
         compute_weight=1.0,
         memory_weight=0.0,
@@ -722,6 +855,9 @@ def test_throughput_saturation_ratio_saturates_compute_limit_before_max_clock():
         arithmetic_intensity_flops_per_byte=1.0,
         communication_share=0.0,
         pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.0,
+        dp_overlapable_fraction=0.0,
+        tp_sync_fraction=0.0,
         hardware_balance_flops_per_byte=1.0,
         compute_weight=1.0,
         memory_weight=0.0,

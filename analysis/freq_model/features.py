@@ -19,6 +19,9 @@ class DerivedModelFeatures:
     arithmetic_intensity_flops_per_byte: float
     communication_share: float
     pipeline_parallel_efficiency: float
+    pipeline_exposed_fraction: float
+    dp_overlapable_fraction: float
+    tp_sync_fraction: float
     hardware_balance_flops_per_byte: float
     compute_weight: float
     memory_weight: float
@@ -36,6 +39,14 @@ def _precision_bytes(precision_mode: str) -> int:
 
 def _clamp(value: float, lower: float, upper: float) -> float:
     return max(lower, min(upper, value))
+
+
+def _dp_overlap_prior(zero_stage: int) -> float:
+    if zero_stage >= 3:
+        return 0.50
+    if zero_stage == 2:
+        return 0.35
+    return 0.20
 
 
 def derive_model_features(hardware: HardwareFeatures, workload: WorkloadFeatures) -> DerivedModelFeatures:
@@ -77,12 +88,13 @@ def derive_model_features(hardware: HardwareFeatures, workload: WorkloadFeatures
             0.0,
         )
     pp_communication_multiplier = 1.0 + pipeline_bubble_fraction
+    communication_penalty_denominator = max((2.0 * tp_penalty) + dp_penalty + (pp_penalty * pp_communication_multiplier), 1e-9)
     communication_bytes = (
         tokens_per_step
         * workload.hidden_size
         * workload.num_layers
         * bytes_per_element
-        * ((2.0 * tp_penalty) + dp_penalty + (pp_penalty * pp_communication_multiplier))
+        * communication_penalty_denominator
     )
 
     approx_memory_bytes_per_step = activation_bytes + (2.0 * parameter_bytes) + communication_bytes
@@ -100,6 +112,15 @@ def derive_model_features(hardware: HardwareFeatures, workload: WorkloadFeatures
         pipeline_parallel_efficiency = microbatches_per_step / (
             microbatches_per_step + max(workload.pipeline_model_parallel_size - 1, 0)
         )
+
+    pipeline_exposed_fraction = pp_penalty * (0.40 + (0.60 * pipeline_bubble_fraction))
+    dp_overlapable_fraction = dp_penalty * _dp_overlap_prior(workload.zero_stage)
+    tp_sync_fraction = (2.0 * tp_penalty) / communication_penalty_denominator if communication_penalty_denominator > 0 else 0.0
+
+    pipeline_exposed_fraction = _clamp(pipeline_exposed_fraction, 0.0, 1.0)
+    dp_overlapable_fraction = _clamp(dp_overlapable_fraction, 0.0, 1.0)
+    tp_sync_fraction = _clamp(tp_sync_fraction, 0.0, 1.0)
+
     communication_weight = _clamp(communication_share * 1.5, 0.05, 0.35)
     compute_base = arithmetic_intensity / (arithmetic_intensity + hardware_balance)
     compute_base = _clamp(compute_base, 0.15, 0.85)
@@ -119,6 +140,9 @@ def derive_model_features(hardware: HardwareFeatures, workload: WorkloadFeatures
         arithmetic_intensity_flops_per_byte=arithmetic_intensity,
         communication_share=communication_share,
         pipeline_parallel_efficiency=pipeline_parallel_efficiency,
+        pipeline_exposed_fraction=pipeline_exposed_fraction,
+        dp_overlapable_fraction=dp_overlapable_fraction,
+        tp_sync_fraction=tp_sync_fraction,
         hardware_balance_flops_per_byte=hardware_balance,
         compute_weight=compute_weight,
         memory_weight=memory_weight,
