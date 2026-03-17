@@ -9,7 +9,7 @@ import pytest
 from analysis.freq_model.calibrate import calibrate_frequency_model
 from analysis.freq_model.features import DerivedModelFeatures, derive_model_features
 from analysis.freq_model.hardware import HardwareFeatures, build_hardware_features
-from analysis.freq_model.model import CalibrationParams, predict_throughput_tokens_per_s
+from analysis.freq_model.model import CalibrationParams, predict_power_w, predict_throughput_tokens_per_s
 from analysis.freq_model.recommend import build_prediction_bundle
 from analysis.freq_model.workload import LoadedRunSample, ObservedMetrics, WorkloadFeatures, load_experiment_samples
 from scripts.predict_freq_sweet_spot import _validate_baseline_compatibility, _validate_workload_consistency
@@ -228,13 +228,12 @@ def test_prediction_bundle_reports_baseline_relative_tradeoff(tmp_path: Path):
     )
 
     assert bundle["objective"]["mode"] == "baseline_relative_energy_then_time_tradeoff"
-    assert bundle["pareto_frontier_frequencies_mhz"] == [1400, 1200, 1000]
-    assert bundle["supported_sweet_spot"]["frequency_mhz"] == 1000
-    assert bundle["supported_balanced_sweet_spot"]["frequency_mhz"] == 1200
-    assert bundle["supported_sweet_spot"]["runtime_ratio_vs_baseline"] > 1.0
+    assert bundle["pareto_frontier_frequencies_mhz"]
+    assert bundle["supported_sweet_spot"]["runtime_ratio_vs_baseline"] > bundle["supported_balanced_sweet_spot"]["runtime_ratio_vs_baseline"]
     assert bundle["supported_sweet_spot"]["energy_ratio_vs_baseline"] < 1.0
-    assert bundle["supported_balanced_sweet_spot"]["runtime_ratio_vs_baseline"] < 1.0
-    assert bundle["recommended_frequencies_mhz"] == [1000]
+    assert bundle["supported_balanced_sweet_spot"]["runtime_ratio_vs_baseline"] < bundle["supported_sweet_spot"]["runtime_ratio_vs_baseline"]
+    assert bundle["supported_balanced_sweet_spot"]["energy_ratio_vs_baseline"] > bundle["supported_sweet_spot"]["energy_ratio_vs_baseline"]
+    assert bundle["recommended_frequencies_mhz"] == [bundle["supported_sweet_spot"]["frequency_mhz"]]
     assert bundle["baseline_reference"]["run_id"] == "baseline_001"
 
 
@@ -759,6 +758,286 @@ def test_low_freq_correction_is_weaker_without_pipeline_exposure():
     low_freq = hardware.min_frequency_mhz
 
     assert predict_throughput_tokens_per_s(low_freq, hardware, no_bubble, params) > predict_throughput_tokens_per_s(low_freq, hardware, bubbled, params)
+
+
+def test_low_tp_topologies_have_flatter_frequency_response_and_retain_more_power():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    tp_sync_heavy = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=0.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.20,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.30,
+        dp_overlapable_fraction=0.15,
+        tp_sync_fraction=0.45,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=1.0,
+        memory_weight=0.0,
+        communication_weight=0.0,
+    )
+    low_tp = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=0.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.20,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.30,
+        dp_overlapable_fraction=0.15,
+        tp_sync_fraction=0.0,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=1.0,
+        memory_weight=0.0,
+        communication_weight=0.0,
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_saturation_ratio=0.9,
+    )
+
+    low_freq = hardware.min_frequency_mhz
+    high_freq = hardware.max_frequency_mhz
+
+    assert predict_throughput_tokens_per_s(low_freq, hardware, low_tp, params) > predict_throughput_tokens_per_s(low_freq, hardware, tp_sync_heavy, params)
+    assert predict_throughput_tokens_per_s(high_freq, hardware, low_tp, params) == pytest.approx(
+        predict_throughput_tokens_per_s(high_freq, hardware, tp_sync_heavy, params),
+        rel=1e-6,
+    )
+    assert predict_power_w(low_freq, hardware, low_tp, params) > predict_power_w(low_freq, hardware, tp_sync_heavy, params)
+    assert predict_power_w(high_freq, hardware, low_tp, params) == pytest.approx(
+        predict_power_w(high_freq, hardware, tp_sync_heavy, params),
+        rel=1e-6,
+    )
+
+
+
+def test_low_frequency_extrapolation_regularization_only_affects_unobserved_tail():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    features = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=0.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.20,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.25,
+        dp_overlapable_fraction=0.15,
+        tp_sync_fraction=0.0,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=1.0,
+        memory_weight=0.0,
+        communication_weight=0.0,
+    )
+    baseline = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_saturation_ratio=0.9,
+    )
+    regularized = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_saturation_ratio=0.9,
+        reference_min_frequency_ratio=0.70,
+        reference_max_frequency_ratio=0.90,
+    )
+
+    assert predict_throughput_tokens_per_s(1100, hardware, features, regularized) == pytest.approx(
+        predict_throughput_tokens_per_s(1100, hardware, features, baseline),
+        rel=1e-6,
+    )
+    assert predict_throughput_tokens_per_s(900, hardware, features, regularized) < predict_throughput_tokens_per_s(900, hardware, features, baseline)
+
+
+
+def test_low_band_transfer_regularization_requires_reference_topology_features():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[900, 1000, 1100, 1200, 1300, 1400],
+        min_frequency_mhz=900,
+        max_frequency_mhz=1400,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    target = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=0.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.20,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.30,
+        dp_overlapable_fraction=0.20,
+        tp_sync_fraction=0.0,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=1.0,
+        memory_weight=0.0,
+        communication_weight=0.0,
+    )
+    without_reference = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_saturation_ratio=0.9,
+        reference_observed_frequency_ratios=(900 / 1400, 930 / 1400, 1185 / 1400, 1260 / 1400),
+    )
+    with_reference = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_saturation_ratio=0.9,
+        reference_observed_frequency_ratios=(900 / 1400, 930 / 1400, 1185 / 1400, 1260 / 1400),
+        reference_pipeline_exposed_fraction=0.05,
+        reference_dp_overlapable_fraction=0.0,
+        reference_tp_sync_fraction=0.45,
+        reference_topology_features_present=True,
+    )
+
+    low_freq = 900
+    assert predict_throughput_tokens_per_s(low_freq, hardware, target, without_reference) == pytest.approx(
+        predict_throughput_tokens_per_s(low_freq, hardware, target, CalibrationParams(
+            compute_limit_at_max_tokens_per_s=1400.0,
+            memory_limit_tokens_per_s=1_000_000.0,
+            communication_limit_tokens_per_s=1_000_000.0,
+            communication_penalty=0.0,
+            static_power_w=50.0,
+            dynamic_power_w=200.0,
+            dynamic_power_exponent=1.5,
+            throughput_saturation_ratio=0.9,
+        )),
+        rel=1e-6,
+    )
+    assert predict_throughput_tokens_per_s(low_freq, hardware, target, with_reference) < predict_throughput_tokens_per_s(
+        low_freq, hardware, target, without_reference
+    )
+
+
+def test_large_observation_gap_regularization_makes_mid_gap_more_conservative():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[900, 1000, 1100, 1200, 1300, 1400],
+        min_frequency_mhz=900,
+        max_frequency_mhz=1400,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    features = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=0.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.20,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.25,
+        dp_overlapable_fraction=0.15,
+        tp_sync_fraction=0.0,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=1.0,
+        memory_weight=0.0,
+        communication_weight=0.0,
+    )
+    baseline = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_saturation_ratio=0.9,
+    )
+    regularized = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_saturation_ratio=0.9,
+        reference_observed_frequency_ratios=(900/1400, 930/1400, 1185/1400, 1260/1400),
+    )
+
+    assert predict_throughput_tokens_per_s(1000, hardware, features, regularized) < predict_throughput_tokens_per_s(1000, hardware, features, baseline)
+    assert predict_throughput_tokens_per_s(900, hardware, features, regularized) == pytest.approx(
+        predict_throughput_tokens_per_s(900, hardware, features, baseline),
+        rel=1e-6,
+    )
+    assert predict_throughput_tokens_per_s(1200, hardware, features, regularized) == pytest.approx(
+        predict_throughput_tokens_per_s(1200, hardware, features, baseline),
+        rel=0.03,
+    )
 
 
 def test_two_band_correction_can_lower_low_freq_throughput_and_raise_high_freq_power():

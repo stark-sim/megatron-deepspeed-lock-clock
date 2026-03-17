@@ -13,7 +13,7 @@ Establish a reproducible workflow for comparing baseline GPU behavior against st
 - Run short and long Megatron-DeepSpeed training experiments reproducibly.
 - Track topology, preflight checks, run commands, logs, and power metrics.
 - Compare baseline vs static frequency configurations under equivalent training settings.
-- Preserve enough metadata to identify a frequency “sweet spot” for energy efficiency.
+- Preserve enough metadata to evaluate full-frequency `total_time` / power curves and compare baseline-relative tradeoffs across topologies.
 
 ## Goals
 - Quantify training energy efficiency using Zeus-based power metrics.
@@ -29,7 +29,7 @@ Establish a reproducible workflow for comparing baseline GPU behavior against st
 - Short-run validation experiments for V100.
 
 ### Out of Scope
-- Quantization experiments for the current V100 sweet-spot investigation.
+- Quantization experiments for the current V100 frequency-curve investigation.
 - Model-quality benchmarking beyond short training stability checks.
 - Production checkpoint retention for energy-only sweep runs.
 
