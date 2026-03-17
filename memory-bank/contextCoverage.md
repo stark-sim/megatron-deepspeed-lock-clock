@@ -25,4 +25,4 @@
 
 ## Improvement Actions
 - Update the memory bank after each new frequency sweep result.
-- Add a dedicated summary section once the V100 sweet-spot recommendation is finalized.
+- Add a dedicated summary section once the V100 full-curve validation story is finalized.

@@ -346,6 +346,18 @@ def calibrate_frequency_model(
         baseline_tokens_per_j,
     )
 
+    max_frequency = float(hardware.max_frequency_mhz or max(frequencies) or 1.0)
+    corrected_params = replace(
+        corrected_params,
+        reference_min_frequency_ratio=min(frequencies) / max_frequency,
+        reference_max_frequency_ratio=max(frequencies) / max_frequency,
+        reference_observed_frequency_ratios=tuple(sorted(freq / max_frequency for freq in frequencies)),
+        reference_pipeline_exposed_fraction=base_features.pipeline_exposed_fraction,
+        reference_dp_overlapable_fraction=base_features.dp_overlapable_fraction,
+        reference_tp_sync_fraction=base_features.tp_sync_fraction,
+        reference_topology_features_present=True,
+    )
+
     return CalibrationResult(
         params=corrected_params,
         throughput_mape=corrected_metrics.throughput_mape,

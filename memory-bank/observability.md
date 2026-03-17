@@ -1,5 +1,22 @@
 # Observability
 
+## 2026-03-17 Local/Remote Replay Check
+- Local focused validation command: `pytest -q --noconftest tests/unit_tests/test_freq_model.py` -> `19 passed in 60.96s`.
+- Local replay artifacts: `.context/transfer-debug-20260317/local-tp1pp4dp4-topodist/prediction.json` and `.context/transfer-debug-20260317/local-tp1pp2dp8-topodist/prediction.json`.
+- Replay summary on measured diagnostic points: `TP=1, PP=4, DP=4` stays at about `1.25%` runtime MAPE / `1.05%` power MAPE / `0.34%` energy MAPE; `TP=1, PP=2, DP=8` stays at about `2.26%` runtime MAPE / `1.66%` power MAPE / `0.65%` energy MAPE.
+- Remote regenerated artifacts using `python3 .context/regen_transfer_bundle.py`: `/home/sd/Megatron-DeepSpeed/.context/canonical-transfer-tp1pp4dp4-20260317-topodist/prediction.json` and `/home/sd/Megatron-DeepSpeed/.context/canonical-transfer-tp1pp2dp8-20260317-topodist/prediction.json`. Both now recommend `[1185, 1192, 1200]` with default `1185 MHz`, matching local replay exactly.
+
+
+- [2026-03-17] Local-only gap-regularization experiment artifacts live under `.context/transfer-debug-20260317/local-tp1pp4dp4-gapfix/` and `.context/transfer-debug-20260317/local-tp1pp2dp8-gapfix/`. It preserves measured-band fit (`TP=1, PP=4, DP=4` still about `1.25%` time / `1.05%` power MAPE) but is not promoted because the regenerated `TP=1, PP=4, DP=4` default still falls to `930 MHz`.
+- [2026-03-17] After adding source-observed-band tail regularization, local `TP=1, PP=2, DP=8` transfer regeneration under `.context/transfer-debug-20260317/local-tp1pp2dp8-tailfix/` now recommends `[900, 907, 915]` instead of `[757, 765, 772]` while leaving the measured `1177/1185/1192 MHz` diagnostics effectively unchanged.
+- [2026-03-17] Remote regeneration confirms the same result for `TP=1, PP=2, DP=8`: `/home/sd/Megatron-DeepSpeed/.context/canonical-transfer-tp1pp2dp8-20260317-tailfix/prediction.json` now defaults to `900 MHz` with calibration reference band ratios `~0.564-0.789`.
+- [2026-03-17] Remote regeneration for `TP=1, PP=4, DP=4` still defaults to `997 MHz` even with the same tail regularization (`/home/sd/Megatron-DeepSpeed/.context/canonical-transfer-tp1pp4dp4-20260317-tailfix/prediction.json`), which isolates a broader low-frequency curve-shape issue that lives inside the source-observed band.
+- [2026-03-17] Remote transfer artifact regenerated after syncing the new `analysis/freq_model/model.py`: `/home/sd/Megatron-DeepSpeed/.context/canonical-transfer-tp1pp2dp8-20260317-anchorfix/prediction.json`.
+- [2026-03-17] Reanalysis against the existing `TP=1, PP=2, DP=8` measured trio is stored locally under `.context/real-v100-tp1pp2dp8-reanalysis-20260317-anchorfix/`; diagnostic-band MAPE is now `total_time≈2.07%`, `avg_power_w≈1.68%`, `total_energy≈0.44%`.
+- [2026-03-17] Important caveat: the regenerated energy-first default for `TP=1, PP=2, DP=8` is still `757 MHz` with neighborhood `[757, 765, 772]`, so do not interpret this model change as full low-frequency-tail validation.
+- [2026-03-17] Copied the minimal transfer-debug bundles from `sd@v100x16-1` into `.context/transfer-debug-20260316/` so the current local predictor can be replayed against the saved source/target `prediction.json` files without touching the remote working tree.
+- [2026-03-17] Local offline replay with the new low-TP transfer-anchor adjustment yields: `TP=1, PP=4, DP=4` -> `total_time MAPE≈1.25%`, `avg_power_w MAPE≈1.05%`, `total_energy MAPE≈0.34%`; `TP=1, PP=2, DP=8` -> `total_time MAPE≈2.07%`, `avg_power_w MAPE≈1.68%`, `total_energy MAPE≈0.44%`.
+- [2026-03-17] Focused local unit coverage for the new low-TP response runs with `pytest --noconftest tests/unit_tests/test_freq_model.py -k ...`; repo-wide pytest still requires `deepspeed` through `tests/conftest.py`.
 ## Logging
 - Primary execution logs are written under `experiments/<run_id>/logs/<run_id>.log`.
 - Detached remote `screen` launch logs are also captured under `experiments/_screen_boot/<session>.log`.
@@ -31,6 +48,18 @@
 | Static clock not reset | GPUs remain locked after run exit | High | Manual `nvidia-smi`/NVML reset |
 
 ## Health Checks
+- [2026-03-17] The detached `TP=1, PP=2, DP=8` static validation trio completed successfully. Zeus summaries: `1177 MHz -> 1130.8 s / 2725506.6 J / 2410.3 W / 0.601 tokens/J`, `1185 MHz -> 1119.4 s / 2729647.6 J / 2438.4 W / 0.600 tokens/J`, `1192 MHz -> 1118.4 s / 2754717.5 J / 2463.0 W / 0.595 tokens/J`.
+- [2026-03-17] Local comparison artifacts for the completed `TP=1, PP=2, DP=8` trio live under `.context/real-v100-tp1pp2dp8-static-20260316/`; use `measured_vs_predicted.tsv` for curve errors and `final_analysis.md` for the diagnostic conclusion.
+- [2026-03-17] Curve-accuracy summary for the completed `TP=1, PP=2, DP=8` trio: `total_time` MAPE `≈11.73%`, `avg_power_w` MAPE `≈5.74%`, and `total_energy` MAPE `≈5.33%`. This is worse than the `TP=1, PP=4, DP=4` diagnostic, so the current transfer issue appears broader than pipeline depth alone.
+- [2026-03-16] The first `TP=1, PP=2, DP=8` unfixed baseline attempt failed with CUDA OOM at step 5 on later pipeline-stage ranks. Retrying with allocator expansion (`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`) resolved the issue and produced final Zeus summary `1137.3 s / 3935271.5 J / 3460.1 W / 0.416 tokens/J`.
+- [2026-03-16] Canonical zero-shot transfer artifacts for `TP=1, PP=2, DP=8` now live under `.context/canonical-transfer-tp1pp2dp8-20260316/`; default recommendation is `1177 MHz` with neighborhood `[1177, 1185, 1192]`.
+- [2026-03-16] Remote `TP=1, PP=2, DP=8` static validation sequence completed in detached session `tp1pp2dp8_static_seq_20260316`; boot log is `/home/sd/Megatron-DeepSpeed/experiments/_screen_boot/tp1pp2dp8_static_seq_20260316.log`, and the completed frequencies were `1177/1185/1192 MHz`.
+- [2026-03-16] Curve-accuracy summary for the completed `TP=1, PP=4, DP=4` trio: `total_time` MAPE is about `7.17%`, `avg_power_w` MAPE about `5.30%`, and `total_energy` MAPE about `1.48%`. Interpret the low energy error carefully: it is likely dominated by cancellation between time and power biases rather than by a truly correct curve.
+- [2026-03-16] The detached `TP=1, PP=4, DP=4` static validation trio completed successfully. Zeus summaries: `1252 MHz -> 1300.1 s / 3078625.8 J / 2367.9 W / 0.532 tokens/J`, `1260 MHz -> 1287.9 s / 3067834.2 J / 2382.0 W / 0.534 tokens/J`, `1267 MHz -> 1286.3 s / 3097007.8 J / 2407.7 W / 0.529 tokens/J`.
+- [2026-03-16] Local comparison artifacts for the completed `TP=1, PP=4, DP=4` trio live under `.context/real-v100-tp1pp4dp4-static-20260316/`; use `measured_vs_predicted.tsv` for ratio errors and `final_analysis.md` for the transfer takeaway.
+- [2026-03-16] The `TP=1, PP=4, DP=4` 50-step unfixed baseline completed on `sd@v100x16-1` with Zeus summary `1316.7 s / 4174627.4 J / 3170.6 W / 0.392 tokens/J` from `/home/sd/Megatron-DeepSpeed/experiments/v100_tp1pp4dp4_baseline50_20260316_185249_DGX2-1/logs/v100_tp1pp4dp4_baseline50_20260316_185249_DGX2-1.log`.
+- [2026-03-16] Canonical zero-shot transfer artifacts for `TP=1, PP=4, DP=4` now live under `.context/canonical-transfer-tp1pp4dp4-20260316/`; default recommendation is `1252 MHz` with neighborhood `[1252, 1260, 1267]` and predicted baseline-relative energy ratio near `0.749x`.
+- [2026-03-16] Remote `TP=1, PP=4, DP=4` static validation sequence completed in detached session `tp1pp4dp4_static_seq_20260316`; boot log is `/home/sd/Megatron-DeepSpeed/experiments/_screen_boot/tp1pp4dp4_static_seq_20260316.log`, and the completed frequencies were `1252/1260/1267 MHz`.
 - [2026-03-16] Canonical predictor-quality checkpoint on `sd@v100x16-1`: outputs live under `.context/canonical-transfer-tp2pp2dp4-20260316/` and `.context/canonical-transfer-tp2pp1dp8-20260316/`. Current canonical defaults are `1072 MHz` for `TP=2, PP=2, DP=4` and `1005 MHz` for `TP=2, PP=1, DP=8`.
 - [2026-03-16] Transfer-time rescaling recheck on `sd@v100x16-1` completed successfully with the new target-topology low-frequency amplitude rule. Outputs live under `.context/remote-transfer-rescaled-tp2pp2dp4-20260316-r2/` and `.context/remote-transfer-rescaled-tp2pp1dp8-20260316-r2/`; defaults are now `1072 MHz` for `TP=2, PP=2, DP=4` and `1005 MHz` for `TP=2, PP=1, DP=8`.
 - [2026-03-16] Second V100 recheck after restoring the low-frequency intensity baseline completed successfully. Outputs live under `.context/remote-recheck-tp2pp2dp4-20260316-v100-r2/` and `.context/remote-recheck-tp2pp1dp8-20260316-v100-r2/`; defaults improved to `1057 MHz` for `TP=2, PP=2, DP=4` and `960 MHz` for `TP=2, PP=1, DP=8`.
@@ -70,7 +99,7 @@
 
 ## Error Tracking
 - [2026-03-12] The first baseline-relative hardware-first refactor compiled but still produced unrealistic pure-analytic recommendations (first `727 MHz`, then `1597 MHz`) on the merged V100 dataset; adding throughput-scale centering plus a throughput-saturation prior corrected the balanced recommendation to about `1252 MHz` while keeping low runtime/energy-ratio error.
-- [2026-03-12] Synthetic smoke validation showed low power-fit error but high throughput-fit error, so calibration quality should be checked on real sweep artifacts before trusting the recommended sweet spot.
+- [2026-03-12] Synthetic smoke validation showed low power-fit error but high throughput-fit error, so calibration quality should be checked on real sweep artifacts before trusting any curve-derived default recommendation.
 - [2026-03-12] The first real V100 prediction achieved `throughput_mape≈10.79%` and `power_mape≈2.37%`, but still extrapolated the optimum below the sampled static range.
 - [2026-03-12] Real follow-up runs at `1020/1027/1035 MHz` all exceeded the old `1200 MHz` point in `tokens/J`, validating the model's low-frequency search direction even though absolute predicted scales remain mismatched.
 - [2026-03-12] Pure analytic calibration still mis-ranked guardrail-optimal frequencies on the merged 8-point dataset, but the observed-frequency interpolation overlay now restores the correct transition pattern across the main guardrail thresholds.
