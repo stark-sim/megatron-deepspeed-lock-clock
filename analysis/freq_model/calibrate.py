@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import List, Tuple
 
+from analysis.freq_model.cross_node import fit_cross_node_penalty_model
 from analysis.freq_model.features import DerivedModelFeatures
 from analysis.freq_model.hardware import HardwareFeatures
 from analysis.freq_model.model import CalibrationParams, infer_initial_anchors, predict_power_w, predict_throughput_tokens_per_s
@@ -347,6 +348,8 @@ def calibrate_frequency_model(
     )
 
     max_frequency = float(hardware.max_frequency_mhz or max(frequencies) or 1.0)
+    cross_node_fit = fit_cross_node_penalty_model(hardware)
+
     corrected_params = replace(
         corrected_params,
         reference_min_frequency_ratio=min(frequencies) / max_frequency,
@@ -356,6 +359,17 @@ def calibrate_frequency_model(
         reference_dp_overlapable_fraction=base_features.dp_overlapable_fraction,
         reference_tp_sync_fraction=base_features.tp_sync_fraction,
         reference_topology_features_present=True,
+        cross_node_alpha_pp_s_per_byte=cross_node_fit.alpha_pp_s_per_byte,
+        cross_node_alpha_dp_s_per_byte=cross_node_fit.alpha_dp_s_per_byte,
+        cross_node_alpha_tp_s_per_byte=cross_node_fit.alpha_tp_s_per_byte,
+        cross_node_reference_cross_node_pp_bytes=cross_node_fit.reference_cross_node_pp_bytes,
+        cross_node_reference_pp_cross_node_wait_pressure=cross_node_fit.reference_pp_cross_node_wait_pressure,
+        cross_node_reference_cross_node_dp_bytes=cross_node_fit.reference_cross_node_dp_bytes,
+        cross_node_beta_pp_wait_s=cross_node_fit.beta_pp_wait_s,
+        cross_node_beta_pp_edge_s=cross_node_fit.beta_pp_edge_s,
+        cross_node_power_base_drop=cross_node_fit.power_base_drop,
+        cross_node_power_low_freq_reference_ratio=cross_node_fit.power_low_freq_reference_ratio,
+        cross_node_power_low_freq_gamma=cross_node_fit.power_low_freq_gamma,
     )
 
     return CalibrationResult(

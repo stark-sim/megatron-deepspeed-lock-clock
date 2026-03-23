@@ -33,6 +33,17 @@ class CalibrationParams:
     reference_dp_overlapable_fraction: float = 0.0
     reference_tp_sync_fraction: float = 0.0
     reference_topology_features_present: bool = False
+    cross_node_alpha_pp_s_per_byte: float = 0.0
+    cross_node_alpha_dp_s_per_byte: float = 0.0
+    cross_node_alpha_tp_s_per_byte: float = 0.0
+    cross_node_reference_cross_node_pp_bytes: float = 0.0
+    cross_node_reference_pp_cross_node_wait_pressure: float = 0.0
+    cross_node_reference_cross_node_dp_bytes: float = 0.0
+    cross_node_beta_pp_wait_s: float = 0.0
+    cross_node_beta_pp_edge_s: float = 0.0
+    cross_node_power_base_drop: float = 0.0
+    cross_node_power_low_freq_reference_ratio: float = 0.782
+    cross_node_power_low_freq_gamma: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -332,7 +343,73 @@ def _power_correction_factor(
     return _clamp(factor, 0.85, 1.20)
 
 
-def predict_throughput_tokens_per_s(
+def estimate_cross_node_time_penalty_s(
+    frequency_mhz: float,
+    hardware: HardwareFeatures,
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    """Estimate cross-node time penalty with communication-complexity-aware model.
+
+    This model explicitly accounts for:
+    1. DP group size effect on allreduce latency (larger groups = slower)
+    2. Frequency-dependent communication exposure (higher freq = less overlap)
+    3. Topology structure (PP stages, TP groups, cross-node boundaries)
+
+    The penalty is ADDITIVE to base step time: corrected_step_time = base_step_time + penalty.
+    """
+    if features.node_count <= 1:
+        return 0.0
+
+    max_frequency = float(hardware.max_frequency_mhz or frequency_mhz or 1.0)
+    frequency_ratio = _clamp(float(frequency_mhz) / max_frequency, 0.05, 1.0)
+
+    # Extract coefficients from params
+    alpha_pp = max(params.cross_node_alpha_pp_s_per_byte, 0.0)
+    alpha_dp = max(params.cross_node_alpha_dp_s_per_byte, 0.0)
+    alpha_tp = max(params.cross_node_alpha_tp_s_per_byte, 0.0)
+    beta_pp_wait = max(params.cross_node_beta_pp_wait_s, 0.0)
+    beta_pp_edge = max(params.cross_node_beta_pp_edge_s, 0.0)
+
+    # --- DP Communication Complexity Model ---
+    # DP allreduce latency scales with group size (logarithmic or linear depending on implementation)
+    # For simplicity, we use a sub-linear scaling factor
+    dp_group_scale = 1.0 + (features.dp_cross_node_group_fraction * 0.5)
+
+    # Frequency sensitivity: higher frequency = faster compute = more exposed communication waiting
+    # At max frequency, communication is fully exposed; at lower frequencies, compute hides more communication
+    # The exposure factor increases with frequency ratio (1.0 = max freq = max exposure)
+    base_compute_fraction = 0.7  # Approximate compute fraction at typical frequencies
+    frequency_adjusted_exposure = base_compute_fraction / max(base_compute_fraction * frequency_ratio, 0.3)
+
+    # --- PP Communication Complexity ---
+    # PP communication happens at pipeline boundaries; bubble fraction affects how much waiting is exposed
+    pp_exposure_factor = 1.0 + (features.pipeline_bubble_fraction * 0.5)
+
+    # --- Calculate time penalties ---
+    # DP penalty: bytes * alpha * group_scale * frequency_exposure
+    dp_penalty_s = (
+        alpha_dp
+        * features.cross_node_dp_bytes
+        * dp_group_scale
+        * frequency_adjusted_exposure
+    )
+
+    # PP penalty: bytes * alpha * exposure_factor + structural wait penalties
+    pp_penalty_s = (
+        alpha_pp
+        * features.cross_node_pp_bytes
+        * pp_exposure_factor
+    ) + (beta_pp_wait * features.pp_cross_node_wait_pressure) + (beta_pp_edge * features.pp_cross_node_edge_fraction)
+
+    # TP penalty (if any TP crosses nodes)
+    tp_penalty_s = alpha_tp * features.cross_node_tp_bytes
+
+    total_penalty_s = dp_penalty_s + pp_penalty_s + tp_penalty_s
+    return max(total_penalty_s, 0.0)
+
+
+def _predict_base_throughput_tokens_per_s(
     frequency_mhz: float,
     hardware: HardwareFeatures,
     features: DerivedModelFeatures,
@@ -356,6 +433,38 @@ def predict_throughput_tokens_per_s(
     return throughput
 
 
+def predict_throughput_tokens_per_s(
+    frequency_mhz: float,
+    hardware: HardwareFeatures,
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    base_throughput = _predict_base_throughput_tokens_per_s(frequency_mhz, hardware, features, params)
+    cross_node_penalty_s = estimate_cross_node_time_penalty_s(frequency_mhz, hardware, features, params)
+    if cross_node_penalty_s <= 0.0:
+        return base_throughput
+    base_step_time_s = features.tokens_per_step / max(base_throughput, 1e-9)
+    corrected_step_time_s = base_step_time_s + cross_node_penalty_s
+    return features.tokens_per_step / max(corrected_step_time_s, 1e-9)
+
+
+
+
+def _cross_node_power_multiplier(
+    frequency_ratio: float,
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    if features.node_count <= 1:
+        return 1.0
+    reference_cross_node_dp_bytes = max(params.cross_node_reference_cross_node_dp_bytes, 1e-9)
+    dp_scale = features.cross_node_dp_bytes / reference_cross_node_dp_bytes
+    low_freq_gap = max(params.cross_node_power_low_freq_reference_ratio - frequency_ratio, 0.0)
+    drop = (params.cross_node_power_base_drop * dp_scale) + (
+        params.cross_node_power_low_freq_gamma * dp_scale * low_freq_gap
+    )
+    return _clamp(1.0 - drop, 0.85, 1.05)
+
 def predict_power_w(
     frequency_mhz: float,
     hardware: HardwareFeatures,
@@ -371,6 +480,7 @@ def predict_power_w(
     dynamic = params.dynamic_power_w * utilization * (frequency_ratio ** params.dynamic_power_exponent)
     power_w = params.static_power_w + dynamic
     power_w *= _power_correction_factor(frequency_ratio, features, params)
+    power_w *= _cross_node_power_multiplier(frequency_ratio, features, params)
     return power_w
 
 

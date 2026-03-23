@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from analysis.freq_model.calibrate import calibrate_frequency_model
+from analysis.freq_model.cross_node import fit_cross_node_penalty_model
 from analysis.freq_model.features import DerivedModelFeatures, derive_model_features
 from analysis.freq_model.hardware import HardwareFeatures, build_hardware_features
 from analysis.freq_model.model import CalibrationParams, predict_power_w, predict_throughput_tokens_per_s
@@ -258,6 +259,7 @@ def test_load_calibrate_and_overlay_modes(tmp_path: Path):
     hardware = build_hardware_features(collection.samples[0].run_payload)
     derived = [derive_model_features(hardware, sample.workload) for sample in collection.samples]
     calibration = calibrate_frequency_model(collection.samples, hardware, derived, baseline_sample=baseline_sample)
+    cross_node_fit = fit_cross_node_penalty_model(hardware)
 
     analytic_bundle = build_prediction_bundle(
         hardware,
@@ -287,6 +289,8 @@ def test_load_calibrate_and_overlay_modes(tmp_path: Path):
     assert calibration.runtime_ratio_mape >= 0.0
     assert calibration.energy_ratio_mape >= 0.0
     assert calibration.total_time_mape >= 0.0
+    assert calibration.params.cross_node_beta_pp_edge_s == pytest.approx(cross_node_fit.beta_pp_edge_s)
+    assert calibration.params.cross_node_power_base_drop == pytest.approx(cross_node_fit.power_base_drop)
     assert calibration.total_energy_mape >= 0.0
     assert calibration.objective >= 0.0
 
@@ -1185,3 +1189,112 @@ def test_load_experiment_samples_falls_back_to_zeus_logs(tmp_path: Path):
     assert observed.num_steps == steps
     assert observed.throughput_tokens_per_s == pytest.approx(1200.0, rel=1e-5)
     assert observed.avg_power_w == pytest.approx(209.0, rel=1e-5)
+
+
+
+def test_cross_node_penalty_fit_returns_positive_coefficients():
+    hardware = HardwareFeatures(
+        gpu_name="Tesla V100-SXM3-32GB",
+        gpu_count=16,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=125.0,
+        peak_fp32_tflops_per_gpu=15.7,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+
+    fit = fit_cross_node_penalty_model(hardware)
+
+    assert fit.alpha_pp_s_per_byte >= 0.0
+    assert fit.alpha_dp_s_per_byte >= 0.0
+    assert fit.alpha_tp_s_per_byte >= 0.0
+    assert fit.alpha_dp_s_per_byte > 0.0, "DP cross-node bytes should drive overhead"
+    assert fit.reference_cross_node_dp_bytes > 0.0
+    assert fit.beta_pp_wait_s >= 0.0
+    assert fit.beta_pp_edge_s >= 0.0
+    assert fit.power_base_drop > 0.0
+    assert 0.74 <= fit.power_low_freq_reference_ratio <= 0.82
+    assert len(fit.points) >= 11
+
+
+def test_cross_node_penalty_slows_and_depowers_multinode_prediction():
+    hardware = HardwareFeatures(
+        gpu_name="Tesla V100-SXM3-32GB",
+        gpu_count=16,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=125.0,
+        peak_fp32_tflops_per_gpu=15.7,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=50000.0,
+        memory_limit_tokens_per_s=45000.0,
+        communication_limit_tokens_per_s=40000.0,
+        communication_penalty=0.35,
+        static_power_w=120.0,
+        dynamic_power_w=180.0,
+        dynamic_power_exponent=1.6,
+        cross_node_alpha_pp_s_per_byte=7.5e-09,
+        cross_node_alpha_dp_s_per_byte=1.0e-10,
+        cross_node_alpha_tp_s_per_byte=8.8e-11,
+    )
+    single_node = WorkloadFeatures(
+        num_layers=28,
+        hidden_size=3584,
+        ffn_hidden_size=18944,
+        num_attention_heads=28,
+        num_key_value_heads=4,
+        seq_length=2048,
+        micro_batch_size=1,
+        global_batch_size=8,
+        train_iters=20,
+        tensor_model_parallel_size=2,
+        pipeline_model_parallel_size=4,
+        data_parallel_size=1,
+        zero_stage=1,
+        precision_mode="bf16",
+        swiglu=True,
+        node_count=1,
+        gpus_per_node=8,
+    )
+    dual_node = WorkloadFeatures(
+        num_layers=28,
+        hidden_size=3584,
+        ffn_hidden_size=18944,
+        num_attention_heads=28,
+        num_key_value_heads=4,
+        seq_length=2048,
+        micro_batch_size=1,
+        global_batch_size=16,
+        train_iters=20,
+        tensor_model_parallel_size=2,
+        pipeline_model_parallel_size=4,
+        data_parallel_size=2,
+        zero_stage=1,
+        precision_mode="bf16",
+        swiglu=True,
+        node_count=2,
+        gpus_per_node=8,
+    )
+
+    single_features = derive_model_features(hardware, single_node)
+    dual_features = derive_model_features(hardware, dual_node)
+
+    single_throughput = predict_throughput_tokens_per_s(1200, hardware, single_features, params)
+    dual_throughput = predict_throughput_tokens_per_s(1200, hardware, dual_features, params)
+    single_power = predict_power_w(1200, hardware, single_features, params)
+    dual_power = predict_power_w(1200, hardware, dual_features, params)
+
+    assert dual_features.cross_node_pp_bytes == pytest.approx(0.0)
+    assert dual_features.cross_node_dp_bytes > 0.0
+    assert dual_features.cross_node_tp_bytes == pytest.approx(0.0)
+    assert dual_features.pp_cross_node_edge_fraction == pytest.approx(0.0)
+    assert dual_features.dp_cross_node_group_fraction == pytest.approx(1.0)
+    assert dual_features.tp_cross_node_group_fraction == pytest.approx(0.0)
+    assert dual_throughput < single_throughput
+    assert dual_power < single_power

@@ -16,6 +16,8 @@
 |---------|---------|---------|
 | `bash` | system | Launcher scripting |
 | `screen` | `4.09.00` | Detached remote experiment sessions |
+| `tp4bit` Conda env | Python `3.12` + `torch 2.9.1+cu128` + `deepspeed 0.18.5` | Current dual-node DGX2 bring-up environment on `sd@v100x16-{1,2}` |
+| `Qwen2.5 tokenizer flat copy` | snapshot-derived local files | Use `/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat` on both DGX2 nodes to avoid Hugging Face snapshot symlink/blob breakage on `sd@v100x16-2` |
 | `nvidia-smi` | system | GPU inspection and validation |
 
 ## Version Constraints
