@@ -30,6 +30,8 @@ class WorkloadFeatures:
     zero_stage: int
     precision_mode: str
     swiglu: bool
+    node_count: int = 1
+    gpus_per_node: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -115,7 +117,9 @@ def build_workload_features(run_payload: Dict[str, Any]) -> WorkloadFeatures:
 
     tp = int(parallelism.get("tensor_model_parallel_size") or topology.get("tp") or 1)
     pp = int(parallelism.get("pipeline_model_parallel_size") or topology.get("pp") or 1)
-    world_size = int(topology.get("world_size") or run_payload.get("environment", {}).get("WORLD_SIZE") or tp * pp)
+    node_count = int(topology.get("nnodes") or run_payload.get("environment", {}).get("NNODES") or 1)
+    gpus_per_node = int(topology.get("nproc_per_node") or 0)
+    world_size = int(topology.get("world_size") or run_payload.get("environment", {}).get("WORLD_SIZE") or max(tp * pp * node_count, tp * pp))
     dp = max(1, world_size // max(tp * pp, 1))
 
     return WorkloadFeatures(
@@ -134,6 +138,8 @@ def build_workload_features(run_payload: Dict[str, Any]) -> WorkloadFeatures:
         zero_stage=int(parallelism.get("zero_stage") or 0),
         precision_mode=_parse_precision_mode(training),
         swiglu=bool(model.get("swiglu")),
+        node_count=node_count,
+        gpus_per_node=gpus_per_node,
     )
 
 

@@ -26,6 +26,21 @@ class DerivedModelFeatures:
     compute_weight: float
     memory_weight: float
     communication_weight: float
+    microbatches_per_step: float = 1.0
+    pipeline_bubble_fraction: float = 0.0
+    replicas_per_node: float = 1.0
+    pp_cross_node_wait_pressure: float = 0.0
+    parameter_bytes: float = 0.0
+    activation_bytes_per_microbatch: float = 0.0
+    dp_exposed_fraction: float = 0.0
+    node_count: int = 1
+    gpus_per_node: int = 0
+    pp_cross_node_edge_fraction: float = 0.0
+    dp_cross_node_group_fraction: float = 0.0
+    tp_cross_node_group_fraction: float = 0.0
+    cross_node_pp_bytes: float = 0.0
+    cross_node_dp_bytes: float = 0.0
+    cross_node_tp_bytes: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -49,6 +64,64 @@ def _dp_overlap_prior(zero_stage: int) -> float:
     return 0.20
 
 
+def _global_rank(pipe_index: int, data_index: int, model_index: int, workload: WorkloadFeatures) -> int:
+    # Megatron rank assignment: rank = tp_rank + tp_size * (pp_rank + pp_size * dp_rank)
+    return model_index + workload.tensor_model_parallel_size * (pipe_index + workload.pipeline_model_parallel_size * data_index)
+
+
+def _node_index_for_rank(global_rank: int, workload: WorkloadFeatures) -> int:
+    gpus_per_node = max(int(workload.gpus_per_node), 1)
+    return global_rank // gpus_per_node
+
+
+def _tp_cross_node_group_fraction(workload: WorkloadFeatures) -> float:
+    if workload.node_count <= 1 or workload.tensor_model_parallel_size <= 1 or workload.gpus_per_node <= 0:
+        return 0.0
+    total = 0.0
+    count = 0
+    for pipe_index in range(workload.pipeline_model_parallel_size):
+        for data_index in range(workload.data_parallel_size):
+            nodes = {
+                _node_index_for_rank(_global_rank(pipe_index, data_index, model_index, workload), workload)
+                for model_index in range(workload.tensor_model_parallel_size)
+            }
+            total += (len(nodes) - 1) / max(workload.tensor_model_parallel_size - 1, 1)
+            count += 1
+    return total / max(count, 1)
+
+
+def _dp_cross_node_group_fraction(workload: WorkloadFeatures) -> float:
+    if workload.node_count <= 1 or workload.data_parallel_size <= 1 or workload.gpus_per_node <= 0:
+        return 0.0
+    total = 0.0
+    count = 0
+    for pipe_index in range(workload.pipeline_model_parallel_size):
+        for model_index in range(workload.tensor_model_parallel_size):
+            nodes = {
+                _node_index_for_rank(_global_rank(pipe_index, data_index, model_index, workload), workload)
+                for data_index in range(workload.data_parallel_size)
+            }
+            total += (len(nodes) - 1) / max(workload.data_parallel_size - 1, 1)
+            count += 1
+    return total / max(count, 1)
+
+
+def _pp_cross_node_edge_fraction(workload: WorkloadFeatures) -> float:
+    if workload.node_count <= 1 or workload.pipeline_model_parallel_size <= 1 or workload.gpus_per_node <= 0:
+        return 0.0
+    cross_edges = 0
+    total_edges = 0
+    for pipe_index in range(workload.pipeline_model_parallel_size - 1):
+        for data_index in range(workload.data_parallel_size):
+            for model_index in range(workload.tensor_model_parallel_size):
+                left_rank = _global_rank(pipe_index, data_index, model_index, workload)
+                right_rank = _global_rank(pipe_index + 1, data_index, model_index, workload)
+                total_edges += 1
+                if _node_index_for_rank(left_rank, workload) != _node_index_for_rank(right_rank, workload):
+                    cross_edges += 1
+    return cross_edges / max(total_edges, 1)
+
+
 def derive_model_features(hardware: HardwareFeatures, workload: WorkloadFeatures) -> DerivedModelFeatures:
     bytes_per_element = _precision_bytes(workload.precision_mode)
     tokens_per_step = float(workload.global_batch_size * workload.seq_length)
@@ -66,6 +139,14 @@ def derive_model_features(hardware: HardwareFeatures, workload: WorkloadFeatures
 
     activation_bytes = (
         tokens_per_step
+        * workload.hidden_size
+        * workload.num_layers
+        * bytes_per_element
+        * 6.0
+    )
+    activation_bytes_per_microbatch = (
+        workload.micro_batch_size
+        * workload.seq_length
         * workload.hidden_size
         * workload.num_layers
         * bytes_per_element
@@ -120,6 +201,40 @@ def derive_model_features(hardware: HardwareFeatures, workload: WorkloadFeatures
     pipeline_exposed_fraction = _clamp(pipeline_exposed_fraction, 0.0, 1.0)
     dp_overlapable_fraction = _clamp(dp_overlapable_fraction, 0.0, 1.0)
     tp_sync_fraction = _clamp(tp_sync_fraction, 0.0, 1.0)
+    dp_exposed_fraction = _clamp(dp_penalty - dp_overlapable_fraction, 0.0, 1.0)
+
+    node_count = max(int(workload.node_count), 1)
+    replicas_per_node = workload.data_parallel_size / max(float(node_count), 1.0)
+    pp_cross_node_edge_fraction = _pp_cross_node_edge_fraction(workload)
+    dp_cross_node_group_fraction = _dp_cross_node_group_fraction(workload)
+    tp_cross_node_group_fraction = _tp_cross_node_group_fraction(workload)
+    cross_node_pp_bytes = 0.0
+    cross_node_dp_bytes = 0.0
+    cross_node_tp_bytes = 0.0
+    pp_cross_node_wait_pressure = 0.0
+    if node_count > 1:
+        cross_node_pp_bytes = (
+            activation_bytes_per_microbatch
+            * microbatches_per_step
+            * pipeline_exposed_fraction
+            * max(workload.pipeline_model_parallel_size - 1, 0)
+            * pp_cross_node_edge_fraction
+        )
+        # DP allreduce overlaps with backward pass computation. More microbatches
+        # means a longer backward pass and more hiding opportunity → exposure ∝ 1/m.
+        dp_cross_node_exposure = dp_cross_node_group_fraction / max(microbatches_per_step, 1.0)
+        cross_node_dp_bytes = (
+            (parameter_bytes / max(workload.tensor_model_parallel_size, 1))
+            * dp_cross_node_exposure
+        )
+        cross_node_tp_bytes = (
+            parameter_bytes
+            * microbatches_per_step
+            * tp_sync_fraction
+            * tp_cross_node_group_fraction
+        )
+        if pp_cross_node_edge_fraction > 0.0:
+            pp_cross_node_wait_pressure = replicas_per_node * pipeline_bubble_fraction
 
     communication_weight = _clamp(communication_share * 1.5, 0.05, 0.35)
     compute_base = arithmetic_intensity / (arithmetic_intensity + hardware_balance)
@@ -147,4 +262,19 @@ def derive_model_features(hardware: HardwareFeatures, workload: WorkloadFeatures
         compute_weight=compute_weight,
         memory_weight=memory_weight,
         communication_weight=communication_weight,
+        microbatches_per_step=microbatches_per_step,
+        pipeline_bubble_fraction=pipeline_bubble_fraction,
+        replicas_per_node=replicas_per_node,
+        pp_cross_node_wait_pressure=pp_cross_node_wait_pressure,
+        parameter_bytes=parameter_bytes,
+        activation_bytes_per_microbatch=activation_bytes_per_microbatch,
+        dp_exposed_fraction=dp_exposed_fraction,
+        node_count=node_count,
+        gpus_per_node=workload.gpus_per_node,
+        pp_cross_node_edge_fraction=pp_cross_node_edge_fraction,
+        dp_cross_node_group_fraction=dp_cross_node_group_fraction,
+        tp_cross_node_group_fraction=tp_cross_node_group_fraction,
+        cross_node_pp_bytes=cross_node_pp_bytes,
+        cross_node_dp_bytes=cross_node_dp_bytes,
+        cross_node_tp_bytes=cross_node_tp_bytes,
     )
