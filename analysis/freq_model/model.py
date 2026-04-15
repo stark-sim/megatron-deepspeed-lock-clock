@@ -29,9 +29,15 @@ class CalibrationParams:
     reference_min_frequency_ratio: float = 0.0
     reference_max_frequency_ratio: float = 1.0
     reference_observed_frequency_ratios: tuple[float, ...] = ()
+    reference_total_gpu_count: int = 1
+    reference_gpus_per_node: int = 1
+    reference_pipeline_parallel_efficiency: float = 1.0
     reference_pipeline_exposed_fraction: float = 0.0
     reference_dp_overlapable_fraction: float = 0.0
     reference_tp_sync_fraction: float = 0.0
+    reference_topology_dispersion: float = 0.0
+    reference_topology_count: int = 1
+    reference_multi_topology_calibration: bool = False
     reference_topology_features_present: bool = False
     cross_node_alpha_pp_s_per_byte: float = 0.0
     cross_node_alpha_dp_s_per_byte: float = 0.0
@@ -44,6 +50,27 @@ class CalibrationParams:
     cross_node_power_base_drop: float = 0.0
     cross_node_power_low_freq_reference_ratio: float = 0.782
     cross_node_power_low_freq_gamma: float = 0.0
+    cross_node_reference_transport_label: str = "tailscale0|ib_disable=1"
+    cross_node_reference_bandwidth_gbps: float = 0.2075
+    cross_node_reference_jitter_cv: float = 0.136
+    cross_node_benchmark_world_size: int = 0
+    cross_node_benchmark_message_sizes_mb: tuple[float, ...] = ()
+    cross_node_benchmark_avg_times_ms: tuple[float, ...] = ()
+    cross_node_benchmark_bus_bandwidth_gbps: tuple[float, ...] = ()
+    cross_node_use_benchmark_time_model: bool = False
+    cross_node_bandwidth_sensitivity: float = 1.0
+    cross_node_jitter_sensitivity: float = 0.5
+    cross_node_pp_exposure_sensitivity: float = 1.0
+    cross_node_dp_exposure_sensitivity: float = 1.0
+    cross_node_tp_exposure_sensitivity: float = 1.0
+    cross_node_dp_group_scale_gain: float = 0.5
+    cross_node_pp_bubble_exposure_gain: float = 0.5
+    base_topology_throughput_sensitivity: float = 0.0
+    base_topology_communication_sensitivity: float = 0.0
+    base_topology_power_sensitivity: float = 0.0
+    base_topology_shape_sensitivity: float = 0.0
+    base_topology_min_throughput_scale: float = 0.18
+    base_topology_max_power_scale: float = 1.75
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -174,13 +201,171 @@ def _has_reference_topology_features(params: CalibrationParams) -> bool:
 def _transfer_topology_distance(features: DerivedModelFeatures, params: CalibrationParams) -> float:
     if not _has_reference_topology_features(params):
         return 0.0
-    return _clamp(
+    raw_distance = _clamp(
         (0.60 * abs(features.tp_sync_fraction - params.reference_tp_sync_fraction))
         + (0.25 * abs(features.pipeline_exposed_fraction - params.reference_pipeline_exposed_fraction))
         + (0.15 * abs(features.dp_overlapable_fraction - params.reference_dp_overlapable_fraction)),
         0.0,
         1.0,
     )
+    if not params.reference_multi_topology_calibration:
+        return raw_distance
+    dispersion = _clamp(params.reference_topology_dispersion, 0.0, 1.0)
+    if raw_distance <= dispersion:
+        return 0.0
+    return _clamp((raw_distance - dispersion) / max(1.0 - dispersion, 1e-9), 0.0, 1.0)
+
+
+def _network_quality_distance(features: DerivedModelFeatures, params: CalibrationParams) -> float:
+    if features.node_count <= 1:
+        return 0.0
+
+    observed_bandwidth = float(features.network_effective_bandwidth_gbps or params.cross_node_reference_bandwidth_gbps or 0.0)
+    observed_jitter = float(features.network_jitter_cv or params.cross_node_reference_jitter_cv or 0.0)
+    reference_bandwidth = float(params.cross_node_reference_bandwidth_gbps or 0.0)
+    reference_jitter = float(params.cross_node_reference_jitter_cv or 0.0)
+
+    bandwidth_distance = 0.0
+    if observed_bandwidth > 0.0 and reference_bandwidth > 0.0:
+        bandwidth_distance = abs(math.log(observed_bandwidth / max(reference_bandwidth, 1e-9)))
+
+    jitter_distance = 0.0
+    if observed_jitter > 0.0 and reference_jitter > 0.0:
+        jitter_distance = abs(math.log(observed_jitter / max(reference_jitter, 1e-9)))
+
+    return _clamp((0.70 * bandwidth_distance) + (0.30 * jitter_distance), 0.0, 1.0)
+
+
+def _transfer_correction_damping(
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+    *,
+    emphasis: str,
+) -> float:
+    topology_distance = _transfer_topology_distance(features, params)
+    network_distance = _network_quality_distance(features, params)
+    if topology_distance <= 0.0 and network_distance <= 0.0:
+        return 1.0
+
+    large_gap_bounds = _primary_large_gap_bounds(params)
+    sparsity_boost = 1.0 if large_gap_bounds is not None else 0.65
+    mismatch = _clamp((0.80 * topology_distance) + (0.20 * network_distance), 0.0, 1.0)
+    if emphasis == 'low':
+        return _clamp(1.0 - ((1.00 + (0.60 * sparsity_boost)) * mismatch), 0.10, 1.0)
+    return _clamp(1.0 - ((0.45 + (0.35 * sparsity_boost)) * mismatch), 0.30, 1.0)
+
+
+def _scale_transfer_correction(correction: float, damping: float, *, preserve_penalty: bool) -> float:
+    if correction > 0.0:
+        return correction * damping
+    if correction < 0.0 and preserve_penalty:
+        return correction * (0.70 + (0.30 * damping))
+    return correction * damping
+
+
+def _topology_shape_pressure(features: DerivedModelFeatures, params: CalibrationParams) -> float:
+    signed_pressure = (
+        0.75 * (features.tp_sync_fraction - params.reference_tp_sync_fraction)
+        + 0.25 * (params.reference_pipeline_exposed_fraction - features.pipeline_exposed_fraction)
+    )
+    return _clamp(signed_pressure, -1.0, 1.0)
+
+
+def _multi_topology_prior_strength(params: CalibrationParams) -> float:
+    if not params.reference_multi_topology_calibration:
+        return 0.0
+    return _clamp(params.reference_topology_dispersion, 0.0, 1.0)
+
+
+def _topology_anchor_pressure(features: DerivedModelFeatures, params: CalibrationParams) -> float:
+    if not _has_reference_topology_features(params):
+        return 0.0
+    return _clamp(
+        (0.70 * max(features.tp_sync_fraction - params.reference_tp_sync_fraction, 0.0))
+        + (0.25 * max(params.reference_pipeline_exposed_fraction - features.pipeline_exposed_fraction, 0.0))
+        + (0.05 * max(params.reference_dp_overlapable_fraction - features.dp_overlapable_fraction, 0.0)),
+        0.0,
+        1.0,
+    )
+
+
+def _topology_frequency_shape_scale(
+    frequency_ratio: float,
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    positive_shape_pressure = max(_topology_shape_pressure(features, params), 0.0)
+    if positive_shape_pressure <= 0.0:
+        return 1.0
+    effective_sensitivity = params.base_topology_shape_sensitivity
+    if params.reference_multi_topology_calibration:
+        effective_sensitivity += 0.50 + (1.50 * _multi_topology_prior_strength(params))
+    if effective_sensitivity <= 0.0:
+        return 1.0
+    low_freq_span = max(1.0 - frequency_ratio, 0.0)
+    adjustment = effective_sensitivity * positive_shape_pressure * (0.35 + (0.65 * low_freq_span))
+    return _clamp(1.0 - adjustment, 0.55, 1.10)
+
+
+def _topology_base_pressure(features: DerivedModelFeatures) -> float:
+    return _clamp(
+        (0.55 * features.tp_sync_fraction)
+        + (0.30 * features.pipeline_exposed_fraction)
+        + (0.15 * (1.0 - features.dp_overlapable_fraction)),
+        0.0,
+        1.0,
+    )
+
+
+def _topology_base_throughput_scale(features: DerivedModelFeatures, params: CalibrationParams) -> float:
+    anchor_pressure = _topology_anchor_pressure(features, params)
+    effective_sensitivity = params.base_topology_throughput_sensitivity
+    if params.reference_multi_topology_calibration:
+        effective_sensitivity += 1.00 + (2.50 * _multi_topology_prior_strength(params))
+    if anchor_pressure <= 0.0 or effective_sensitivity <= 0.0:
+        return 1.0
+    scale = 1.0 / (1.0 + (2.5 * effective_sensitivity * anchor_pressure))
+    return _clamp(scale, params.base_topology_min_throughput_scale, 1.02)
+
+
+def _topology_communication_scale(features: DerivedModelFeatures, params: CalibrationParams) -> float:
+    anchor_pressure = _topology_anchor_pressure(features, params)
+    effective_sensitivity = params.base_topology_communication_sensitivity
+    if params.reference_multi_topology_calibration:
+        effective_sensitivity += 0.15 + (1.20 * _multi_topology_prior_strength(params))
+    if anchor_pressure <= 0.0 or effective_sensitivity <= 0.0:
+        return 1.0
+    amplification = 2.0 * effective_sensitivity * anchor_pressure
+    return _clamp(1.0 + amplification, 1.0, 4.0)
+
+
+def _topology_power_scale(features: DerivedModelFeatures, params: CalibrationParams) -> float:
+    anchor_pressure = _topology_anchor_pressure(features, params)
+    effective_sensitivity = params.base_topology_power_sensitivity
+    if params.reference_multi_topology_calibration:
+        effective_sensitivity += 0.10 + (0.80 * _multi_topology_prior_strength(params))
+    if anchor_pressure <= 0.0 or effective_sensitivity <= 0.0:
+        return 1.0
+    boost = 0.60 * effective_sensitivity * anchor_pressure
+    return _clamp(1.0 + boost, 0.90, max(params.base_topology_max_power_scale, 1.0))
+
+
+def _cluster_capacity_scale(features: DerivedModelFeatures, params: CalibrationParams) -> float:
+    reference_total_gpus = max(int(params.reference_total_gpu_count or 0), 1)
+    target_total_gpus = max(int(features.node_count) * max(int(features.gpus_per_node), 1), 1)
+    gpu_scale = target_total_gpus / reference_total_gpus
+
+    reference_pipeline_efficiency = max(float(params.reference_pipeline_parallel_efficiency or 0.0), 1e-9)
+    target_pipeline_efficiency = max(float(features.pipeline_parallel_efficiency or 0.0), 1e-9)
+    pipeline_scale = target_pipeline_efficiency / reference_pipeline_efficiency
+
+    return _clamp(gpu_scale * pipeline_scale, 0.25, 8.0)
+
+
+def _local_gpu_count_power_scale(features: DerivedModelFeatures, params: CalibrationParams) -> float:
+    reference_gpus_per_node = max(int(params.reference_gpus_per_node or 0), 1)
+    target_gpus_per_node = max(int(features.gpus_per_node), 1)
+    return _clamp(target_gpus_per_node / reference_gpus_per_node, 0.25, 8.0)
 
 
 def _in_gap_frequency_regularization_blend(
@@ -320,10 +505,14 @@ def _throughput_correction_factor(
     params: CalibrationParams,
 ) -> float:
     low_position, high_position, gate_low, gate_high = _correction_positions(frequency_ratio, params)
-    low_intensity = _low_freq_correction_intensity(features, params)
-    high_intensity = _high_freq_correction_intensity(features, params)
-    low_factor = 1.0 + (low_intensity * params.throughput_low_freq_correction * low_position)
-    high_factor = 1.0 + (high_intensity * params.throughput_high_freq_correction * (high_position ** 2))
+    low_damping = _transfer_correction_damping(features, params, emphasis='low')
+    high_damping = _transfer_correction_damping(features, params, emphasis='high')
+    low_intensity = _low_freq_correction_intensity(features, params) * low_damping
+    high_intensity = _high_freq_correction_intensity(features, params) * high_damping
+    low_correction = _scale_transfer_correction(params.throughput_low_freq_correction, low_damping, preserve_penalty=True)
+    high_correction = _scale_transfer_correction(params.throughput_high_freq_correction, high_damping, preserve_penalty=False)
+    low_factor = 1.0 + (low_intensity * low_correction * low_position)
+    high_factor = 1.0 + (high_intensity * high_correction * (high_position ** 2))
     factor = (gate_low * low_factor) + (gate_high * high_factor)
     return _clamp(factor, 0.75, 1.25)
 
@@ -334,13 +523,156 @@ def _power_correction_factor(
     params: CalibrationParams,
 ) -> float:
     low_position, high_position, gate_low, gate_high = _correction_positions(frequency_ratio, params)
-    low_intensity = _low_freq_correction_intensity(features, params)
-    high_intensity = _high_freq_correction_intensity(features, params)
-    low_factor = 1.0 + (low_intensity * params.power_low_freq_correction * low_position)
-    high_factor = 1.0 + (high_intensity * params.power_high_freq_correction * (high_position ** 2))
+    low_damping = _transfer_correction_damping(features, params, emphasis='low')
+    high_damping = _transfer_correction_damping(features, params, emphasis='high')
+    low_intensity = _low_freq_correction_intensity(features, params) * low_damping
+    high_intensity = _high_freq_correction_intensity(features, params) * high_damping
+    low_correction = _scale_transfer_correction(params.power_low_freq_correction, low_damping, preserve_penalty=True)
+    high_correction = _scale_transfer_correction(params.power_high_freq_correction, high_damping, preserve_penalty=False)
+    low_factor = 1.0 + (low_intensity * low_correction * low_position)
+    high_factor = 1.0 + (high_intensity * high_correction * (high_position ** 2))
     factor = (gate_low * low_factor) + (gate_high * high_factor)
     factor *= 1.0 + (_power_frequency_retention_bias(features) * (1.0 - frequency_ratio))
     return _clamp(factor, 0.85, 1.20)
+
+
+def _cross_node_bandwidth_factor(
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    if features.node_count <= 1:
+        return 1.0
+
+    observed_bandwidth = float(features.network_effective_bandwidth_gbps or params.cross_node_reference_bandwidth_gbps or 0.0)
+    if params.cross_node_reference_bandwidth_gbps <= 0.0 or observed_bandwidth <= 0.0:
+        return 1.0
+
+    bandwidth_ratio = params.cross_node_reference_bandwidth_gbps / max(observed_bandwidth, 1e-9)
+    return _clamp(1.0 + (params.cross_node_bandwidth_sensitivity * (bandwidth_ratio - 1.0)), 0.75, 3.0)
+
+
+def _cross_node_benchmark_bandwidth_scale(
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    if features.node_count <= 1:
+        return 1.0
+
+    observed_bandwidth = float(features.network_effective_bandwidth_gbps or 0.0)
+    reference_bandwidth = float(params.cross_node_reference_bandwidth_gbps or 0.0)
+    if observed_bandwidth <= 0.0 or reference_bandwidth <= 0.0:
+        return 1.0
+    return _clamp(observed_bandwidth / max(reference_bandwidth, 1e-9), 0.02, 1024.0)
+
+
+def _cross_node_jitter_multiplier(
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    if features.node_count <= 1:
+        return 1.0
+
+    observed_jitter = float(features.network_jitter_cv or params.cross_node_reference_jitter_cv or 0.0)
+    if params.cross_node_reference_jitter_cv <= 0.0 or observed_jitter <= 0.0:
+        return 1.0
+
+    jitter_ratio = observed_jitter / max(params.cross_node_reference_jitter_cv, 1e-9)
+    return _clamp(1.0 + (params.cross_node_jitter_sensitivity * (jitter_ratio - 1.0)), 0.85, 2.5)
+
+
+def _cross_node_network_quality_multiplier(
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    return _clamp(
+        _cross_node_bandwidth_factor(features, params) * _cross_node_jitter_multiplier(features, params),
+        0.75,
+        4.0,
+    )
+
+
+def _has_cross_node_benchmark_curve(params: CalibrationParams) -> bool:
+    return (
+        params.cross_node_use_benchmark_time_model
+        and len(params.cross_node_benchmark_message_sizes_mb) > 0
+        and len(params.cross_node_benchmark_message_sizes_mb) == len(params.cross_node_benchmark_bus_bandwidth_gbps)
+    )
+
+
+def _cross_node_benchmark_points(params: CalibrationParams) -> list[tuple[float, float]]:
+    points = []
+    for size_mb, busbw_gbps in zip(
+        params.cross_node_benchmark_message_sizes_mb,
+        params.cross_node_benchmark_bus_bandwidth_gbps,
+    ):
+        size_mb = float(size_mb)
+        busbw_gbps = float(busbw_gbps)
+        if size_mb > 0.0 and busbw_gbps > 0.0:
+            points.append((size_mb, busbw_gbps))
+    return sorted(points, key=lambda item: item[0])
+
+
+def _interpolate_cross_node_benchmark_bandwidth_gbps(
+    message_bytes: float,
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    points = _cross_node_benchmark_points(params)
+    if not points or message_bytes <= 0.0:
+        return 0.0
+
+    target_size_mb = max(message_bytes / 1_000_000.0, 1e-6)
+    if target_size_mb <= points[0][0]:
+        base_bandwidth_gbps = points[0][1]
+    elif target_size_mb >= points[-1][0]:
+        base_bandwidth_gbps = points[-1][1]
+    else:
+        base_bandwidth_gbps = points[-1][1]
+        for (left_size, left_bandwidth), (right_size, right_bandwidth) in zip(points, points[1:]):
+            if left_size <= target_size_mb <= right_size:
+                left_log_size = math.log(max(left_size, 1e-9))
+                right_log_size = math.log(max(right_size, 1e-9))
+                target_log_size = math.log(target_size_mb)
+                if abs(right_log_size - left_log_size) < 1e-12:
+                    base_bandwidth_gbps = right_bandwidth
+                else:
+                    blend = (target_log_size - left_log_size) / (right_log_size - left_log_size)
+                    left_log_bandwidth = math.log(max(left_bandwidth, 1e-9))
+                    right_log_bandwidth = math.log(max(right_bandwidth, 1e-9))
+                    base_bandwidth_gbps = math.exp(
+                        left_log_bandwidth + (blend * (right_log_bandwidth - left_log_bandwidth))
+                    )
+                break
+
+    return max(base_bandwidth_gbps * _cross_node_benchmark_bandwidth_scale(features, params), 0.0)
+
+
+def _allreduce_transfer_bytes(message_bytes: float, group_size: int) -> float:
+    if message_bytes <= 0.0 or group_size <= 1:
+        return 0.0
+    return 2.0 * message_bytes * max(group_size - 1, 0) / max(group_size, 1)
+
+
+def _estimate_benchmark_transport_time_s(
+    message_bytes: float,
+    *,
+    collective_group_size: int,
+    features: DerivedModelFeatures,
+    params: CalibrationParams,
+) -> float:
+    if message_bytes <= 0.0:
+        return 0.0
+
+    bandwidth_gbps = _interpolate_cross_node_benchmark_bandwidth_gbps(message_bytes, features, params)
+    if bandwidth_gbps <= 0.0:
+        return 0.0
+
+    transfer_bytes = (
+        _allreduce_transfer_bytes(message_bytes, collective_group_size)
+        if collective_group_size > 1
+        else message_bytes
+    )
+    return transfer_bytes / max(bandwidth_gbps * 1_000_000_000.0, 1e-9)
 
 
 def estimate_cross_node_time_penalty_s(
@@ -371,41 +703,55 @@ def estimate_cross_node_time_penalty_s(
     beta_pp_wait = max(params.cross_node_beta_pp_wait_s, 0.0)
     beta_pp_edge = max(params.cross_node_beta_pp_edge_s, 0.0)
 
-    # --- DP Communication Complexity Model ---
-    # DP allreduce latency scales with group size (logarithmic or linear depending on implementation)
-    # For simplicity, we use a sub-linear scaling factor
-    dp_group_scale = 1.0 + (features.dp_cross_node_group_fraction * 0.5)
+    # --- Explicit TP/PP/DP exposed communication time model ---
+    # Higher frequency means less compute slack to hide communication waits, so exposure grows with frequency_ratio.
+    pp_exposure_factor = _clamp(
+        0.65
+        + (0.35 * frequency_ratio)
+        + (params.cross_node_pp_bubble_exposure_gain * features.pipeline_bubble_fraction),
+        0.50,
+        1.80,
+    )
+    dp_exposure_factor = _clamp(
+        0.55
+        + (0.45 * frequency_ratio)
+        + (0.25 * (1.0 - features.dp_overlapable_fraction))
+        + (0.20 * features.dp_cross_node_group_fraction),
+        0.40,
+        2.00,
+    )
+    tp_exposure_factor = _clamp(
+        0.65
+        + (0.50 * frequency_ratio)
+        + (0.30 * features.tp_sync_fraction)
+        + (0.20 * features.tp_cross_node_group_fraction),
+        0.50,
+        2.20,
+    )
+    dp_group_scale = 1.0 + (features.dp_cross_node_group_fraction * params.cross_node_dp_group_scale_gain)
 
-    # Frequency sensitivity: higher frequency = faster compute = more exposed communication waiting
-    # At max frequency, communication is fully exposed; at lower frequencies, compute hides more communication
-    # The exposure factor increases with frequency ratio (1.0 = max freq = max exposure)
-    base_compute_fraction = 0.7  # Approximate compute fraction at typical frequencies
-    frequency_adjusted_exposure = base_compute_fraction / max(base_compute_fraction * frequency_ratio, 0.3)
-
-    # --- PP Communication Complexity ---
-    # PP communication happens at pipeline boundaries; bubble fraction affects how much waiting is exposed
-    pp_exposure_factor = 1.0 + (features.pipeline_bubble_fraction * 0.5)
-
-    # --- Calculate time penalties ---
-    # DP penalty: bytes * alpha * group_scale * frequency_exposure
     dp_penalty_s = (
         alpha_dp
         * features.cross_node_dp_bytes
         * dp_group_scale
-        * frequency_adjusted_exposure
+        * dp_exposure_factor
+        * max(params.cross_node_dp_exposure_sensitivity, 0.0)
     )
-
-    # PP penalty: bytes * alpha * exposure_factor + structural wait penalties
     pp_penalty_s = (
         alpha_pp
         * features.cross_node_pp_bytes
         * pp_exposure_factor
+        * max(params.cross_node_pp_exposure_sensitivity, 0.0)
     ) + (beta_pp_wait * features.pp_cross_node_wait_pressure) + (beta_pp_edge * features.pp_cross_node_edge_fraction)
+    tp_penalty_s = (
+        alpha_tp
+        * features.cross_node_tp_bytes
+        * tp_exposure_factor
+        * max(params.cross_node_tp_exposure_sensitivity, 0.0)
+    )
+    network_quality_multiplier = _cross_node_network_quality_multiplier(features, params)
 
-    # TP penalty (if any TP crosses nodes)
-    tp_penalty_s = alpha_tp * features.cross_node_tp_bytes
-
-    total_penalty_s = dp_penalty_s + pp_penalty_s + tp_penalty_s
+    total_penalty_s = network_quality_multiplier * (dp_penalty_s + pp_penalty_s + tp_penalty_s)
     return max(total_penalty_s, 0.0)
 
 
@@ -418,11 +764,21 @@ def _predict_base_throughput_tokens_per_s(
     max_frequency = float(hardware.max_frequency_mhz or frequency_mhz or 1.0)
     frequency_ratio = _clamp(float(frequency_mhz) / max_frequency, 0.05, 1.0)
     compute_frequency_ratio = _compute_frequency_ratio(frequency_ratio, params, features)
-    compute_limit = params.compute_limit_at_max_tokens_per_s * compute_frequency_ratio
-    memory_limit = params.memory_limit_tokens_per_s
+    compute_frequency_ratio *= _topology_frequency_shape_scale(frequency_ratio, features, params)
+    topology_throughput_scale = _topology_base_throughput_scale(features, params)
+    topology_communication_scale = _topology_communication_scale(features, params)
+    cluster_capacity_scale = _cluster_capacity_scale(features, params)
+    compute_limit = (
+        params.compute_limit_at_max_tokens_per_s
+        * compute_frequency_ratio
+        * topology_throughput_scale
+        * cluster_capacity_scale
+    )
+    memory_limit = params.memory_limit_tokens_per_s * cluster_capacity_scale
     exposed_communication_share = _exposed_communication_share(features)
     communication_limit = params.communication_limit_tokens_per_s / (
-        1.0 + params.communication_penalty * exposed_communication_share * ((1.0 / frequency_ratio) - 1.0)
+        (1.0 + params.communication_penalty * exposed_communication_share * ((1.0 / frequency_ratio) - 1.0))
+        * topology_communication_scale
     )
     throughput = _harmonic_blend(
         [compute_limit, memory_limit, communication_limit],
@@ -460,8 +816,9 @@ def _cross_node_power_multiplier(
     reference_cross_node_dp_bytes = max(params.cross_node_reference_cross_node_dp_bytes, 1e-9)
     dp_scale = features.cross_node_dp_bytes / reference_cross_node_dp_bytes
     low_freq_gap = max(params.cross_node_power_low_freq_reference_ratio - frequency_ratio, 0.0)
-    drop = (params.cross_node_power_base_drop * dp_scale) + (
-        params.cross_node_power_low_freq_gamma * dp_scale * low_freq_gap
+    network_quality_multiplier = _cross_node_network_quality_multiplier(features, params)
+    drop = (params.cross_node_power_base_drop * dp_scale * network_quality_multiplier) + (
+        params.cross_node_power_low_freq_gamma * dp_scale * low_freq_gap * network_quality_multiplier
     )
     return _clamp(1.0 - drop, 0.85, 1.05)
 
@@ -479,6 +836,8 @@ def predict_power_w(
     utilization = _clamp(throughput / compute_limit, 0.05, 1.2)
     dynamic = params.dynamic_power_w * utilization * (frequency_ratio ** params.dynamic_power_exponent)
     power_w = params.static_power_w + dynamic
+    power_w *= _topology_power_scale(features, params)
+    power_w *= _local_gpu_count_power_scale(features, params)
     power_w *= _power_correction_factor(frequency_ratio, features, params)
     power_w *= _cross_node_power_multiplier(frequency_ratio, features, params)
     return power_w
@@ -501,9 +860,10 @@ def predict_point(
     tokens_per_wh = tokens_per_j * 3600.0
     samples_per_wh = throughput_samples_per_s * 3600.0 / max(power_w, 1e-9)
     exposed_communication_share = _exposed_communication_share(features)
+    cluster_capacity_scale = _cluster_capacity_scale(features, params)
     component_limits = {
-        "compute_tokens_per_s": params.compute_limit_at_max_tokens_per_s * compute_frequency_ratio,
-        "memory_tokens_per_s": params.memory_limit_tokens_per_s,
+        "compute_tokens_per_s": params.compute_limit_at_max_tokens_per_s * compute_frequency_ratio * cluster_capacity_scale,
+        "memory_tokens_per_s": params.memory_limit_tokens_per_s * cluster_capacity_scale,
         "communication_tokens_per_s": params.communication_limit_tokens_per_s / (
             1.0 + params.communication_penalty * exposed_communication_share * ((1.0 / frequency_ratio) - 1.0)
         ),

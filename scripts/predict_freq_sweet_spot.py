@@ -15,6 +15,7 @@ if str(REPO_ROOT) not in sys.path:
 from analysis.freq_model.calibrate import calibrate_frequency_model
 from analysis.freq_model.features import derive_model_features
 from analysis.freq_model.hardware import build_hardware_features
+from analysis.freq_model.network import apply_network_quality, load_network_quality_observation
 from analysis.freq_model.recommend import build_prediction_bundle
 from analysis.freq_model.workload import ExperimentCollection, LoadedRunSample, load_experiment_samples
 
@@ -46,6 +47,7 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Blend observed static points back into the curve with interpolation; disabled by default for hardware-first prediction",
     )
+    parser.add_argument("--network-benchmark-json", default=None, help="Optional network benchmark JSON used to annotate derived features for multi-node prediction")
     return parser.parse_args()
 
 
@@ -327,6 +329,9 @@ def main() -> None:
         power_limit_w_per_gpu=args.power_limit_w_per_gpu,
     )
     derived_features = [derive_model_features(hardware, sample.workload) for sample in collection.samples]
+    network_quality = load_network_quality_observation(args.network_benchmark_json) if args.network_benchmark_json else None
+    if network_quality is not None:
+        derived_features = [apply_network_quality(features, network_quality) for features in derived_features]
     comparison_steps = _resolve_comparison_steps(first_sample, args.comparison_steps)
     baseline_sample = _load_baseline_sample(args.baseline_root, args.baseline_run_id)
     _validate_baseline_compatibility(collection.samples, baseline_sample)
@@ -372,6 +377,7 @@ def main() -> None:
         "samples": [sample.to_dict() for sample in collection.samples],
         "skipped_runs": collection.skipped_runs,
         "derived_features": derived_features[0].to_dict(),
+        "network_quality": network_quality.to_dict() if network_quality is not None else None,
         "baseline_sample": baseline_sample.to_dict() if baseline_sample is not None else None,
         "calibration": {
             "params": calibration.params.to_dict(),

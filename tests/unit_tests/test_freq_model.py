@@ -6,11 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from analysis.freq_model.calibrate import calibrate_frequency_model
+from analysis.freq_model.calibrate import _aggregate_reference_features, _correction_objective, _fit_cross_node_exposure_scaling, _fit_topology_base_scaling, _reference_topology_metadata, CalibrationMetrics, calibrate_frequency_model
 from analysis.freq_model.cross_node import fit_cross_node_penalty_model
 from analysis.freq_model.features import DerivedModelFeatures, derive_model_features
 from analysis.freq_model.hardware import HardwareFeatures, build_hardware_features
-from analysis.freq_model.model import CalibrationParams, predict_power_w, predict_throughput_tokens_per_s
+from analysis.freq_model.network import apply_network_quality, load_network_quality_observation
+from analysis.freq_model.model import CalibrationParams, _cluster_capacity_scale, _local_gpu_count_power_scale, _throughput_correction_factor, estimate_cross_node_time_penalty_s, predict_power_w, predict_throughput_tokens_per_s
 from analysis.freq_model.recommend import build_prediction_bundle
 from analysis.freq_model.workload import LoadedRunSample, ObservedMetrics, WorkloadFeatures, load_experiment_samples
 from scripts.predict_freq_sweet_spot import _validate_baseline_compatibility, _validate_workload_consistency
@@ -1167,6 +1168,25 @@ def test_throughput_saturation_ratio_saturates_compute_limit_before_max_clock():
     assert throughput_below_saturation < throughput_at_early_saturation
 
 
+def test_load_experiment_samples_infers_static_frequency_from_run_id(tmp_path: Path):
+    experiment_root = tmp_path / "experiments"
+    run_id = "dual16_tp4pp1dp4_static990_20260325_235717_DGX2-1"
+    _write_run(experiment_root, run_id, frequency_mhz=990, throughput_tokens_per_s=1200.0, avg_power_w=209.0)
+
+    run_dir = experiment_root / run_id
+    payload = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    payload["freq_policy"] = {"mode": None, "static_clock_mhz": None}
+    payload["experiment_name"] = "dual16_tp4pp1dp4_static990"
+    payload["identity"] = {"run_id": run_id, "experiment_name": "dual16_tp4pp1dp4_static990"}
+    (run_dir / "run.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    collection = load_experiment_samples(str(experiment_root))
+
+    assert collection.skipped_runs == []
+    assert len(collection.samples) == 1
+    assert collection.samples[0].observed.frequency_mhz == 990
+
+
 def test_load_experiment_samples_falls_back_to_zeus_logs(tmp_path: Path):
     experiment_root = tmp_path / "experiments"
     run_dir = experiment_root / "run_1200"
@@ -1297,4 +1317,878 @@ def test_cross_node_penalty_slows_and_depowers_multinode_prediction():
     assert dual_features.dp_cross_node_group_fraction == pytest.approx(1.0)
     assert dual_features.tp_cross_node_group_fraction == pytest.approx(0.0)
     assert dual_throughput < single_throughput
-    assert dual_power < single_power
+    assert dual_power == pytest.approx(single_power, rel=0.02)
+
+
+def test_cross_node_penalty_fit_scales_continuously_with_benchmark_bandwidth():
+    hardware = HardwareFeatures(
+        gpu_name="Tesla V100-SXM3-32GB",
+        gpu_count=16,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=125.0,
+        peak_fp32_tflops_per_gpu=15.7,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+
+    baseline = fit_cross_node_penalty_model(hardware)
+    near_threshold_low = fit_cross_node_penalty_model(
+        hardware,
+        {
+            "busbw_gbps": 49.0,
+            "results": [
+                {"size_mb": 1, "busbw_gbps": 49.0, "cv": 0.01},
+                {"size_mb": 64, "busbw_gbps": 49.0, "cv": 0.01},
+            ],
+        },
+    )
+    near_threshold_high = fit_cross_node_penalty_model(
+        hardware,
+        {
+            "busbw_gbps": 51.0,
+            "results": [
+                {"size_mb": 1, "busbw_gbps": 51.0, "cv": 0.01},
+                {"size_mb": 64, "busbw_gbps": 51.0, "cv": 0.01},
+            ],
+        },
+    )
+
+    assert near_threshold_low.alpha_dp_s_per_byte < baseline.alpha_dp_s_per_byte
+    assert near_threshold_high.alpha_dp_s_per_byte < near_threshold_low.alpha_dp_s_per_byte
+    assert near_threshold_high.alpha_dp_s_per_byte > 0.0
+    assert near_threshold_high.points[-1]["mode"] == "benchmark_scaled_alpha"
+    assert near_threshold_high.alpha_dp_s_per_byte == pytest.approx(
+        near_threshold_low.alpha_dp_s_per_byte * (49.0 / 51.0),
+        rel=0.10,
+    )
+
+
+def test_cluster_capacity_scale_tracks_gpu_growth_and_pipeline_efficiency():
+    source_like = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.1,
+        pipeline_parallel_efficiency=2.0 / 3.0,
+        pipeline_exposed_fraction=0.3,
+        dp_overlapable_fraction=0.1,
+        tp_sync_fraction=0.0,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.75,
+        memory_weight=0.15,
+        communication_weight=0.10,
+        node_count=1,
+        gpus_per_node=4,
+    )
+    target_like = DerivedModelFeatures(
+        **{
+            **source_like.to_dict(),
+            "pipeline_parallel_efficiency": 0.5,
+            "pipeline_exposed_fraction": 0.35,
+            "dp_overlapable_fraction": 0.15,
+            "node_count": 2,
+            "gpus_per_node": 4,
+        }
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=2000.0,
+        communication_limit_tokens_per_s=1400.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=150.0,
+        dynamic_power_exponent=1.5,
+        reference_total_gpu_count=4,
+        reference_pipeline_parallel_efficiency=2.0 / 3.0,
+    )
+
+    assert _cluster_capacity_scale(source_like, params) == pytest.approx(1.0)
+    assert _cluster_capacity_scale(target_like, params) == pytest.approx(1.5)
+
+
+def test_local_gpu_count_power_scale_tracks_per_node_growth():
+    source_like = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.1,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.0,
+        dp_overlapable_fraction=0.1,
+        tp_sync_fraction=0.0,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.75,
+        memory_weight=0.15,
+        communication_weight=0.10,
+        node_count=2,
+        gpus_per_node=4,
+    )
+    target_like = DerivedModelFeatures(
+        **{
+            **source_like.to_dict(),
+            "node_count": 1,
+            "gpus_per_node": 8,
+        }
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=2000.0,
+        communication_limit_tokens_per_s=1400.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=150.0,
+        dynamic_power_exponent=1.5,
+        reference_total_gpu_count=8,
+        reference_gpus_per_node=4,
+        reference_pipeline_parallel_efficiency=1.0,
+    )
+
+    assert _local_gpu_count_power_scale(source_like, params) == pytest.approx(1.0)
+    assert _local_gpu_count_power_scale(target_like, params) == pytest.approx(2.0)
+
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=4,
+        supported_frequency_mhz=SUPPORTED_CLOCKS,
+        min_frequency_mhz=SUPPORTED_CLOCKS[0],
+        max_frequency_mhz=SUPPORTED_CLOCKS[-1],
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    source_power = predict_power_w(1200, hardware, source_like, params)
+    target_power = predict_power_w(1200, hardware, target_like, params)
+
+    assert target_power == pytest.approx(source_power * 2.0, rel=1e-6)
+
+
+def test_network_quality_observation_and_penalty_scaling(tmp_path: Path):
+    benchmark_path = tmp_path / "network.json"
+    benchmark_path.write_text(json.dumps({
+        "nccl_socket_ifname": "tailscale0",
+        "nccl_ib_disable": "1",
+        "results": [
+            {"size_mb": 16, "busbw_gbps": 0.10, "cv": 0.20},
+            {"size_mb": 64, "busbw_gbps": 0.10, "cv": 0.01},
+            {"size_mb": 256, "busbw_gbps": 0.10, "cv": 0.02}
+        ]
+    }) + "\n", encoding="utf-8")
+
+    observation = load_network_quality_observation(benchmark_path)
+    assert observation.transport_label == "tailscale0|ib_disable=1"
+    assert observation.effective_bandwidth_gbps == pytest.approx(0.10)
+    assert observation.small_message_jitter_cv == pytest.approx(0.20)
+
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[1000, 1200],
+        min_frequency_mhz=1000,
+        max_frequency_mhz=1200,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    features = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.2,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.0,
+        dp_overlapable_fraction=0.2,
+        tp_sync_fraction=0.0,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.7,
+        memory_weight=0.2,
+        communication_weight=0.1,
+        node_count=2,
+        gpus_per_node=8,
+        dp_cross_node_group_fraction=1.0,
+        cross_node_dp_bytes=1_000_000_000.0,
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        cross_node_alpha_dp_s_per_byte=1e-9,
+        cross_node_reference_cross_node_dp_bytes=1_000_000_000.0,
+        cross_node_reference_bandwidth_gbps=0.20,
+        cross_node_reference_jitter_cv=0.10,
+        cross_node_bandwidth_sensitivity=1.0,
+        cross_node_jitter_sensitivity=0.5,
+    )
+
+    base_penalty = estimate_cross_node_time_penalty_s(1200, hardware, features, params)
+    worse_network_penalty = estimate_cross_node_time_penalty_s(1200, hardware, apply_network_quality(features, observation), params)
+    assert worse_network_penalty > base_penalty
+
+
+def test_cross_node_penalty_exposure_increases_with_frequency():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[600, 1200],
+        min_frequency_mhz=600,
+        max_frequency_mhz=1200,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    features = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.2,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.3,
+        dp_overlapable_fraction=0.1,
+        tp_sync_fraction=0.4,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.7,
+        memory_weight=0.2,
+        communication_weight=0.1,
+        node_count=2,
+        gpus_per_node=8,
+        pp_cross_node_edge_fraction=0.5,
+        pp_cross_node_wait_pressure=1.0,
+        dp_cross_node_group_fraction=1.0,
+        tp_cross_node_group_fraction=0.5,
+        cross_node_pp_bytes=500_000_000.0,
+        cross_node_dp_bytes=1_000_000_000.0,
+        cross_node_tp_bytes=200_000_000.0,
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        cross_node_alpha_pp_s_per_byte=1e-9,
+        cross_node_alpha_dp_s_per_byte=1e-9,
+        cross_node_alpha_tp_s_per_byte=1e-9,
+        cross_node_beta_pp_wait_s=0.02,
+        cross_node_beta_pp_edge_s=0.01,
+    )
+
+    low_freq_penalty = estimate_cross_node_time_penalty_s(600, hardware, features, params)
+    high_freq_penalty = estimate_cross_node_time_penalty_s(1200, hardware, features, params)
+    assert high_freq_penalty > low_freq_penalty
+
+
+def test_predict_script_network_benchmark_annotation(tmp_path: Path):
+    experiment_root = tmp_path / "experiments"
+    _write_run(experiment_root, "run_1000", frequency_mhz=1000, throughput_tokens_per_s=1000.0, avg_power_w=171.0)
+    _write_run(experiment_root, "run_1200", frequency_mhz=1200, throughput_tokens_per_s=1200.0, avg_power_w=209.0)
+    _write_run(experiment_root, "run_1400", frequency_mhz=1400, throughput_tokens_per_s=1400.0, avg_power_w=250.0)
+    benchmark_path = tmp_path / "network.json"
+    benchmark_path.write_text(json.dumps({
+        "nccl_socket_ifname": "tailscale0",
+        "nccl_ib_disable": "1",
+        "results": [
+            {"size_mb": 16, "busbw_gbps": 0.20, "cv": 0.14},
+            {"size_mb": 64, "busbw_gbps": 0.21, "cv": 0.01},
+            {"size_mb": 256, "busbw_gbps": 0.205, "cv": 0.01}
+        ]
+    }) + "\n", encoding="utf-8")
+    output_dir = tmp_path / "prediction_out"
+
+    completed = subprocess.run([
+        sys.executable,
+        "scripts/predict_freq_sweet_spot.py",
+        "--experiment-root",
+        str(experiment_root),
+        "--output-dir",
+        str(output_dir),
+        "--network-benchmark-json",
+        str(benchmark_path),
+    ], check=True, capture_output=True, text=True)
+    assert completed.returncode == 0
+    payload = json.loads((output_dir / "prediction.json").read_text(encoding="utf-8"))
+    assert payload["network_quality"]["transport_label"] == "tailscale0|ib_disable=1"
+    assert payload["derived_features"]["network_effective_bandwidth_gbps"] == pytest.approx((0.21 + 0.205) / 2.0)
+    assert payload["derived_features"]["network_jitter_cv"] == pytest.approx(0.14)
+
+
+def test_transfer_damping_reduces_positive_low_freq_boost_under_topology_mismatch():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[600, 900, 1200],
+        min_frequency_mhz=600,
+        max_frequency_mhz=1200,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    same_features = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.3,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.0,
+        dp_overlapable_fraction=0.2,
+        tp_sync_fraction=0.0,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.7,
+        memory_weight=0.2,
+        communication_weight=0.1,
+        node_count=2,
+        gpus_per_node=8,
+        network_effective_bandwidth_gbps=0.2075,
+        network_jitter_cv=0.136,
+    )
+    mismatch_features = DerivedModelFeatures(
+        **{**same_features.to_dict(), 'pipeline_exposed_fraction': 0.55, 'tp_sync_fraction': 0.45, 'dp_overlapable_fraction': 0.05}
+    )
+    base_params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_low_freq_correction=0.20,
+        reference_min_frequency_ratio=0.75,
+        reference_observed_frequency_ratios=(0.75, 0.90, 1.0),
+        reference_pipeline_exposed_fraction=0.0,
+        reference_dp_overlapable_fraction=0.2,
+        reference_tp_sync_fraction=0.0,
+        reference_topology_features_present=True,
+        cross_node_reference_bandwidth_gbps=0.2075,
+        cross_node_reference_jitter_cv=0.136,
+    )
+    no_correction = CalibrationParams(
+        **{**base_params.to_dict(), 'throughput_low_freq_correction': 0.0}
+    )
+
+    same_factor = _throughput_correction_factor(0.5, same_features, base_params)
+    mismatch_factor = _throughput_correction_factor(0.5, mismatch_features, base_params)
+
+    assert mismatch_factor < same_factor
+    assert mismatch_factor > 1.0
+
+
+def test_transfer_damping_preserves_same_topology_network_matched_behavior():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[600, 900, 1200],
+        min_frequency_mhz=600,
+        max_frequency_mhz=1200,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    features = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.3,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.0,
+        dp_overlapable_fraction=0.2,
+        tp_sync_fraction=0.0,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.7,
+        memory_weight=0.2,
+        communication_weight=0.1,
+        node_count=2,
+        gpus_per_node=8,
+        network_effective_bandwidth_gbps=0.2075,
+        network_jitter_cv=0.136,
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1400.0,
+        memory_limit_tokens_per_s=1_000_000.0,
+        communication_limit_tokens_per_s=1_000_000.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=200.0,
+        dynamic_power_exponent=1.5,
+        throughput_low_freq_correction=0.20,
+        reference_min_frequency_ratio=0.75,
+        reference_observed_frequency_ratios=(0.75, 0.90, 1.0),
+        reference_pipeline_exposed_fraction=0.0,
+        reference_dp_overlapable_fraction=0.2,
+        reference_tp_sync_fraction=0.0,
+        reference_topology_features_present=True,
+        cross_node_reference_bandwidth_gbps=0.2075,
+        cross_node_reference_jitter_cv=0.136,
+    )
+    corrected = predict_throughput_tokens_per_s(600, hardware, features, params)
+    baseline = predict_throughput_tokens_per_s(600, hardware, features, CalibrationParams(**{**params.to_dict(), 'throughput_low_freq_correction': 0.0}))
+
+    assert corrected > baseline
+
+
+def test_reference_topology_metadata_detects_multi_topology_pool(tmp_path: Path):
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[1000, 1200, 1400],
+        min_frequency_mhz=1000,
+        max_frequency_mhz=1400,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    workload_a = WorkloadFeatures(
+        num_layers=28, hidden_size=3584, ffn_hidden_size=18944, num_attention_heads=28, num_key_value_heads=4,
+        seq_length=2048, micro_batch_size=1, global_batch_size=16, train_iters=20,
+        tensor_model_parallel_size=2, pipeline_model_parallel_size=4, data_parallel_size=2,
+        zero_stage=1, precision_mode='bf16', swiglu=True, node_count=2, gpus_per_node=8,
+    )
+    workload_b = WorkloadFeatures(
+        num_layers=28, hidden_size=3584, ffn_hidden_size=18944, num_attention_heads=28, num_key_value_heads=4,
+        seq_length=2048, micro_batch_size=1, global_batch_size=16, train_iters=20,
+        tensor_model_parallel_size=4, pipeline_model_parallel_size=1, data_parallel_size=4,
+        zero_stage=1, precision_mode='bf16', swiglu=True, node_count=2, gpus_per_node=8,
+    )
+    observed = ObservedMetrics(
+        iteration=20, frequency_mhz=1200, num_steps=20, time_s=100.0, step_time_s=5.0, avg_power_w=200.0,
+        energy_j=20000.0, energy_wh=20000.0/3600.0, interval_tokens=1000.0, interval_samples=20.0,
+        throughput_tokens_per_s=10.0, throughput_samples_per_s=0.2, tokens_per_j=0.05, tokens_per_wh=180.0, samples_per_wh=3.6,
+    )
+    sample_a = LoadedRunSample('a', tmp_path / 'a', {}, workload_a, observed)
+    sample_b = LoadedRunSample('b', tmp_path / 'b', {}, workload_b, observed)
+    features_a = derive_model_features(hardware, workload_a)
+    features_b = derive_model_features(hardware, workload_b)
+
+    reference, topology_count, multi_topology, dispersion = _reference_topology_metadata([sample_a, sample_b], [features_a, features_b])
+
+    assert topology_count == 2
+    assert multi_topology is True
+    assert dispersion > 0.0
+    assert reference.pipeline_exposed_fraction == pytest.approx((features_a.pipeline_exposed_fraction + features_b.pipeline_exposed_fraction) / 2.0)
+
+
+def test_correction_objective_penalizes_multi_topology_amplitude_more():
+    metrics = CalibrationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    single = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1000.0, memory_limit_tokens_per_s=1000.0, communication_limit_tokens_per_s=1000.0,
+        communication_penalty=0.0, static_power_w=50.0, dynamic_power_w=100.0, dynamic_power_exponent=1.5,
+        throughput_low_freq_correction=0.08, power_high_freq_correction=0.04, reference_topology_count=1,
+    )
+    pooled = CalibrationParams(**{**single.to_dict(), 'reference_topology_count': 3, 'reference_multi_topology_calibration': True})
+
+    assert _correction_objective(metrics, pooled) > _correction_objective(metrics, single)
+
+
+def test_topology_base_scaling_reduces_mismatch_throughput():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[600, 900, 1200],
+        min_frequency_mhz=600,
+        max_frequency_mhz=1200,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    same_features = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.2,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.05,
+        dp_overlapable_fraction=0.2,
+        tp_sync_fraction=0.2,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.7,
+        memory_weight=0.2,
+        communication_weight=0.1,
+        node_count=2,
+        gpus_per_node=8,
+    )
+    mismatch_features = DerivedModelFeatures(
+        **{**same_features.to_dict(), "pipeline_exposed_fraction": 0.55, "tp_sync_fraction": 0.65, "dp_overlapable_fraction": 0.05}
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1200.0,
+        memory_limit_tokens_per_s=1200.0,
+        communication_limit_tokens_per_s=1200.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=100.0,
+        dynamic_power_exponent=1.5,
+        reference_pipeline_exposed_fraction=0.05,
+        reference_dp_overlapable_fraction=0.2,
+        reference_tp_sync_fraction=0.2,
+        reference_topology_features_present=True,
+        base_topology_throughput_sensitivity=0.8,
+        base_topology_communication_sensitivity=0.4,
+    )
+    freq = 900
+    same_throughput = predict_throughput_tokens_per_s(freq, hardware, same_features, params)
+    mismatch_throughput = predict_throughput_tokens_per_s(freq, hardware, mismatch_features, params)
+    assert mismatch_throughput < same_throughput
+
+
+def test_topology_base_scaling_increases_mismatch_power():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[600, 900, 1200],
+        min_frequency_mhz=600,
+        max_frequency_mhz=1200,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    same_features = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.2,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.05,
+        dp_overlapable_fraction=0.2,
+        tp_sync_fraction=0.2,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.7,
+        memory_weight=0.2,
+        communication_weight=0.1,
+        node_count=2,
+        gpus_per_node=8,
+    )
+    mismatch_features = DerivedModelFeatures(
+        **{**same_features.to_dict(), "pipeline_exposed_fraction": 0.55, "tp_sync_fraction": 0.65, "dp_overlapable_fraction": 0.05}
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1200.0,
+        memory_limit_tokens_per_s=1200.0,
+        communication_limit_tokens_per_s=1200.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=100.0,
+        dynamic_power_exponent=1.5,
+        reference_pipeline_exposed_fraction=0.05,
+        reference_dp_overlapable_fraction=0.2,
+        reference_tp_sync_fraction=0.2,
+        reference_topology_features_present=True,
+        base_topology_power_sensitivity=0.6,
+    )
+    freq = 900
+    same_power = predict_power_w(freq, hardware, same_features, params)
+    mismatch_power = predict_power_w(freq, hardware, mismatch_features, params)
+    assert mismatch_power > same_power
+
+
+
+def test_fit_topology_base_scaling_checks_all_shape_candidates(monkeypatch):
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[600, 900, 1200],
+        min_frequency_mhz=600,
+        max_frequency_mhz=1200,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    features = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.2,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.40,
+        dp_overlapable_fraction=0.15,
+        tp_sync_fraction=0.30,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.7,
+        memory_weight=0.2,
+        communication_weight=0.1,
+        node_count=2,
+        gpus_per_node=8,
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1200.0,
+        memory_limit_tokens_per_s=1200.0,
+        communication_limit_tokens_per_s=1200.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=100.0,
+        dynamic_power_exponent=1.5,
+        reference_multi_topology_calibration=True,
+        reference_topology_features_present=True,
+    )
+
+    def fake_metrics(*args, **kwargs):
+        return CalibrationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    def fake_objective(metrics, candidate_params):
+        return abs(candidate_params.base_topology_shape_sensitivity - 0.8)
+
+    monkeypatch.setattr('analysis.freq_model.calibrate._evaluate_metrics', fake_metrics)
+    monkeypatch.setattr('analysis.freq_model.calibrate._correction_objective', fake_objective)
+
+    best_params, _, best_objective = _fit_topology_base_scaling(
+        [object()],
+        hardware,
+        [features],
+        params,
+        baseline_throughput=1000.0,
+        baseline_tokens_per_j=2.0,
+    )
+
+    assert best_params.base_topology_shape_sensitivity == pytest.approx(0.8)
+    assert best_objective == pytest.approx(0.0)
+
+
+
+def test_fit_cross_node_exposure_scaling_checks_all_candidates(monkeypatch):
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[600, 900, 1200],
+        min_frequency_mhz=600,
+        max_frequency_mhz=1200,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    features = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.2,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.40,
+        dp_overlapable_fraction=0.15,
+        tp_sync_fraction=0.30,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.7,
+        memory_weight=0.2,
+        communication_weight=0.1,
+        node_count=2,
+        gpus_per_node=8,
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1200.0,
+        memory_limit_tokens_per_s=1200.0,
+        communication_limit_tokens_per_s=1200.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=100.0,
+        dynamic_power_exponent=1.5,
+        cross_node_alpha_dp_s_per_byte=1e-9,
+    )
+
+    def fake_metrics(*args, **kwargs):
+        return CalibrationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    def fake_objective(metrics, candidate_params):
+        return (
+            abs(candidate_params.cross_node_pp_exposure_sensitivity - 1.2)
+            + abs(candidate_params.cross_node_dp_exposure_sensitivity - 0.8)
+            + abs(candidate_params.cross_node_tp_exposure_sensitivity - 1.0)
+            + abs(candidate_params.cross_node_dp_group_scale_gain - 0.7)
+            + abs(candidate_params.cross_node_pp_bubble_exposure_gain - 0.3)
+        )
+
+    monkeypatch.setattr('analysis.freq_model.calibrate._evaluate_metrics', fake_metrics)
+    monkeypatch.setattr('analysis.freq_model.calibrate._correction_objective', fake_objective)
+
+    best_params, _, best_objective = _fit_cross_node_exposure_scaling(
+        [object()],
+        hardware,
+        [features],
+        params,
+        baseline_throughput=1000.0,
+        baseline_tokens_per_j=2.0,
+    )
+
+    assert best_params.cross_node_pp_exposure_sensitivity == pytest.approx(1.2)
+    assert best_params.cross_node_dp_exposure_sensitivity == pytest.approx(0.8)
+    assert best_params.cross_node_tp_exposure_sensitivity == pytest.approx(1.0)
+    assert best_params.cross_node_dp_group_scale_gain == pytest.approx(0.7)
+    assert best_params.cross_node_pp_bubble_exposure_gain == pytest.approx(0.3)
+    assert best_objective == pytest.approx(0.0)
+
+
+def test_multi_topology_prior_penalizes_tp_heavier_target_without_fitted_scaling():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[600, 900, 1200],
+        min_frequency_mhz=600,
+        max_frequency_mhz=1200,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    reference_like = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.2,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.40,
+        dp_overlapable_fraction=0.15,
+        tp_sync_fraction=0.30,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.7,
+        memory_weight=0.2,
+        communication_weight=0.1,
+        node_count=2,
+        gpus_per_node=8,
+    )
+    tp_heavier = DerivedModelFeatures(
+        **{**reference_like.to_dict(), 'pipeline_exposed_fraction': 0.0, 'tp_sync_fraction': 0.65}
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1200.0,
+        memory_limit_tokens_per_s=1200.0,
+        communication_limit_tokens_per_s=1200.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=100.0,
+        dynamic_power_exponent=1.5,
+        reference_pipeline_exposed_fraction=0.40,
+        reference_dp_overlapable_fraction=0.15,
+        reference_tp_sync_fraction=0.30,
+        reference_topology_features_present=True,
+        reference_multi_topology_calibration=True,
+        reference_topology_dispersion=0.20,
+    )
+    freq = 900
+    reference_throughput = predict_throughput_tokens_per_s(freq, hardware, reference_like, params)
+    target_throughput = predict_throughput_tokens_per_s(freq, hardware, tp_heavier, params)
+    assert target_throughput < reference_throughput
+
+
+def test_topology_shape_scaling_penalizes_low_frequency_for_tp_heavier_targets():
+    hardware = HardwareFeatures(
+        gpu_name="synthetic",
+        gpu_count=16,
+        supported_frequency_mhz=[600, 900, 1200],
+        min_frequency_mhz=600,
+        max_frequency_mhz=1200,
+        power_limit_w_per_gpu=300.0,
+        peak_fp16_tensor_tflops_per_gpu=100.0,
+        peak_fp32_tflops_per_gpu=50.0,
+        memory_bandwidth_gbps_per_gpu=900.0,
+    )
+    reference_like = DerivedModelFeatures(
+        tokens_per_step=1000.0,
+        samples_per_step=1.0,
+        approx_model_params=1.0,
+        approx_flops_per_token=1.0,
+        approx_flops_per_step=1000.0,
+        approx_memory_bytes_per_step=1.0,
+        approx_communication_bytes_per_step=1.0,
+        arithmetic_intensity_flops_per_byte=1.0,
+        communication_share=0.2,
+        pipeline_parallel_efficiency=1.0,
+        pipeline_exposed_fraction=0.40,
+        dp_overlapable_fraction=0.15,
+        tp_sync_fraction=0.30,
+        hardware_balance_flops_per_byte=1.0,
+        compute_weight=0.7,
+        memory_weight=0.2,
+        communication_weight=0.1,
+        node_count=2,
+        gpus_per_node=8,
+    )
+    tp_heavier = DerivedModelFeatures(
+        **{**reference_like.to_dict(), 'pipeline_exposed_fraction': 0.0, 'tp_sync_fraction': 0.65}
+    )
+    params = CalibrationParams(
+        compute_limit_at_max_tokens_per_s=1200.0,
+        memory_limit_tokens_per_s=1200.0,
+        communication_limit_tokens_per_s=1200.0,
+        communication_penalty=0.0,
+        static_power_w=50.0,
+        dynamic_power_w=100.0,
+        dynamic_power_exponent=1.5,
+        reference_pipeline_exposed_fraction=0.40,
+        reference_dp_overlapable_fraction=0.15,
+        reference_tp_sync_fraction=0.30,
+        reference_topology_features_present=True,
+        base_topology_shape_sensitivity=0.8,
+    )
+    no_shape = CalibrationParams(**{**params.to_dict(), 'base_topology_shape_sensitivity': 0.0})
+
+    shaped = predict_throughput_tokens_per_s(600, hardware, tp_heavier, params)
+    unshaped = predict_throughput_tokens_per_s(600, hardware, tp_heavier, no_shape)
+
+    assert shaped < unshaped

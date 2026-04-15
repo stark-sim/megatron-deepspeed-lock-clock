@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import math
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List
 
@@ -58,6 +59,88 @@ class CrossNodeFitResult:
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+
+_REFERENCE_NETWORK_BANDWIDTH_GBPS = 0.2075
+_REFERENCE_NETWORK_JITTER_CV = 0.136
+_JITTER_SENSITIVITY = 0.5
+
+
+def _network_benchmark_points(payload: Dict[str, Any] | None) -> list[tuple[float, float]]:
+    if not payload:
+        return []
+    points = []
+    for result in payload.get('results') or []:
+        size_mb = float(result.get('size_mb') or 0.0)
+        busbw_gbps = float(result.get('busbw_gbps') or 0.0)
+        if size_mb > 0.0 and busbw_gbps > 0.0:
+            points.append((size_mb, busbw_gbps))
+    return sorted(points, key=lambda item: item[0])
+
+
+def _interpolate_benchmark_bandwidth_gbps(
+    payload: Dict[str, Any] | None,
+    *,
+    message_bytes: float,
+    fallback_bandwidth_gbps: float,
+) -> float:
+    points = _network_benchmark_points(payload)
+    if message_bytes <= 0.0:
+        return max(fallback_bandwidth_gbps, 0.0)
+    if not points:
+        return max(float(payload.get('busbw_gbps', 0.0)) if payload else fallback_bandwidth_gbps, 0.0)
+
+    target_size_mb = max(message_bytes / 1_000_000.0, 1e-6)
+    if target_size_mb <= points[0][0]:
+        return points[0][1]
+    if target_size_mb >= points[-1][0]:
+        return points[-1][1]
+
+    for (left_size, left_bandwidth), (right_size, right_bandwidth) in zip(points, points[1:]):
+        if left_size <= target_size_mb <= right_size:
+            left_log_size = math.log(max(left_size, 1e-9))
+            right_log_size = math.log(max(right_size, 1e-9))
+            target_log_size = math.log(target_size_mb)
+            if abs(right_log_size - left_log_size) < 1e-12:
+                return right_bandwidth
+            blend = (target_log_size - left_log_size) / (right_log_size - left_log_size)
+            left_log_bandwidth = math.log(max(left_bandwidth, 1e-9))
+            right_log_bandwidth = math.log(max(right_bandwidth, 1e-9))
+            return math.exp(left_log_bandwidth + (blend * (right_log_bandwidth - left_log_bandwidth)))
+
+    return points[-1][1]
+
+
+def _benchmark_jitter_factor(payload: Dict[str, Any] | None) -> float:
+    if not payload:
+        return 1.0
+    results = list(payload.get('results') or [])
+    if not results:
+        return 1.0
+    small_messages = [entry for entry in results if float(entry.get('size_mb') or 0.0) <= 16.0]
+    representative = small_messages or results
+    observed_jitter = max(float(entry.get('cv') or 0.0) for entry in representative)
+    if observed_jitter <= 0.0 or _REFERENCE_NETWORK_JITTER_CV <= 0.0:
+        return 1.0
+    jitter_ratio = observed_jitter / max(_REFERENCE_NETWORK_JITTER_CV, 1e-9)
+    return min(max(1.0 + (_JITTER_SENSITIVITY * (jitter_ratio - 1.0)), 0.85), 2.5)
+
+
+def _benchmark_alpha_scale(
+    payload: Dict[str, Any] | None,
+    *,
+    message_bytes: float,
+    fallback_bandwidth_gbps: float = _REFERENCE_NETWORK_BANDWIDTH_GBPS,
+) -> float:
+    observed_bandwidth_gbps = _interpolate_benchmark_bandwidth_gbps(
+        payload,
+        message_bytes=message_bytes,
+        fallback_bandwidth_gbps=fallback_bandwidth_gbps,
+    )
+    if observed_bandwidth_gbps <= 0.0:
+        return 1.0
+    bandwidth_factor = _REFERENCE_NETWORK_BANDWIDTH_GBPS / max(observed_bandwidth_gbps, 1e-9)
+    return bandwidth_factor * _benchmark_jitter_factor(payload)
 
 
 def _v100_dual_node_calibration_points() -> List[CrossNodeCalibrationPoint]:
@@ -409,6 +492,7 @@ def _fit_power_drop_model(
 
 def fit_cross_node_penalty_model(
     hardware: HardwareFeatures,
+    network_bench_result: Dict[str, Any] | None = None,
 ) -> CrossNodeFitResult:
     """Fit holistic multi-node time penalty model.
 
@@ -420,7 +504,15 @@ def fit_cross_node_penalty_model(
     Topology interaction features capture effects beyond simple communication volume:
     - pp_dp_interaction: how PP depth affects DP allreduce hiding opportunity
     - cross_node_pressure_per_node: NIC contention from concurrent cross-node groups
+
+    Args:
+        hardware: Hardware features
+        network_bench_result: Optional all-reduce benchmark result. If provided, keep
+            the learned penalty structure but continuously rescale alpha/beta by the
+            measured communication speed instead of switching between hardcoded
+            "fast" and "slow" branches.
     """
+    # Base calibration path
     rows = []
     for point in _v100_dual_node_calibration_points():
         c_pp, c_dp, c_tp, diagnostics = _proxy_terms(hardware, point.workload)
@@ -484,6 +576,52 @@ def fit_cross_node_penalty_model(
     reference_cross_node_pp_bytes = float(reference_diagnostics['cross_node_pp_bytes'])
     reference_pp_cross_node_wait_pressure = float(reference_diagnostics['pp_cross_node_wait_pressure'])
     reference_cross_node_dp_bytes = float(reference_diagnostics['cross_node_dp_bytes'])
+
+    def _weighted_representative_bytes(index: int) -> float:
+        weighted_sum = 0.0
+        weight_sum = 0.0
+        for point, c_pp, c_dp, c_tp, _, _ in rows:
+            value = [c_pp, c_dp, c_tp][index]
+            if value <= 0.0:
+                continue
+            weighted_sum += point.weight * value
+            weight_sum += point.weight
+        if weight_sum <= 0.0:
+            return [reference_cross_node_pp_bytes, reference_cross_node_dp_bytes, 0.0][index]
+        return weighted_sum / weight_sum
+
+    representative_pp_bytes = _weighted_representative_bytes(0)
+    representative_dp_bytes = _weighted_representative_bytes(1)
+    representative_tp_bytes = _weighted_representative_bytes(2)
+
+    alpha_scaling_diagnostics: Dict[str, float] = {}
+    if network_bench_result:
+        pp_scale = _benchmark_alpha_scale(network_bench_result, message_bytes=representative_pp_bytes)
+        dp_scale = _benchmark_alpha_scale(network_bench_result, message_bytes=representative_dp_bytes)
+        tp_scale = _benchmark_alpha_scale(
+            network_bench_result,
+            message_bytes=representative_tp_bytes or representative_dp_bytes,
+        )
+        alpha_pp *= pp_scale
+        alpha_dp *= dp_scale
+        alpha_tp *= tp_scale
+        beta_pp_wait *= pp_scale
+        beta_pp_edge *= pp_scale
+        alpha_scaling_diagnostics = {
+            'benchmark_pp_alpha_scale': pp_scale,
+            'benchmark_dp_alpha_scale': dp_scale,
+            'benchmark_tp_alpha_scale': tp_scale,
+            'benchmark_reference_bandwidth_gbps': _REFERENCE_NETWORK_BANDWIDTH_GBPS,
+            'benchmark_reference_jitter_cv': _REFERENCE_NETWORK_JITTER_CV,
+            'benchmark_observed_peak_busbw_gbps': float(
+                network_bench_result.get('busbw_gbps')
+                or max((entry.get('busbw_gbps', 0.0) for entry in network_bench_result.get('results') or []), default=0.0)
+            ),
+            'benchmark_representative_pp_bytes': representative_pp_bytes,
+            'benchmark_representative_dp_bytes': representative_dp_bytes,
+            'benchmark_representative_tp_bytes': representative_tp_bytes,
+        }
+
     power_base_drop, power_low_freq_reference_ratio, power_low_freq_gamma, power_payloads = _fit_power_drop_model(
         hardware,
         reference_cross_node_dp_bytes=reference_cross_node_dp_bytes,
@@ -527,10 +665,18 @@ def fit_cross_node_penalty_model(
                 'power_base_drop': power_base_drop,
                 'power_low_freq_reference_ratio': power_low_freq_reference_ratio,
                 'power_low_freq_gamma': power_low_freq_gamma,
+                **alpha_scaling_diagnostics,
                 **diagnostics,
             }
         )
     point_payloads.extend(power_payloads)
+    if network_bench_result:
+        point_payloads.append(
+            {
+                'mode': 'benchmark_scaled_alpha',
+                **alpha_scaling_diagnostics,
+            }
+        )
 
     return CrossNodeFitResult(
         alpha_pp_s_per_byte=alpha_pp,
