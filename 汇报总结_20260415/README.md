@@ -20,7 +20,9 @@
 | `06_讲稿.md` | 30 秒、90 秒和摘要级别的讲稿 |
 | `07_实现说明.md` | 这套汇报包和 demo 脚本的设计说明 |
 | `08_完整PPT与汇报材料.md` | **16 页正式汇报 PPT 的内容说明与使用指南** |
-| `GPU_Energy_Optimization_20Percent_Savings.pdf` | **可直接使用的完整 PPT 文件** |
+| `GPU能效优化_20%+功耗节省方案.pdf` | **中文版 PPT 文件（主要版本）** |
+| `main_zh.tex` | 中文版 LaTeX 源文件 |
+| `Makefile` | 编译脚本（使用 XeLaTeX） |
 | `脚本/` | 与汇报直接配套的 demo 启动脚本和 Zeus 对比脚本 |
 
 ## 最推荐的使用顺序

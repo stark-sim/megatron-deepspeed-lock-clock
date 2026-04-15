@@ -2,8 +2,26 @@
 
 ## 文件位置
 
-- **PDF 文件**: `GPU_Energy_Optimization_20Percent_Savings.pdf` (本目录下)
-- **LaTeX 源文件**: `presentation/` 目录下的 `main_en.tex` 和 `main.tex`
+| 文件 | 说明 | 语言 |
+|------|------|------|
+| `GPU能效优化_20%+功耗节省方案.pdf` | **中文版 PPT（主要版本）** | 中文为主，关键技术概念保留英文 |
+| `main_zh.tex` | 中文版 LaTeX 源文件 | 中文 |
+| `Makefile` | 编译脚本 | - |
+
+**注意**: 原英文版 PPT (`GPU_Energy_Optimization_20Percent_Savings.pdf`) 已归档，当前主要使用中文版。
+
+## 如何编译中文版
+
+```bash
+cd 汇报总结_20260415
+
+# 需要安装 XeLaTeX（支持中文）
+make          # 编译中文版
+make view     # 在 macOS 上查看
+make clean    # 清理辅助文件
+```
+
+**依赖**: TeX Live 或 MiKTeX，包含 XeLaTeX 编译器
 
 ## PPT 概览
 
