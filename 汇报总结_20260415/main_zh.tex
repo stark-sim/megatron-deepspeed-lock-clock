@@ -46,11 +46,11 @@
   \vskip0pt%
 }
 
-% Title information - Chinese with English keywords
-\title[GPU Energy Optimization]{\textbf{分布式训练 GPU 能效优化}}
-\subtitle{基于 Static Frequency 策略的 20\%+ Power Savings 方案}
-\author[Team]{Distributed Training Optimization Team}
-\institute[]{Megatron-DeepSpeed Energy Efficiency Project}
+% Title information
+\title[GPU能效优化]{\textbf{分布式训练 GPU 能效优化}}
+\subtitle{基于锁频策略的 20\%+ 功耗节省方案}
+\author[团队]{分布式训练优化团队}
+\institute[]{Megatron-DeepSpeed 能效实验项目}
 \date{\today}
 
 \begin{document}
@@ -83,21 +83,21 @@
 \vspace{0.5cm}
 \textbf{传统方案局限:}
 \begin{itemize}
-    \item Dynamic Frequency Scaling 复杂度高
+    \item 动态频率调整复杂度高
     \item 默认配置远非能效最优
-    \item 缺乏精确的 Energy Efficiency 预测工具
+    \item 缺乏精确的能效预测工具
 \end{itemize}
 \end{column}
 \begin{column}{0.5\textwidth}
 \begin{block}{我们的洞察}
-\textbf{Static Frequency} 策略可以在不显著影响训练时间的前提下，实现显著的能耗节省。
+\textbf{固定频率（Static Frequency）}策略可以在不显著影响训练时间的前提下，实现显著的能耗节省。
 \end{block}
 \vspace{0.3cm}
 \begin{tikzpicture}[scale=0.8]
-    \draw[->] (0,0) -- (5,0) node[right] {Time};
-    \draw[->] (0,0) -- (0,3) node[above] {Power};
-    \draw[thick,accentgold] (0,2.5) -- (5,2.5) node[midway,above] {Baseline (Default)};
-    \draw[thick,successgreen] (0,1.7) -- (5,1.7) node[midway,below] {Static Frequency};
+    \draw[->] (0,0) -- (5,0) node[right] {时间};
+    \draw[->] (0,0) -- (0,3) node[above] {功率};
+    \draw[thick,accentgold] (0,2.5) -- (5,2.5) node[midway,above] {默认配置};
+    \draw[thick,successgreen] (0,1.7) -- (5,1.7) node[midway,below] {优化频点};
     \draw[dashed,gray] (0,0) rectangle (5,3);
     \node at (2.5,-0.5) {\small \textbf{节省 25-35\% 能耗}};
 \end{tikzpicture}
@@ -107,33 +107,33 @@
 
 \begin{frame}{核心技术挑战}
 \begin{block}{核心问题}
-如何在 \textbf{保证训练效率} 的前提下，找到 \textbf{能效最优} 的 GPU Static Frequency？
+如何在 \textbf{保证训练效率} 的前提下，找到 \textbf{能效最优} 的 GPU 固定频点？
 \end{block}
 \vspace{0.3cm}
 \begin{columns}
 \begin{column}{0.33\textwidth}
 \centering
-\textbf{挑战 1: Frequency-Performance 非线性}
+\textbf{挑战 1: 频率-性能非线性}
 \vspace{0.2cm}
 
 \begin{tikzpicture}[scale=0.6]
-    \draw[->] (0,0) -- (4,0) node[right] {Freq};
-    \draw[->] (0,0) -- (0,3) node[above] {Perf};
+    \draw[->] (0,0) -- (4,0) node[right] {频率};
+    \draw[->] (0,0) -- (0,3) node[above] {性能};
     \draw[thick,accentgold,domain=0.5:3.5,smooth,variable=\x] plot (\x,{2.5*(1-exp(-\x/1.5))});
-    \node[alertred] at (3.5,2.2) {\small Saturation};
+    \node[alertred] at (3.5,2.2) {\small 饱和区};
 \end{tikzpicture}
 
 高频收益递减
 \end{column}
 \begin{column}{0.33\textwidth}
 \centering
-\textbf{挑战 2: Cross-Node Communication}
+\textbf{挑战 2: 跨节点通信}
 \vspace{0.2cm}
 
 \begin{tikzpicture}[scale=0.6]
-    \node[draw,circle,fill=accentgold!30] (n1) at (0,1.5) {Node1};
-    \node[draw,circle,fill=accentgold!30] (n2) at (3,1.5) {Node2};
-    \draw[<->,thick] (n1) -- (n2) node[midway,above] {\small IB};
+    \node[draw,circle,fill=accentgold!30] (n1) at (0,1.5) {节点1};
+    \node[draw,circle,fill=accentgold!30] (n2) at (3,1.5) {节点2};
+    \draw[<->,thick] (n1) -- (n2) node[midway,above] {\small 高速网};
     \draw[<->,thick,dashed,gray] (n1) to[bend right=30] node[midway,below] {\small VPN} (n2);
 \end{tikzpicture}
 
@@ -141,7 +141,7 @@
 \end{column}
 \begin{column}{0.33\textwidth}
 \centering
-\textbf{挑战 3: Parallelism Topology 多样性}
+\textbf{挑战 3: 并行拓扑多样性}
 \vspace{0.2cm}
 
 \begin{tikzpicture}[scale=0.6]
@@ -150,7 +150,7 @@
     \node[draw,rectangle,fill=accentgold!30] (dp) at (3,2) {DP};
     \draw[->] (tp) -- (pp);
     \draw[->] (pp) -- (dp);
-    \node at (1.5,1) {\small Combo};
+    \node at (1.5,1) {\small 组合};
 \end{tikzpicture}
 
 不同并行策略
@@ -168,53 +168,53 @@
     arrow/.style={->,thick,accentgold}
 ]
     \node[box] (exp) at (0,0) {\textbf{实验层}};
-    \node[right=0.3cm of exp,align=left,font=\small] {Unified Launcher\\Preflight Checks};
+    \node[right=0.3cm of exp,align=left,font=\small] {统一启动\\预检流程};
     
     \node[box] (mon) at (5,0) {\textbf{监控层}};
-    \node[right=0.3cm of mon,align=left,font=\small] {Zeus Power Monitor\\Real-time Tracking};
+    \node[right=0.3cm of mon,align=left,font=\small] {功率统计\\实时追踪};
     
     \node[box] (pred) at (10,0) {\textbf{预测层}};
-    \node[right=0.3cm of pred,align=left,font=\small] {Network-Aware Model\\Cross-Topology Transfer};
+    \node[right=0.3cm of pred,align=left,font=\small] {网络感知模型\\跨拓扑迁移};
     
     \draw[arrow] (exp) -- (mon);
     \draw[arrow] (mon) -- (pred);
     
-    \node[box,successgreen,fill=successgreen!20] (out) at (5,-2) {\textbf{20\%+ Power Savings}};
+    \node[box,successgreen,fill=successgreen!20] (out) at (5,-2) {\textbf{20\%+ 功耗节省}};
     \draw[arrow] (pred.south) -- ++(0,-0.5) -| (out.north);
 \end{tikzpicture}
 \end{center}
 \vspace{0.3cm}
 \begin{itemize}
-    \item \textbf{实验层}: 标准化 Static Frequency 实验流程，支持 Multi-Node 并行
-    \item \textbf{监控层}: 毫秒级 Power 采集，精确到每个 Training Step
-    \item \textbf{预测层}: Dynamic Network Detection，自适应 Cross-Node 建模
+    \item \textbf{实验层}: 标准化定频实验流程，支持多节点并行
+    \item \textbf{监控层}: 毫秒级功率采集，精确到每个训练步
+    \item \textbf{预测层}: 动态网络检测，自适应跨节点建模
 \end{itemize}
 \end{frame}
 
-\begin{frame}{关键创新: Network-Aware Prediction}
+\begin{frame}{关键创新: 网络感知预测}
 \begin{columns}
 \begin{column}{0.5\textwidth}
 \textbf{传统方案:}
 \begin{itemize}
-    \item 固定 Cross-Node Penalty Coefficients
-    \item 假设 Slow Network (VPN)
-    \item 在 High-Speed Network (IB) 下失效
+    \item 固定跨节点惩罚系数
+    \item 假设慢速网络（VPN）
+    \item 在高速网络（IB）下失效
 \end{itemize}
 \vspace{0.3cm}
 \begin{alertblock}{问题}
-Prediction Error 高达 \textbf{98.5\%}
+预测误差高达 \textbf{98.5\%}
 \end{alertblock}
 \end{column}
 \begin{column}{0.5\textwidth}
 \textbf{我们的方案:}
 \begin{itemize}
-    \item 实时测量 Network Bandwidth
-    \item 动态调整 Penalty Coefficients
-    \item 支持 IB / RoCE / Ethernet
+    \item 实时测量网络带宽
+    \item 动态调整惩罚系数
+    \item 支持多种网络类型
 \end{itemize}
 \vspace{0.3cm}
 \begin{block}{成果}
-Error 降至 \textbf{11.48\%}
+误差降至 \textbf{11.48\%}
 \end{block}
 \end{column}
 \end{columns}
@@ -222,12 +222,12 @@ Error 降至 \textbf{11.48\%}
 \begin{center}
 \begin{tabular}{ccc}
 \toprule
-\textbf{网络类型} & \textbf{带宽} & \textbf{Penalty Coefficient ($\alpha_{dp}$)} \\
+\textbf{网络类型} & \textbf{带宽} & \textbf{惩罚系数} \\
 \midrule
 InfiniBand & 111 Gbps & $5\times10^{-13}$ (降低1700×) \\
 RoCE & 25-100 Gbps & $1\times10^{-11}$ \\
-Ethernet & 1-10 Gbps & $4.2\times10^{-11}$ \\
-Tailscale VPN & 0.2 Gbps & $8.41\times10^{-10}$ \\
+以太网 & 1-10 Gbps & $4.2\times10^{-11}$ \\
+VPN & 0.2 Gbps & $8.41\times10^{-10}$ \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -236,9 +236,9 @@ Tailscale VPN & 0.2 Gbps & $8.41\times10^{-10}$ \\
 % Section 3: Results
 \section{实验结果}
 
-\begin{frame}{核心指标: Power Savings 超过 20\%}
+\begin{frame}{核心指标: 功耗节省超过 20\%}
 \begin{center}
-\huge \textbf{平均 Power Savings: \textcolor{successgreen}{24-35\%}}
+\huge \textbf{平均功耗节省 \textcolor{successgreen}{24-35\%}}
 \end{center}
 \vspace{0.5cm}
 \begin{columns}
@@ -255,9 +255,9 @@ Tailscale VPN & 0.2 Gbps & $8.41\times10^{-10}$ \\
 \begin{column}{0.5\textwidth}
 \begin{block}{测试场景}
 \begin{itemize}
-    \item 单机 16 GPUs
-    \item 双机 16 GPUs (2×8)
-    \item 不同 Parallelism Topology
+    \item 单机 16 卡
+    \item 双机 16 卡 (2×8)
+    \item 不同并行拓扑
     \item 多频点对比
 \end{itemize}
 \end{block}
@@ -265,13 +265,13 @@ Tailscale VPN & 0.2 Gbps & $8.41\times10^{-10}$ \\
 \end{columns}
 \end{frame}
 
-\begin{frame}{详细数据: 不同 Topology 的能效对比}
+\begin{frame}{详细数据: 不同拓扑的能效对比}
 \begin{table}
 \centering
 \small
 \begin{tabular}{ccccc}
 \toprule
-\textbf{Topology} & \textbf{Baseline Power} & \textbf{优化频点} & \textbf{优化后 Power} & \textbf{节省} \\
+\textbf{拓扑} & \textbf{基线功率} & \textbf{优化频点} & \textbf{优化后功率} & \textbf{节省} \\
 \midrule
 TP=1, PP=4, DP=4 & 3170.6 W & 1252-1267 MHz & 2407.7 W & \textcolor{successgreen}{\textbf{24\%}} \\
 TP=2, PP=2, DP=4 & 3686.1 W & 1072-1125 MHz & 2477.3 W & \textcolor{successgreen}{\textbf{33\%}} \\
@@ -284,16 +284,16 @@ TP=4, PP=1, DP=4 & 3613.0 W & 1080-1155 MHz & 2363.6 W & \textcolor{successgreen
 \begin{column}{0.5\textwidth}
 \textbf{关键发现:}
 \begin{itemize}
-    \item 所有 Topology 均实现 \textbf{20\%+} 节省
+    \item 所有拓扑均实现 \textbf{20\%+} 节省
     \item 训练时间变化在 \textbf{±3\%} 以内
-    \item Energy Efficiency (Tokens/J) 提升 \textbf{30-50\%}
+    \item 能效比（词元/焦耳）提升 \textbf{30-50\%}
 \end{itemize}
 \end{column}
 \begin{column}{0.5\textwidth}
 \begin{tikzpicture}[scale=0.6]
     % Axes
-    \draw[->] (0,0) -- (7,0) node[right] {Topology};
-    \draw[->] (0,0) -- (0,4.5) node[above] {Power (W)};
+    \draw[->] (0,0) -- (7,0) node[right] {拓扑};
+    \draw[->] (0,0) -- (0,4.5) node[above] {功率 (W)};
     
     % Y-axis labels (scaled: 1000W = 0.5cm)
     \foreach \y/\label in {1/2000, 2/3000, 3/4000}
@@ -316,54 +316,54 @@ TP=4, PP=1, DP=4 & 3613.0 W & 1080-1155 MHz & 2363.6 W & \textcolor{successgreen
     
     % Legend
     \fill[alertred!60] (4.5,4) rectangle (5,4.3);
-    \node[right] at (5.1,4.15) {\small Baseline};
+    \node[right] at (5.1,4.15) {\small 基线};
     \fill[successgreen!60] (4.5,3.4) rectangle (5,3.7);
-    \node[right] at (5.1,3.55) {\small Optimized};
+    \node[right] at (5.1,3.55) {\small 优化后};
 \end{tikzpicture}
 \end{column}
 \end{columns}
 \end{frame}
 
-\begin{frame}{Prediction Accuracy: 从 98.5\% 到 11.48\%}
+\begin{frame}{预测准确性: 从 98.5\% 到 11.48\%}
 \begin{columns}
 \begin{column}{0.5\textwidth}
-\textbf{修复前 (Fixed Coefficients):}
+\textbf{修复前（固定系数）:}
 \begin{itemize}
-    \item Time Prediction Error: \textcolor{alertred}{\textbf{98.5\%}}
-    \item 严重高估 Cross-Node Overhead
-    \item 不适用于 High-Speed Network
+    \item 时间预测误差: \textcolor{alertred}{\textbf{98.5\%}}
+    \item 严重高估跨节点开销
+    \item 不适用于高速网络
 \end{itemize}
 \vspace{0.3cm}
 \begin{tikzpicture}[scale=0.6]
-    \draw[->] (0,0) -- (5,0) node[right] {Frequency};
-    \draw[->] (0,0) -- (0,4) node[above] {Time};
+    \draw[->] (0,0) -- (5,0) node[right] {频率};
+    \draw[->] (0,0) -- (0,4) node[above] {时间};
     \draw[thick,accentgold] plot[smooth] coordinates {(0.5,1) (2,1.2) (3.5,1.5)};
     \draw[thick,alertred,dashed] plot[smooth] coordinates {(0.5,2.5) (2,3) (3.5,3.5)};
-    \node[alertred] at (4,3.5) {\small Predicted};
-    \node[accentgold] at (4,1.5) {\small Actual};
+    \node[alertred] at (4,3.5) {\small 预测};
+    \node[accentgold] at (4,1.5) {\small 实际};
 \end{tikzpicture}
 \end{column}
 \begin{column}{0.5\textwidth}
-\textbf{修复后 (Network-Aware):}
+\textbf{修复后（网络感知）:}
 \begin{itemize}
-    \item Time Prediction Error: \textcolor{successgreen}{\textbf{11.48\%}}
-    \item 准确识别 Network Characteristics
-    \item 支持多种 Network Types
+    \item 时间预测误差: \textcolor{successgreen}{\textbf{11.48\%}}
+    \item 准确识别网络特性
+    \item 支持多网络类型
 \end{itemize}
 \vspace{0.3cm}
 \begin{tikzpicture}[scale=0.6]
-    \draw[->] (0,0) -- (5,0) node[right] {Frequency};
-    \draw[->] (0,0) -- (0,4) node[above] {Time};
+    \draw[->] (0,0) -- (5,0) node[right] {频率};
+    \draw[->] (0,0) -- (0,4) node[above] {时间};
     \draw[thick,accentgold] plot[smooth] coordinates {(0.5,1) (2,1.2) (3.5,1.5)};
     \draw[thick,successgreen,dashed] plot[smooth] coordinates {(0.5,1.1) (2,1.3) (3.5,1.6)};
-    \node[successgreen] at (4,1.6) {\small Predicted};
-    \node[accentgold] at (4,1.5) {\small Actual};
+    \node[successgreen] at (4,1.6) {\small 预测};
+    \node[accentgold] at (4,1.5) {\small 实际};
 \end{tikzpicture}
 \end{column}
 \end{columns}
 \vspace{0.5cm}
 \begin{block}{技术价值}
-Prediction Accuracy 的提升使得 \textbf{Zero-Shot Optimization} 成为可能，减少实际验证所需的实验次数 50\%+
+预测准确性的提升使得 \textbf{零样本优化} 成为可能，减少实际验证所需的实验次数 50\%+
 \end{block}
 \end{frame}
 
@@ -372,7 +372,7 @@ Prediction Accuracy 的提升使得 \textbf{Zero-Shot Optimization} 成为可能
 
 \begin{frame}{成本节省估算}
 \begin{center}
-\large \textbf{以 100-GPU Cluster 训练 GPT-3 级别模型为例}
+\large \textbf{以 100 卡集群训练 GPT-3 级别模型为例}
 \end{center}
 \vspace{0.3cm}
 \begin{columns}
@@ -380,30 +380,30 @@ Prediction Accuracy 的提升使得 \textbf{Zero-Shot Optimization} 成为可能
 \begin{block}{训练成本对比}
 \begin{itemize}
     \item 训练时长: 30 天
-    \item Per-GPU Power: 300W (baseline)
-    \item 优化后 Power: 210W (-30\%)
+    \item 单卡功率: 300W（基线）
+    \item 优化后功率: 210W（-30\%）
 \end{itemize}
 \end{block}
 \vspace{0.3cm}
 \textbf{节省计算:}
 \begin{align*}
-\text{Energy Saved} &= 100 \text{ GPUs} \times 90\text{W} \times 720\text{h} \\
-&= 6,480 \text{ kWh} \\
-\text{Cost Saved} &= 6,480 \times \$0.15 \\
-&= \textcolor{successgreen}{\textbf{\$972}}
+\text{节省电能} &= 100 \text{ 卡} \times 90\text{W} \times 720\text{小时} \\
+&= 6,480 \text{ 度电} \\
+\text{节省费用} &= 6,480 \times 1.0\text{元} \\
+&= \textcolor{successgreen}{\textbf{6,480 元}}
 \end{align*}
 \end{column}
 \begin{column}{0.5\textwidth}
 \begin{tikzpicture}[scale=0.8]
-    \node[draw,rectangle,rounded corners,fill=accentgold!20,minimum width=4cm,minimum height=1cm] (baseline) at (0,4) {Baseline: 30\% Extra Energy};
-    \node[draw,rectangle,rounded corners,fill=successgreen!20,minimum width=4cm,minimum height=1cm] (optimized) at (0,2) {Optimized: 20-35\% Savings};
-    \node[draw,rectangle,rounded corners,fill=white,minimum width=4cm,minimum height=1cm] (savings) at (0,0) {单次训练节省: \textbf{\$972}};
+    \node[draw,rectangle,rounded corners,fill=accentgold!20,minimum width=4cm,minimum height=1cm] (baseline) at (0,4) {基线: 30\% 额外能耗};
+    \node[draw,rectangle,rounded corners,fill=successgreen!20,minimum width=4cm,minimum height=1cm] (optimized) at (0,2) {优化后: 20-35\% 节省};
+    \node[draw,rectangle,rounded corners,fill=white,minimum width=4cm,minimum height=1cm] (savings) at (0,0) {单次训练节省: \textbf{6,480 元}};
     
     \draw[->,thick,alertred] (baseline) -- (optimized) node[midway,right] {-30\%};
     \draw[->,thick,successgreen] (optimized) -- (savings);
 \end{tikzpicture}
 \vspace{0.3cm}
-\small 年化节省 (月度训练): \textbf{\$11,664}
+\small 年化节省（月度训练）: \textbf{77,760 元}
 \end{column}
 \end{columns}
 \end{frame}
@@ -414,14 +414,14 @@ Prediction Accuracy 的提升使得 \textbf{Zero-Shot Optimization} 成为可能
 \textbf{适用场景:}
 \begin{itemize}
     \item 企业 AI 训练集群
-    \item Cloud GPU Instances
+    \item 云计算 GPU 实例
     \item 超算中心深度学习分区
-    \item Edge Training Nodes
+    \item 边缘训练节点
 \end{itemize}
 \vspace{0.3cm}
 \textbf{部署要求:}
 \begin{itemize}
-    \item NVIDIA GPU (V100/A100/H100)
+    \item NVIDIA GPU（V100/A100/H100）
     \item NVML 支持
     \item DeepSpeed / PyTorch 框架
 \end{itemize}
@@ -429,7 +429,7 @@ Prediction Accuracy 的提升使得 \textbf{Zero-Shot Optimization} 成为可能
 \begin{column}{0.5\textwidth}
 \begin{block}{技术扩展路线}
 \begin{enumerate}
-    \item \textbf{网络层}: IB $\rightarrow$ RoCE $\rightarrow$ Ethernet
+    \item \textbf{网络层}: IB $\rightarrow$ RoCE $\rightarrow$ 以太网
     \item \textbf{拓扑层}: 2×4 $\rightarrow$ 2×8 $\rightarrow$ 2×16 $\rightarrow$ 4×8
     \item \textbf{硬件层}: V100 $\rightarrow$ A100 $\rightarrow$ H100
 \end{enumerate}
@@ -437,9 +437,9 @@ Prediction Accuracy 的提升使得 \textbf{Zero-Shot Optimization} 成为可能
 \vspace{0.3cm}
 \textbf{下一步验证:}
 \begin{itemize}
-    \item RoCE 环境 (sd-1, sd-2)
-    \item A100 Clusters
-    \item 更大规模 (32-64 GPUs)
+    \item RoCE 环境（sd-1, sd-2）
+    \item A100 集群
+    \item 更大规模（32-64 卡）
 \end{itemize}
 \end{column}
 \end{columns}
@@ -453,21 +453,21 @@ Prediction Accuracy 的提升使得 \textbf{Zero-Shot Optimization} 成为可能
 \begin{tikzpicture}[
     achievement/.style={rectangle,draw,thick,rounded corners,minimum width=3.5cm,minimum height=2cm,fill=white,align=center}
 ]
-    \node[achievement,successgreen,fill=successgreen!10] (a1) at (0,0) {\textbf{20\%+}\\Power Savings};
-    \node[achievement,accentgold,fill=accentgold!10] (a2) at (4.5,0) {\textbf{11.48\%}\\Prediction Error};
-    \node[achievement,accentgold,fill=accentgold!10] (a3) at (9,0) {\textbf{1700×}\\Coefficient Optimization};
+    \node[achievement,successgreen,fill=successgreen!10] (a1) at (0,0) {\textbf{20\%+}\\功耗节省};
+    \node[achievement,accentgold,fill=accentgold!10] (a2) at (4.5,0) {\textbf{11.48\%}\\预测误差};
+    \node[achievement,accentgold,fill=accentgold!10] (a3) at (9,0) {\textbf{1700×}\\系数优化};
     
-    \node[below=0.3cm of a1,font=\small,align=center] {所有测试 Topology\\均达标};
-    \node[below=0.3cm of a2,font=\small,align=center] {Network-Aware Model\\高精度};
-    \node[below=0.3cm of a3,font=\small,align=center] {Dynamic Adaptation\\多网络类型};
+    \node[below=0.3cm of a1,font=\small,align=center] {所有测试拓扑\\均达标};
+    \node[below=0.3cm of a2,font=\small,align=center] {网络感知模型\\高精度};
+    \node[below=0.3cm of a3,font=\small,align=center] {动态适配\\多网络类型};
 \end{tikzpicture}
 \end{center}
 \vspace{0.5cm}
 \begin{block}{技术亮点}
 \begin{itemize}
-    \item \textbf{首创} Dynamic Network-Aware Cross-Node Performance Prediction 框架
-    \item Prediction Accuracy 飞跃：\textbf{98.5\% $\rightarrow$ 11.48\%}
-    \item 支持 \textbf{Zero-Shot} Frequency Optimization，实验成本降低 50\%+
+    \item \textbf{首创} 动态网络感知跨节点性能预测框架
+    \item 预测精度飞跃：\textbf{98.5\% $\rightarrow$ 11.48\%}
+    \item 支持 \textbf{零样本} 频率优化，实验成本降低 50\%+
 \end{itemize}
 \end{block}
 \end{frame}
@@ -475,26 +475,26 @@ Prediction Accuracy 的提升使得 \textbf{Zero-Shot Optimization} 成为可能
 \begin{frame}{下一步工作计划}
 \begin{columns}
 \begin{column}{0.5\textwidth}
-\textbf{近期 (1-2 个月):}
+\textbf{近期（1-2 个月）:}
 \begin{itemize}
     \item RoCE 环境验证
-    \item 论文投稿 (MLSys/SC/IPDPS)
+    \item 论文投稿（MLSys/SC/IPDPS）
     \item 开源代码发布
 \end{itemize}
 \vspace{0.3cm}
-\textbf{中期 (3-6 个月):}
+\textbf{中期（3-6 个月）:}
 \begin{itemize}
     \item A100/H100 适配
-    \item 更大规模验证 (32-64 GPUs)
+    \item 更大规模验证（32-64 卡）
     \item 自动化部署工具
 \end{itemize}
 \end{column}
 \begin{column}{0.5\textwidth}
-\textbf{长期 (6-12 个月):}
+\textbf{长期（6-12 个月）:}
 \begin{itemize}
     \item 多租户场景优化
-    \item Heterogeneous Cluster 支持
-    \item Cloud Service 集成
+    \item 异构集群支持
+    \item 云服务集成
 \end{itemize}
 \vspace{0.5cm}
 \begin{alertblock}{立即行动}
@@ -509,7 +509,7 @@ Prediction Accuracy 的提升使得 \textbf{Zero-Shot Optimization} 成为可能
 \Huge \textbf{谢谢!}
 \vspace{1cm}
 
-\Large Q \& A
+\Large 问答环节
 \vspace{1cm}
 
 \normalsize
@@ -537,34 +537,34 @@ CPU & Intel Xeon Platinum 8168 @ 2.70GHz \\
 网络 & Mellanox ConnectX-5 (100 Gbps IB) \\
 \midrule
 软件栈 & CUDA 12.1 / PyTorch 2.1.0 / DeepSpeed 0.12 \\
-模型 & Qwen2.5-7B (7B 参数, 28 层) \\
-数据集 & Chinese Wikipedia \\
+模型 & Qwen2.5-7B（7B 参数, 28 层） \\
+数据集 & 中文 Wikipedia \\
 \bottomrule
 \end{tabular}
 \end{table}
 \end{frame}
 
-\begin{frame}{附录: Prediction Model 公式}
-\textbf{Cross-Node Time Penalty:}
+\begin{frame}{附录: 预测模型公式}
+\textbf{跨节点时间惩罚:}
 \[
 T_{cross\_node}(f) = \alpha_{pp} \cdot V_{pp} + \alpha_{dp} \cdot V_{dp} + \alpha_{tp} \cdot V_{tp}
 \]
 
-Penalty Coefficient $\alpha$ 根据 Network Bandwidth 选择：
+惩罚系数 $\alpha$ 根据网络带宽选择：
 \[
 \alpha_{dp} = \begin{cases}
-5 \times 10^{-13} & \text{if } B_{eff} > 50\text{Gbps (IB)} \\
-8.41 \times 10^{-10} & \text{otherwise (standard network)}
+5 \times 10^{-13} & \text{若 } B_{eff} > 50\text{Gbps（IB）} \\
+8.41 \times 10^{-10} & \text{否则（标准网络）}
 \end{cases}
 \]
 \vspace{0.3cm}
 
-\textbf{Frequency-Performance Model:}
+\textbf{频率-性能模型:}
 \[
 T_{compute}(f) = \frac{W}{\min(f \cdot C_{max}, S_{mem}, S_{comm})}
 \]
 
-其中 $W$ 为 Workload，$C_{max}$ 为最大计算能力，$S$ 为带宽限制。
+其中 $W$ 为工作量，$C_{max}$ 为最大计算能力，$S$ 为带宽限制。
 \end{frame}
 
 \end{document}
