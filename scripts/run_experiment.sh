@@ -1,8 +1,88 @@
 #!/bin/bash
 set -euo pipefail
 
-BASE_PATH="${BASE_PATH:-/home/sd/Megatron-DeepSpeed}"
-source "${BASE_PATH}/scripts/experiment_utils.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_PATH="${BASE_PATH:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+source "${SCRIPT_DIR}/experiment_utils.sh"
+PYTHON_BIN="${PYTHON_BIN:-$(resolve_python_bin)}"
+CONDA_ENV="${CONDA_ENV:-${CONDA_DEFAULT_ENV:-}}"
+
+resolve_default_dataset() {
+    local candidates=(
+        "${BASE_PATH}/data/chinese_wiki_megatron_text_document"
+        "${BASE_PATH}/data/qwen_data_text_document"
+    )
+    local candidate
+    for candidate in "${candidates[@]}"; do
+        if [[ -f "${candidate}.bin" && -f "${candidate}.idx" ]]; then
+            printf '%s\n' "${candidate}"
+            return
+        fi
+    done
+    printf '%s\n' "${BASE_PATH}/data/chinese_wiki_megatron_text_document"
+}
+
+resolve_default_tokenizer() {
+    local candidate
+    if [[ -d "${BASE_PATH}/.context/qwen25_tokenizer_flat" ]]; then
+        printf '%s\n' "${BASE_PATH}/.context/qwen25_tokenizer_flat"
+        return
+    fi
+
+    shopt -s nullglob
+    for candidate in \
+        "${HOME}/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B-Instruct/snapshots/"* \
+        "${HOME}/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B/snapshots/"* \
+        "${HOME}/.cache/huggingface/hub/models--Qwen--Qwen2.5-3B-Instruct/snapshots/"* \
+        "${HOME}/.cache/huggingface/hub/models--Qwen--Qwen2.5-14B/snapshots/"* \
+        "/home/sd/.cache/huggingface/hub/models--Qwen--Qwen2.5-14B/snapshots/"*
+    do
+        if [[ -f "${candidate}/tokenizer.json" ]]; then
+            printf '%s\n' "${candidate}"
+            shopt -u nullglob
+            return
+        fi
+    done
+    shopt -u nullglob
+
+    printf '%s\n' "${BASE_PATH}/.context/qwen25_tokenizer_flat"
+}
+
+dataset_exists() {
+    local dataset_prefix="$1"
+    [[ -n "${dataset_prefix}" && -f "${dataset_prefix}.bin" && -f "${dataset_prefix}.idx" ]]
+}
+
+tokenizer_exists() {
+    local tokenizer_path="$1"
+    [[ -n "${tokenizer_path}" && -d "${tokenizer_path}" && ( -f "${tokenizer_path}/tokenizer.json" || -f "${tokenizer_path}/tokenizer_config.json" ) ]]
+}
+
+declare -a REMOTE_SELECTED_HOSTS=()
+
+resolve_host_gpu_indices() {
+    local host="$1"
+    local short_host="${host%%.*}"
+    local local_host_short="${HOSTNAME%%.*}"
+    if [[ "$host" == "localhost" || "$host" == "$HOSTNAME" || "$host" == "$local_host_short" ]]; then
+        printf '%s\n' "${LOCAL_GPU_INDICES}"
+        return
+    fi
+    if [[ -n "${DS_INCLUDE:-}" ]]; then
+        local chunk entry_host gpu_indices entry_short
+        IFS='@' read -r -a chunks <<< "${DS_INCLUDE}"
+        for chunk in "${chunks[@]}"; do
+            entry_host="${chunk%%:*}"
+            gpu_indices="${chunk#*:}"
+            entry_short="${entry_host%%.*}"
+            if [[ "${entry_host}" == "${host}" || "${entry_short}" == "${short_host}" ]]; then
+                printf '%s\n' "${gpu_indices}"
+                return
+            fi
+        done
+    fi
+    printf '%s\n' "${LOCAL_GPU_INDICES}"
+}
 
 LAUNCHER="${LAUNCHER:-deepspeed}"
 EXPERIMENT_MODE="${EXPERIMENT_MODE:-baseline}"
@@ -14,11 +94,12 @@ NODE_RANK="${NODE_RANK:-0}"
 MASTER_ADDR="${MASTER_ADDR:-localhost}"
 MASTER_PORT="${MASTER_PORT:-29500}"
 HOSTFILE="${HOSTFILE:-}"
+DS_INCLUDE="${DS_INCLUDE:-}"
 
 MODEL_SIZE="${MODEL_SIZE:-qwen7b}"
 DS_CONFIG_TEMPLATE="${DS_CONFIG_TEMPLATE:-${BASE_PATH}/scripts/ds_config_7b_tp4.json}"
-DATASET="${DATASET:-${BASE_PATH}/data/chinese_wiki_megatron_text_document}"
-TOKENIZER_PATH="${TOKENIZER_PATH:-/home/sd/.cache/huggingface/hub/models--Qwen--Qwen2.5-14B/snapshots/97e1e76335b7017d8f67c08a19d103c0504298c9}"
+DATASET="${DATASET:-$(resolve_default_dataset)}"
+TOKENIZER_PATH="${TOKENIZER_PATH:-$(resolve_default_tokenizer)}"
 CHECKPOINT_ROOT="${CHECKPOINT_ROOT:-${BASE_PATH}/checkpoints/${EXPERIMENT_NAME}}"
 LOAD_CHECKPOINT="${LOAD_CHECKPOINT:-0}"
 VALIDATE_ONLY="${VALIDATE_ONLY:-0}"
@@ -61,7 +142,7 @@ if (( EVAL_ITERS <= 0 )) && (( EVAL_INTERVAL <= 0 )); then
     EVAL_INTERVAL=$(( TRAIN_STEPS + 1 ))
 fi
 
-LOCAL_GPU_INDICES="$(parse_cuda_visible_devices)"
+LOCAL_GPU_INDICES="${LOCAL_GPU_INDICES:-$(parse_cuda_visible_devices)}"
 LOCAL_GPU_COUNT="$(count_csv_items "$LOCAL_GPU_INDICES")"
 WORLD_SIZE="$(( LOCAL_GPU_COUNT * NNODES ))"
 
@@ -105,13 +186,18 @@ if (( NNODES > 1 )) && [[ -z "$HOSTFILE" ]]; then
     exit 1
 fi
 
-if (( PP > 1 )) && [[ -z "$HOSTFILE" ]]; then
-    echo "[Error] HOSTFILE is required when PP>1" >&2
+if (( PP > 1 )) && [[ -z "$MASTER_ADDR" || -z "$MASTER_PORT" ]]; then
+    echo "[Error] MASTER_ADDR and MASTER_PORT are required when PP>1" >&2
     exit 1
 fi
 
-if (( PP > 1 )) && [[ -z "$MASTER_ADDR" || -z "$MASTER_PORT" ]]; then
-    echo "[Error] MASTER_ADDR and MASTER_PORT are required when PP>1" >&2
+if ! dataset_exists "$DATASET"; then
+    echo "[Error] DATASET prefix is invalid: ${DATASET} (.bin/.idx missing)" >&2
+    exit 1
+fi
+
+if ! tokenizer_exists "$TOKENIZER_PATH"; then
+    echo "[Error] TOKENIZER_PATH is invalid: ${TOKENIZER_PATH}" >&2
     exit 1
 fi
 
@@ -149,14 +235,12 @@ write_topology_json "$TOPOLOGY_JSON_PATH" "$LOCAL_GPU_INDICES" "$NNODES" "$NODE_
 export MEGATRON_TOPOLOGY_JSON="$TOPOLOGY_JSON_PATH"
 
 run_local_preflight() {
-    python3 - <<'PY'
+    "$PYTHON_BIN" - <<'PY'
 import json
 import os
 import socket
 import subprocess
 import sys
-
-sys.path.insert(0, '/home/sd/.local/lib/python3.10/site-packages')
 
 result = {
     'hostname': socket.gethostname(),
@@ -183,11 +267,29 @@ result['checks']['tp_fits_local_node'] = len(gpu_indices) >= expected_tp
 result['checks']['repo_exists'] = os.path.exists(os.getcwd())
 result['checks']['python_available'] = command_ok(['python3', '--version'])[0]
 result['checks']['nvidia_smi_available'] = command_ok(['bash', '-lc', 'command -v nvidia-smi >/dev/null 2>&1'])[0]
+dataset_prefix = os.environ.get('DATASET', '')
+tokenizer_path = os.environ.get('TOKENIZER_PATH', '')
+result['checks']['dataset_exists'] = (
+    bool(dataset_prefix)
+    and os.path.exists(f'{dataset_prefix}.bin')
+    and os.path.exists(f'{dataset_prefix}.idx')
+)
+result['checks']['tokenizer_exists'] = (
+    bool(tokenizer_path)
+    and os.path.isdir(tokenizer_path)
+    and (
+        os.path.exists(os.path.join(tokenizer_path, 'tokenizer.json'))
+        or os.path.exists(os.path.join(tokenizer_path, 'tokenizer_config.json'))
+    )
+)
 if os.environ.get('LAUNCHER', 'deepspeed') == 'deepspeed':
     result['checks']['launcher_available'] = command_ok(['bash', '-lc', 'command -v deepspeed >/dev/null 2>&1'])[0]
 else:
     result['checks']['launcher_available'] = command_ok(['python3', '-m', 'torch.distributed.run', '--help'])[0]
 try:
+    fallback = os.path.expanduser('~/.local/lib/python3.10/site-packages')
+    if os.path.isdir(fallback) and fallback not in sys.path:
+        sys.path.insert(0, fallback)
     import pynvml
     result['checks']['pynvml_available'] = True
 except Exception:
@@ -220,7 +322,7 @@ print(json.dumps(result, sort_keys=True))
 PY
 }
 
-LOCAL_PREFLIGHT="$(TP="$TP" LAUNCHER="$LAUNCHER" EXPERIMENT_MODE="$EXPERIMENT_MODE" STATIC_CLOCK_MHZ="$STATIC_CLOCK_MHZ" run_local_preflight)"
+LOCAL_PREFLIGHT="$(CUDA_VISIBLE_DEVICES="$LOCAL_GPU_INDICES" TP="$TP" LAUNCHER="$LAUNCHER" EXPERIMENT_MODE="$EXPERIMENT_MODE" STATIC_CLOCK_MHZ="$STATIC_CLOCK_MHZ" DATASET="$DATASET" TOKENIZER_PATH="$TOKENIZER_PATH" run_local_preflight)"
 REMOTE_PREFLIGHTS=()
 
 if (( NNODES > 1 )); then
@@ -233,13 +335,19 @@ for entry in payload.get('selected_hosts', []):
 PY
 )
     for host in "${SELECTED_HOSTS[@]}"; do
-        local_host_short="${HOSTNAME%%.*}"
-        if [[ "$host" == "localhost" || "$host" == "$HOSTNAME" || "$host" == "$local_host_short" ]]; then
+        if [[ "$(is_local_host_alias "$host")" == "1" ]]; then
             continue
         fi
-        REMOTE_PREFLIGHTS+=("$(run_remote_preflight "$host" "$BASE_PATH" "$TP" "$EXPERIMENT_MODE" "$STATIC_CLOCK_MHZ" "${CUDA_VISIBLE_DEVICES:-}" "$LAUNCHER")")
+        REMOTE_SELECTED_HOSTS+=("$host")
+        host_gpu_indices="$(resolve_host_gpu_indices "$host")"
+        REMOTE_PREFLIGHTS+=("$(run_remote_preflight "$host" "$BASE_PATH" "$TP" "$EXPERIMENT_MODE" "$STATIC_CLOCK_MHZ" "$host_gpu_indices" "$LAUNCHER" "$DATASET" "$TOKENIZER_PATH" "$CONDA_ENV")")
     done
 fi
+
+for host in "${REMOTE_SELECTED_HOSTS[@]}"; do
+    ssh "$host" "mkdir -p '$RUN_DIR' '$RUN_LOG_DIR'"
+    sync_file_to_host "$RUN_DS_CONFIG" "$host" "$RUN_DS_CONFIG"
+done
 
 python3 - "$PREFLIGHT_JSON_PATH" "$LOCAL_PREFLIGHT" "${REMOTE_PREFLIGHTS[@]}" <<'PY'
 import json
@@ -258,7 +366,61 @@ if not payload['ok']:
 PY
 export MEGATRON_PREFLIGHT_JSON="$PREFLIGHT_JSON_PATH"
 
+DEEPSPEED_ENV_PATH="${BASE_PATH}/.deepspeed_env"
+DEEPSPEED_ENV_BACKUP=""
+
+prepare_deepspeed_env() {
+    if [[ "$LAUNCHER" != "deepspeed" ]]; then
+        return
+    fi
+
+    DEEPSPEED_ENV_BACKUP="${RUN_DIR}/.deepspeed_env.backup"
+    if [[ -f "$DEEPSPEED_ENV_PATH" ]]; then
+        cp "$DEEPSPEED_ENV_PATH" "$DEEPSPEED_ENV_BACKUP"
+    else
+        : > "$DEEPSPEED_ENV_BACKUP"
+    fi
+
+    {
+        if [[ -s "$DEEPSPEED_ENV_BACKUP" ]]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+                [[ -n "$line" && "$line" == *=* ]] || continue
+                printf '%s\n' "$line"
+            done < "$DEEPSPEED_ENV_BACKUP"
+        fi
+        cat <<EOF
+MEGATRON_RUN_ID=${MEGATRON_RUN_ID}
+MEGATRON_EXPERIMENT_ROOT=${MEGATRON_EXPERIMENT_ROOT}
+MEGATRON_EXPERIMENT_MODE=${MEGATRON_EXPERIMENT_MODE}
+MEGATRON_REQUESTED_TP=${MEGATRON_REQUESTED_TP}
+MEGATRON_REQUESTED_PP=${MEGATRON_REQUESTED_PP}
+MEGATRON_HOSTFILE_PATH=${MEGATRON_HOSTFILE_PATH:-}
+MEGATRON_HOSTFILE_JSON=${MEGATRON_HOSTFILE_JSON:-}
+MEGATRON_TOPOLOGY_JSON=${MEGATRON_TOPOLOGY_JSON}
+MEGATRON_PREFLIGHT_JSON=${MEGATRON_PREFLIGHT_JSON}
+STATIC_CLOCK_MHZ=${STATIC_CLOCK_MHZ:-}
+EOF
+    } > "$DEEPSPEED_ENV_PATH"
+}
+
+restore_deepspeed_env() {
+    if [[ "$LAUNCHER" != "deepspeed" ]]; then
+        return
+    fi
+
+    if [[ -n "$DEEPSPEED_ENV_BACKUP" && -f "$DEEPSPEED_ENV_BACKUP" ]]; then
+        if [[ -s "$DEEPSPEED_ENV_BACKUP" ]]; then
+            mv "$DEEPSPEED_ENV_BACKUP" "$DEEPSPEED_ENV_PATH"
+        else
+            rm -f "$DEEPSPEED_ENV_PATH" "$DEEPSPEED_ENV_BACKUP"
+        fi
+    fi
+}
+
+prepare_deepspeed_env
+
 if [[ "$VALIDATE_ONLY" == "1" ]]; then
+    restore_deepspeed_env
     echo "[Validate] topology and preflight succeeded"
     echo "[Validate] run_dir=${RUN_DIR}"
     exit 0
@@ -266,10 +428,15 @@ fi
 
 cleanup() {
     local exit_code=$?
+    restore_deepspeed_env
     if [[ -n "${LOCAL_GPU_INDICES:-}" ]]; then
         case "$EXPERIMENT_MODE" in
             static)
                 if [[ -n "$STATIC_CLOCK_MHZ" ]]; then
+                    for host in "${REMOTE_SELECTED_HOSTS[@]}"; do
+                        remote_gpu_indices="$(resolve_host_gpu_indices "$host")"
+                        reset_remote_gpu_clocks "$host" "$CONDA_ENV" "$remote_gpu_indices" || echo "[Cleanup] Warning: Failed to reset GPU clocks on ${host}:${remote_gpu_indices}" >&2
+                    done
                     reset_gpu_clocks "$LOCAL_GPU_INDICES" || echo "[Cleanup] Warning: Failed to reset GPU clocks for ${LOCAL_GPU_INDICES}" >&2
                 fi
                 ;;
@@ -288,7 +455,15 @@ if [[ "$EXPERIMENT_MODE" == "static" ]]; then
         exit 1
     fi
     assert_static_clock_supported "$LOCAL_GPU_INDICES" "$STATIC_CLOCK_MHZ"
+    for host in "${REMOTE_SELECTED_HOSTS[@]}"; do
+        remote_gpu_indices="$(resolve_host_gpu_indices "$host")"
+        assert_remote_static_clock_supported "$host" "$CONDA_ENV" "$remote_gpu_indices" "$STATIC_CLOCK_MHZ"
+    done
     lock_gpu_clocks "$LOCAL_GPU_INDICES" "$STATIC_CLOCK_MHZ"
+    for host in "${REMOTE_SELECTED_HOSTS[@]}"; do
+        remote_gpu_indices="$(resolve_host_gpu_indices "$host")"
+        lock_remote_gpu_clocks "$host" "$CONDA_ENV" "$remote_gpu_indices" "$STATIC_CLOCK_MHZ"
+    done
 elif [[ "$EXPERIMENT_MODE" != "baseline" && "$EXPERIMENT_MODE" != "dynamic" && "$EXPERIMENT_MODE" != "dryrun" ]]; then
     echo "[Error] Unsupported EXPERIMENT_MODE=${EXPERIMENT_MODE}" >&2
     exit 1
@@ -381,11 +556,20 @@ elif [[ "$EXPERIMENT_MODE" == "dryrun" ]]; then
 fi
 
 if [[ "$LAUNCHER" == "deepspeed" ]]; then
-    LAUNCH_CMD=(deepspeed)
-    if [[ -n "$HOSTFILE" ]]; then
-        LAUNCH_CMD+=(--hostfile "$HOSTFILE" --num_nodes "$NNODES" --num_gpus "$LOCAL_GPU_COUNT")
+    LAUNCH_CMD=(deepspeed --master_addr "$MASTER_ADDR" --master_port "$MASTER_PORT")
+    if [[ -n "$DS_INCLUDE" ]]; then
+        # --include encodes both node and GPU selection; do not add num_nodes/num_gpus
+        if [[ -n "$HOSTFILE" ]]; then
+            LAUNCH_CMD+=(--hostfile "$HOSTFILE" --include "$DS_INCLUDE")
+        else
+            LAUNCH_CMD+=(--include "$DS_INCLUDE")
+        fi
     else
-        LAUNCH_CMD+=(--num_gpus "$LOCAL_GPU_COUNT")
+        if [[ -n "$HOSTFILE" ]]; then
+            LAUNCH_CMD+=(--hostfile "$HOSTFILE" --num_nodes "$NNODES" --num_gpus "$LOCAL_GPU_COUNT")
+        else
+            LAUNCH_CMD+=(--num_gpus "$LOCAL_GPU_COUNT")
+        fi
     fi
     FINAL_CMD=("${LAUNCH_CMD[@]}" "${TRAIN_CMD[@]}")
 elif [[ "$LAUNCHER" == "torchrun" ]]; then

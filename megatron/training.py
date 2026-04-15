@@ -1302,9 +1302,13 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
 
     setup_profiler(args, get_accelerator().device_name())
     
+    disable_zeus_monitoring = os.environ.get('DISABLE_ZEUS_MONITORING', '').lower() in {
+        '1', 'true', 'yes', 'on'
+    }
+
     # Start GPU power monitoring (only on rank 0)
     # 注意：关闭 custom 监控，只使用 Zeus 监控
-    if is_rank_0():
+    if is_rank_0() and not disable_zeus_monitoring:
         # try:
         #     log_dir = args.save if args.save else "/home/sd/Megatron-DeepSpeed/logs"
         #     start_power_monitoring(sample_interval=5.0, log_dir=log_dir)
@@ -1318,6 +1322,8 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
             print_rank_0("Zeus power monitoring started")
         except Exception as e:
             print_rank_0(f"Warning: Failed to start Zeus monitoring: {e}")
+    elif is_rank_0():
+        print_rank_0("Zeus monitoring disabled by DISABLE_ZEUS_MONITORING")
         
     # 启动 GPU 频率管理（local_rank=0 管理所有 GPU，使用并行调频）
     # 策略：只对大通信操作（>阈值元素）降频，小通信跳过

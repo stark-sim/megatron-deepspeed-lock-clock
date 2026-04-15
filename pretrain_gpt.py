@@ -21,12 +21,28 @@ from megatron.arguments import core_transformer_config_from_args
 import deepspeed
 from deepspeed.runtime.utils import see_memory_usage
 from deepspeed.accelerator.real_accelerator import get_accelerator
-from deepspeed.sequence.fpdt_layer import FPDT_InputConstruct
 import os
 import subprocess
 
 from torch import nn
 import torch.nn.functional as F
+
+try:
+    from deepspeed.sequence.fpdt_layer import FPDT_InputConstruct
+    fpdt_input_supported = True
+except ImportError:
+    FPDT_InputConstruct = None
+    fpdt_input_supported = False
+
+
+def _require_fpdt_input_support():
+    if fpdt_input_supported:
+        return
+    raise ImportError(
+        "DeepSpeed FPDT sequence parallel support is not available in the current "
+        "environment. Disable --ds-sequence-parallel-fpdt or install a DeepSpeed "
+        "build that provides deepspeed.sequence.fpdt_layer."
+    )
 
 
 def model_provider(pre_process=True, post_process=True):
@@ -127,6 +143,7 @@ def get_batch(data_iterator):
     seq_parallel_world_rank = mpu.get_sequence_parallel_rank()
 
     if args.ds_sequence_parallel_fpdt:
+        _require_fpdt_input_support()
         return FPDT_InputConstruct(tokens, labels, loss_mask, attention_mask, position_ids, args, seq_parallel_world_size, seq_parallel_world_rank).generate()
 
     # For Megatron's sequence parallel

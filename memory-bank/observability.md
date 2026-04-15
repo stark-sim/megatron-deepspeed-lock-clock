@@ -1,5 +1,236 @@
+- [2026-04-01] `dual8_tp4pp1dp2_static990_20260401_222055_DGX2-1` confirms that the `.deepspeed_env` path is active: runner log prints `deepspeed_env file = ./.deepspeed_env` and the pdsh launch command includes `export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`. After this change, the run progresses through `iteration 1/20`, `2/20`, and `3/20` with step times about `71.0s`, `69.6s`, and `67.3s`, instead of OOMing around the third optimizer step as before.
+- [2026-03-31] Successful `8-11` smoke artifact: `dual8_tp4pp1dp2_smoke990_20260331_163556_DGX2-1` logs `iteration 1/2` and `iteration 2/2` with remote rank-4 summary lines plus local `steps: 1/2` markers. Observed iter times are about `67.8s` and `66.3s`, samples/sec about `0.118-0.121`, and the run reaches `validation loss at iteration 2`.
+- [2026-03-31] Full source collection is now live in `screen` session `dual8_tp4pp1dp2_collect_20260331`. The first full point `dual8_tp4pp1dp2_static990_20260331_164228_DGX2-1` has begun on `GPU8-11` and currently sits in distributed initialization / early startup without an immediate `FileNotFoundError`, indicating the latest cache syncs covered the previously exposed dataset hashes.
 # Observability
+- [2026-04-11] Fresh IB formal remote sanity check completed against live DGX2 artifacts:
+  - verified on `sd@v100x16-1`:
+    - source `ib_dual8_tp4pp1dp2_formal_990_20260410_20260410_161719_DGX2-1`
+    - target `ib_dual16_tp4pp1dp4_formal_1080_20260411_110907_DGX2-1`
+    - target `ib_dual16_tp4pp1dp4_formal_1155_20260411_111702_DGX2-1`
+  - structured metadata:
+    - all three have `run.json.status=completed` and `final_iteration=20`
+    - source topology resolves to `visible_gpu_indices=[8,9,10,11]`, `nproc_per_node=4`, `world_size=8`
+    - target topology resolves to `visible_gpu_indices=[8,9,10,11,12,13,14,15]`, `nproc_per_node=8`, `world_size=16`
+    - `hostfile_snapshot.json` explicitly records both `v100x16-1` and `v100x16-2`
+  - event/log confirmation:
+    - source `990` `events.jsonl` finalized with Zeus `404.1298 s / 238940.408 J / 591.247 W`
+    - target `1080` `events.jsonl` finalized with Zeus `372.2408 s / 468052.854 J / 1257.393 W`
+    - target `1155` `events.jsonl` finalized with Zeus `351.5297 s / 475668.378 J / 1353.139 W`
+    - source / target logs both contain `v100x16-2:`-prefixed `iteration 1/20 ... 20/20` lines, so the second node was actively participating rather than inferred post hoc
+  - secondary-node note:
+    - `sd@v100x16-2` can see the target run directory, but it only exposes `ds_config.json`; the full artifact set remains on `DGX2-1`, so current two-node verification should treat node0 as the authoritative artifact writer
+- [2026-04-11] Power-fixed live-IB replay artifact added at `.context/transfer_eval_ib_2x4_to_2x8_rerun_topology_fixed_live_ib_powerfix_20260411/`:
+  - codepath note:
+    - `predict_power_w()` now includes explicit `target.gpus_per_node / reference_gpus_per_node` scaling
+    - `alpha_dp` remains unchanged at `2.220525e-11 s/byte`, so this replay isolates power-structure correction rather than communication-model changes
+  - replay summary:
+    - `total_time_mape=0.1148`
+    - `step_time_mape=0.1148`
+    - `avg_power_mape=0.0328`
+    - `total_energy_mape=0.0786`
+  - per-point replay details:
+    - `990 MHz`: observed/predicted power `1189.17 / 1128.43 W`, power APE `5.11%`, energy APE `2.98%`
+    - `1080 MHz`: observed/predicted power `1257.39 / 1229.19 W`, power APE `2.24%`, energy APE `9.22%`
+    - `1155 MHz`: observed/predicted power `1353.14 / 1319.64 W`, power APE `2.48%`, energy APE `11.37%`
+  - comparison against the immediately previous live-IB replay:
+    - `avg_power_mape: 51.64% -> 3.28%`
+    - `total_energy_mape: 46.07% -> 7.86%`
+    - `total_time_mape: 11.48% -> 11.48%`
+- [2026-04-11] Fresh transport-consistent `2x4 -> 2x8` IB formal replay is now stored at `.context/transfer_eval_ib_2x4_to_2x8_rerun_topology_fixed_live_ib_20260411/`:
+  - source root: `.context/ib_formal_rerun_20260410/source_curated/`
+  - target root: `.context/ib_formal_rerun_20260410/target_final/`
+  - benchmark JSON: `.context/ib_formal_replay_20260410/comm_bench_2x4_20260410_ibhist.json`
+  - topology note:
+    - source workload = `2x4`, `TP=4`, `PP=1`, `DP=2`, `GBS=8`
+    - target workload = `2x8`, `TP=4`, `PP=1`, `DP=4`, `GBS=16`
+    - stock `scripts/evaluate_transfer_prediction.py` rejects this pair with `source and target workloads differ outside topology fields`, so this replay was executed as a topology-fixed override run rather than through the strict CLI path
+  - live-IB replay summary:
+    - `alpha_dp=2.220525e-11 s/byte`
+    - `total_time_mape=0.1148`
+    - `step_time_mape=0.1148`
+    - `avg_power_mape=0.5164`
+    - `total_energy_mape=0.4607`
+  - per-point replay details:
+    - `990 MHz`: observed/predicted time `401.187 / 435.396 s`, time APE `8.53%`, observed/predicted power `1189.17 / 564.22 W`, energy APE `48.51%`
+    - `1080 MHz`: observed/predicted time `372.241 / 415.901 s`, time APE `11.73%`, observed/predicted power `1257.39 / 614.59 W`, energy APE `45.39%`
+    - `1155 MHz`: observed/predicted time `351.530 / 401.421 s`, time APE `14.19%`, observed/predicted power `1353.14 / 659.82 W`, energy APE `44.32%`
+  - sensitivity note:
+    - replacing the live dual-node benchmark with the historical `.context/ib_formal_replay_20260410/ib_benchmark_111g_20260403.json` only moves time MAPE `11.48% -> 11.43%`
+    - interpretation: for this fresh rerun pair, the residual gap is no longer dominated by benchmark-bandwidth optimism/pessimism
+- [2026-04-10] The first recovered `2x8` IB formal target point is now local and complete:
+  - remote run dir: `/home/sd/Megatron-DeepSpeed/experiments/ib_dual16_tp4pp1dp4_diag_nozeus_990_20260410_202433_DGX2-1`
+  - local copy: `.context/ib_formal_rerun_20260410/target_partial/ib_dual16_tp4pp1dp4_diag_nozeus_990_20260410_202433_DGX2-1/`
+  - config: `TP=4`, `PP=1`, `DP=4`, `GBS=16`, `MICRO=1`, `TRAIN_STEPS=20`, `STATIC_CLOCK_MHZ=990`, `MASTER_ADDR=192.168.205.201`, `MASTER_PORT=30041`
+  - representative iteration logs:
+    - `iter1=21.228s`
+    - `iter2=20.221s`
+    - `iter3=19.994s`
+    - `iter9=19.867s`
+  - Zeus summary from `run.json`:
+    - `401.187s / 477080.108J / 1189.17W`
+  - metadata confirmation:
+    - `status=completed`
+    - `final_iteration=20`
+    - `topology.resolved.visible_gpu_indices=[8,9,10,11,12,13,14,15]`
+    - `topology.resolved.nproc_per_node=8`
+  - failure / retry note:
+    - the earlier formal `990` attempt `ib_dual16_tp4pp1dp4_formal_990_20260410_192729_DGX2-1` failed right after `training ...` with `torch.AcceleratorError: CUDA error: out of memory`; the retry above completed on the same topology/slice
+- [2026-04-10] `2x8` IB target smoke is now a completed, metadata-clean artifact on the intended `8-15` slice:
+  - run dir: `/home/sd/Megatron-DeepSpeed/experiments/ib_dual16_tp4pp1dp4_smoke_1080_20260410_192035_DGX2-1`
+  - config: `TP=4`, `PP=1`, `DP=4`, `GBS=16`, `MICRO=1`, `TRAIN_STEPS=2`, `STATIC_CLOCK_MHZ=1080`, `MASTER_ADDR=192.168.205.201`, `MASTER_PORT=30020`
+  - Zeus interval:
+    - `38.452s / 46709.31J / 1214.74W`
+  - metadata confirmation from `run.json`:
+    - `hostfile.entries=[v100x16-1,v100x16-2]`
+    - `topology.resolved.visible_gpu_indices=[8,9,10,11,12,13,14,15]`
+    - `topology.resolved.nproc_per_node=8`
+    - `preflight.ok=true`
+    - `preflight.node_results[*].gpu_indices=[8,9,10,11,12,13,14,15]`
+  - operational note:
+    - the earlier failed smoke `ib_dual16_tp4pp1dp4_smoke_1080_20260410_171438_DGX2-1` remained `status="initialized"` because `DGX2-2` lacked the dataset cache hash `d1158a21c6d1be91201644dbce18ab32_*`; after syncing those files and cleaning hung ranks, the same launcher path completed successfully
+- [2026-04-10] The new transport-consistent `2x4` IB smoke rerun completed successfully on the intended `8-11` GPU slice:
+  - run dir: `/home/sd/Megatron-DeepSpeed/experiments/ib_2x4_smoke_rerun_20260410_retry_20260410_155057_DGX2-1`
+  - config: `TP=4`, `PP=1`, `DP=2`, `GBS=8`, `MICRO=1`, `TRAIN_STEPS=2`, `STATIC_CLOCK_MHZ=1080`, `MASTER_ADDR=192.168.205.201`, `MASTER_PORT=29973`
+  - step metrics:
+    - `step1=19.650s`
+    - `step2=19.455s`
+  - Zeus interval:
+    - `39.1s / 23609.5J / 603.3W`
+  - metadata confirmation from `run.json`:
+    - `hostfile.entries=[v100x16-1,v100x16-2]`
+    - `topology.resolved.visible_gpu_indices=[8,9,10,11]`
+    - `topology.resolved.nproc_per_node=4`
+    - `preflight.ok=true`
+- [2026-04-10] The first retry before the successful smoke exposed a launcher-only regression rather than a training/runtime regression:
+  - run dir: `/home/sd/Megatron-DeepSpeed/experiments/ib_2x4_smoke_rerun_20260410_retry_20260410_154329_DGX2-1`
+  - failure site: `deepspeed/launcher/runner.py` parsing `.deepspeed_env`
+  - root cause: the overlay writer inserted a blank line between preserved env lines and appended `MEGATRON_*` lines, while the current DeepSpeed runner expects every non-comment line to contain `=`
+- [2026-04-10] `VALIDATE_ONLY=1` artifact `/home/sd/Megatron-DeepSpeed/experiments/ib_2x4_validate_aliasfix2_20260410_20260410_160700_DGX2-1` confirms the hostfile alias fix:
+  - `preflight.json.node_results` now contains exactly `2` nodes (`DGX2-1`, `DGX2-2`)
+  - both nodes report `cuda_visible_devices="8,9,10,11"` and `gpu_indices=[8,9,10,11]`
+- [2026-04-10] Zeus still logs `Started monitoring GPUs: [0, 1, 2, 3]` even when the launcher uses `CUDA_VISIBLE_DEVICES=8,9,10,11`; current evidence indicates this is visible-device-relative logging rather than a real regression in device selection, because `run.json`, `topology.json`, and preflight all agree on the absolute slice `8-11`
+- [2026-04-10] Forensic check of the earlier "successful" IB smoke artifact `/home/sd/Megatron-DeepSpeed/experiments/ib_2x4_smoke_rerun_20260410_20260410_132952_DGX2-1` shows the metadata fix was still not evidenced in that run:
+  - `run.json.hostfile = {}`
+  - `run.json.topology.resolved = {}`
+  - `topology.json` still says `nproc_per_node=16` and `visible_gpu_indices=[0..15]`
+  - `preflight.json` contains a local-node entry with empty `cuda_visible_devices` and `gpu_indices=[0..15]`
+  - interpretation: the run proves training can finish, but not that the patched launcher metadata path was active
+- [2026-04-10] Clean single-node deepspeed metadata verification on `DGX2-2` is stored at `/home/sd/Megatron-DeepSpeed/experiments/ib_single_node_metadata_verify_20260410_20260410_134052_DGX2-2` and shows the patched path works when the launcher is invoked with explicit `CUDA_VISIBLE_DEVICES=8,9,10,11` and `LOCAL_GPU_INDICES=8,9,10,11`:
+  - `run.json.environment.CUDA_VISIBLE_DEVICES = "8,9,10,11"`
+  - `run.json.topology.requested = {tp: "4", pp: "1"}`
+  - `run.json.topology.resolved.visible_gpu_indices = [8,9,10,11]`
+  - `run.json.preflight.node_results[0].gpu_indices = [8,9,10,11]`
+  - the run finalizes as `status="incomplete"` because rank0 later aborts during model build with `AttributeError: module 'psutil' has no attribute 'virtual_memory'`
+- [2026-04-10] Live occupancy snapshot before the intended dual-node rerun:
+  - `DGX2-1` is fully occupied by external `VLLM::Worker_TP0..15` processes from `lb`'s `vllm serve /share-data/models/Llama-3.1-70B-Instruct --tp 16`
+  - each GPU reports about `9436 MiB` resident and low but non-zero compute utilization (`~4-8%` in `nvidia-smi pmon`)
+  - `DGX2-2` remains clean on `GPU 8-11` and can still be used for isolated launcher verification
+- [2026-04-10] Live dual-node DGX2 IB benchmark succeeded after aligning launcher provenance with the historical run pair:
+  - remote benchmark script had to be synced from local `.context/torch_nccl_comm_bench.py`; the stale remote copy rejected `--warmup-iters` / `--iters`
+  - using recovered-run-aligned `MASTER_ADDR=192.168.205.201` plus `GLOO_SOCKET_IFNAME=enp6s0`, `NCCL_SOCKET_IFNAME=enp6s0`, `NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_6,mlx5_7,mlx5_8,mlx5_9`, `NCCL_IB_DISABLE=0` produced a successful `2x4` benchmark JSON at `.context/ib_formal_replay_20260410/comm_bench_2x4_20260410_ibhist.json`
+  - rank0 live output:
+    - `1 MB  avg=0.274 ms  busbw=6.388  cv=0.128`
+    - `4 MB  avg=0.711 ms  busbw=9.842  cv=0.079`
+    - `16 MB avg=2.426 ms  busbw=11.543 cv=0.513`
+    - `64 MB avg=5.971 ms  busbw=18.757 cv=0.031`
+  - the benchmark completes cleanly across both nodes and all eight benchmark ranks exit successfully
+- [2026-04-10] Fresh topology-fixed replay against the live dual-node IB benchmark is stored at `.context/ib_formal_replay_20260410/transfer_eval_current_code_topology_fixed_live_ib.json` and `.md`
+  - `target total_time_mape=0.1901`
+  - `target step_time_mape=0.1901`
+  - `target avg_power_mape=0.5236`
+  - `target total_energy_mape=0.4328`
+  - `alpha_dp=2.220525e-11 s/byte`
+  - per-point target time APE:
+    - `990 MHz`: `15.13%`
+    - `1080 MHz`: `19.31%`
+    - `1155 MHz`: `22.60%`
+- [2026-04-10] Comparison against the previous topology-fixed replay driven by `.context/ib_formal_replay_20260410/ib_benchmark_111g_20260403.json`:
+  - time MAPE stays effectively unchanged: `18.98% -> 19.01%`
+  - `alpha_dp` rises from `1.997e-12` to `2.221e-11 s/byte`, but remains far below slow-network scale
+  - interpretation: the remaining raw-artifact IB mismatch is not explained by benchmark optimism alone
+- [2026-04-09] IB reconstructed sanity replay artifact added at `.context/ib_synthetic_transfer_regression_20260409.md`.
+- [2026-04-09] This replay is intentionally marked reconstructed rather than formal because the current workspace snapshot lacks the original raw `2x8` IB target artifact used by the paper-era checkpoint. The replay uses:
+  - source topology definition from `.context/dual8_tp4pp1dp2_collection_20260401/.../run.json` with manual `node_count=2`, `gpus_per_node=4`
+  - target topology definition from `.context/dual16_tp4pp1dp4_prediction_compare_20260326/experiments/.../run.json` with manual `node_count=2`, `gpus_per_node=8`
+  - observed IB metrics from `.context/paper/experimental_data.md`
+  - IB benchmark curve from `.context/transfer_2x4_to_2x8_ib_20260403.py`
+- [2026-04-09] Reconstructed IB replay result:
+  - legacy synthetic path: `time_mape=0.1237`, `power_mape=0.0302`, `energy_mape=0.0899`
+  - current continuous-scaling path: `time_mape=0.1123`, `power_mape=0.0328`, `energy_mape=0.0760`
+  - current cross-node coefficients on IB synthetic replay: `alpha_dp≈1.997e-12 s/byte`, `alpha_pp=0`, `alpha_tp=0`
+- [2026-04-09] Per-frequency current IB synthetic replay:
+  - `990 MHz`: predicted `429.1 s / 554.9 W / 238.1 kJ`, observed `395.7 s / 584.2 W / 231.2 kJ`
+  - `1080 MHz`: predicted `408.5 s / 587.0 W / 239.8 kJ`, observed `366.5 s / 604.8 W / 221.7 kJ`
+  - `1155 MHz`: predicted `393.2 s / 614.5 W / 241.6 kJ`, observed `345.5 s / 626.3 W / 216.4 kJ`
+- [2026-04-09] After adding cluster-capacity transfer scaling and keeping power normalization local-node scoped, the latest formal Ethernet replay under `.context/transfer_eval_eth_qwen3b_1x4_source_curve_20260409_curated_to_eth_qwen3b_2x4_target_curve_20260408_sd-1/` reports:
+  - `total_time_mape=0.0516`
+  - `step_time_mape=0.0516`
+  - `avg_power_mape=0.1238`
+  - `total_energy_mape=0.1042`
+- [2026-04-09] Per-point APEs for the new replay:
+  - `1005 MHz`: step time `4.28%`, power `16.79%`, energy `13.23%`
+  - `1200 MHz`: step time `7.07%`, power `12.95%`, energy `6.79%`
+  - `1395 MHz`: step time `4.14%`, power `7.40%`, energy `11.23%`
+- [2026-04-09] Relative to the earlier formal checkpoint under `.context/eth_2x4_curve_eval_20260409/transfer_eval/`, the latest replay improves:
+  - time MAPE: `40.17% -> 5.16%`
+  - avg-power MAPE: `20.99% -> 12.38%`
+  - total-energy MAPE: `10.58% -> 10.42%`
+- [2026-04-09] The final successful validation command sequence for this iteration is:
+  - `python3 -m pytest --noconftest -q tests/unit_tests/test_freq_model.py -k 'cluster_capacity_scale_tracks_gpu_growth_and_pipeline_efficiency or load_calibrate_and_overlay_modes or cross_node_penalty_fit_scales_continuously_with_benchmark_bandwidth or network_quality_observation_and_penalty_scaling'`
+    - result: `4 passed, 33 deselected in 33.90s`
+  - `python3 scripts/evaluate_transfer_prediction.py --source-root .context/eth_2x4_curve_eval_20260409/eth_qwen3b_1x4_source_curve_20260409_curated --target-root .context/eth_2x4_curve_eval_20260409/eth_qwen3b_2x4_target_curve_20260408_sd-1 --network-benchmark-json .context/comm_bench_2x4_eth0_20260406_175803.json`
+- [2026-04-09] After switching from hard thresholding to benchmark-scaled continuous `alpha/beta`, targeted predictor validation passed locally:
+  - `python3 -m pytest --noconftest -q tests/unit_tests/test_freq_model.py -k 'fit_cross_node_penalty_model_produces_positive_coefficients or cross_node_penalty_fit_scales_continuously_with_benchmark_bandwidth or network_quality_observation_and_penalty_scaling or cross_node_penalty_exposure_increases_with_frequency'`
+    - result: `3 passed, 33 deselected in 0.13s`
+  - `python3 -m pytest --noconftest -q tests/unit_tests/test_freq_model.py -k 'load_calibrate_and_overlay_modes or predict_script_network_benchmark_annotation'`
+    - result: `2 passed, 34 deselected in 83.09s`
+- [2026-04-09] New formal Ethernet `2x4` replay artifact after continuous benchmark scaling: `.context/transfer_eval_eth_qwen3b_1x4_source_curve_20260409_curated_to_eth_qwen3b_2x4_target_curve_20260408_sd-1/transfer_prediction.json` and `transfer_prediction_report.md`.
+- [2026-04-09] The new replay reports `total_time_mape=0.3919`, `step_time_mape=0.3919`, `avg_power_mape=0.2198`, `total_energy_mape=0.0843`. Compared with the earlier formal checkpoint under `.context/eth_2x4_curve_eval_20260409/transfer_eval/`, time MAPE improves by about `0.98` percentage points and energy MAPE improves by about `2.14` percentage points, while avg-power MAPE worsens by about `0.99` percentage points.
+- [2026-04-09] Under the new benchmark-scaled-alpha path, Ethernet `2x4` cross-node coefficients are `alpha_dp≈7.32e-10 s/byte`, `alpha_pp=0`, `alpha_tp=0`; this is lower than the earlier `alpha_dp≈8.41e-10`, but the predictor still recommends low clocks (`1005/1020/1035 MHz`) and remains systematically time-conservative across all three measured points.
+- [2026-04-09] Formal `2x4` Ethernet transfer artifacts are staged locally under `.context/eth_2x4_curve_eval_20260409/`. Curated source root: `.context/eth_2x4_curve_eval_20260409/eth_qwen3b_1x4_source_curve_20260409_curated/` with `1005`, `1200`, and successful rerun `1395_r1`; target root: `.context/eth_2x4_curve_eval_20260409/eth_qwen3b_2x4_target_curve_20260408_sd-1/`; evaluation output: `.context/eth_2x4_curve_eval_20260409/transfer_eval/transfer_prediction.json` and `transfer_prediction_report.md`.
+- [2026-04-09] Source formal sweep observability:
+  - `1005 MHz`: standard run artifacts present under `eth_qwen3b_1x4_source_static1005_20260408_sd-2/`
+  - `1200 MHz`: Zeus summary `169.6 s / 40464.6 J / 238.7 W / 4.049 tokens/J`; `step1=27.788s`, `step20=5.955s`, `skipped=0`
+  - `1395 MHz` first attempt (`eth_qwen3b_1x4_source_static1395_20260408_sd-2`) failed during distributed init with `torch.distributed.DistNetworkError: EADDRINUSE` on `29549`; failed run dir remains for forensics but is excluded from formal local replay
+  - `1395 MHz` rerun (`eth_qwen3b_1x4_source_static1395_r1_20260409_sd-2`) succeeded with `29551`; Zeus summary `169.6 s / 40837.5 J / 240.7 W / 4.012 tokens/J`; `step1=27.198s`, `step20=5.808s`, `skipped=0`
+- [2026-04-09] Formal local transfer replay against `.context/comm_bench_2x4_eth0_20260406_175803.json` reports `total_time_mape=0.4017`, `step_time_mape=0.4017`, `avg_power_mape=0.2099`, `total_energy_mape=0.1058`. Per-target-point APEs:
+  - `1005 MHz`: time `43.78%`, power `23.97%`, energy `9.31%`
+  - `1200 MHz`: time `46.52%`, power `21.54%`, energy `14.95%`
+  - `1395 MHz`: time `30.21%`, power `17.46%`, energy `7.48%`
+- [2026-04-09] The replay keeps the slow-network branch active on Ethernet with `transport=eth0|ib_disable=1`, `effective_bandwidth_gbps≈0.2026`, `small_message_jitter_cv≈0.0153`, `large_message_jitter_cv≈0.0072`, and cross-node coefficients `alpha_dp≈8.41e-10 s/byte`, `alpha_pp=0`, `alpha_tp=0`. The resulting predictor remains systematically time-conservative on Ethernet, recommending low frequencies (`1005/1020/1035 MHz`) and overestimating runtime at all three measured points.
+- [2026-04-08] First full-GPU `2x4` Ethernet smoke on `sd-1/sd-2` succeeded with `GPU 0,1,2,3` per host. Artifacts now live under `/home/user/Megatron-DeepSpeed/experiments/eth_qwen3b_2x4_fullgpu_smoke_20260408_sd-1/`: `manual_2x4.log`, `run.json`, `events.jsonl`, `command.sh`, and `notes.md`. Key runtime lines are `step1=16.150s`, `step2=8.303s`, `global_batch_size=4`, `skipped=0`; rank-0 memory line reports `reserved/max reserved=10966/10966 MB`, and rank-4 reports `10086/10086 MB`.
+- [2026-04-08] The corresponding `events.jsonl` confirms the standard interval tracker is back on Ethernet: `initialized -> interval -> finalized(status=completed)`. The Zeus interval for steps `1-2` reports `time_s=24.477`, `energy_j=6891.94`, `avg_power_w=281.56`, `interval_samples=8`, and `tokens/J=2.377`.
+- [2026-04-08] The first `2x4` relaunch after syncing tracker files failed immediately on both nodes with `ImportError: cannot import name 'collect_nvml_device_snapshot' from megatron.gpu_freq_manager`. Root cause was a stale remote `megatron/gpu_freq_manager.py` while `megatron/experiment_tracker.py` had already been updated. Syncing that one file from the local workspace to both `sd-1` and `sd-2` cleared the blocker on the next retry.
+- [2026-04-07] `2x2` Ethernet target smoke succeeded on `sd-1/sd-2` with `GPU 2,3` per host. Log: `/home/user/Megatron-DeepSpeed/experiments/eth_qwen3b_target_validate_fixpy_20260407_sd-1/manual_cpuoffload_r5.log`. Key runtime lines: `step1=37.418s`, `step2=10.976s`, `global_batch_size=4`, `skipped=0`; rank-0 memory line reports `reserved/max reserved=11126/11126 MB`, rank-2 reports `12786/12786 MB`.
+- [2026-04-07] Aligned single-node Ethernet source smoke succeeded on `sd-2` at `/home/user/Megatron-DeepSpeed/experiments/eth_qwen3b_source_gb4_manual_20260407_sd-2/manual_gb4.log`. Configuration matches the target workload except topology (`PP=2`, `TP=1`, `GBS=4`, `ZeRO-1 + CPU offload`, `GPU 2,3`). Key runtime lines: `step1=34.361s`, `step2=8.296s`, `skipped=0`.
+- [2026-04-07] Local provisional time-only replay using the aligned source point plus `.context/comm_bench_2x4_eth0_20260406_175803.json` predicts target `step_time≈14.683s` for the observed `2x2` Ethernet target whose measured `step2≈10.976s`, giving `APE≈33.8%`. The replay keeps the slow-network branch active with `alpha_dp≈8.41e-10 s/byte` and `transport=eth0|ib_disable=1`.
+- [2026-04-07] Successful Ethernet benchmark on `sd-1/sd-2` using synced local code: `bash .context/run_comm_bench.sh 2x4` with `SIZES_MB="1 4 16 64"`, `BENCH_WARMUP_ITERS=3`, `BENCH_ITERS=8`, `NCCL_SOCKET_IFNAME=eth0`, `NCCL_IB_DISABLE=1`. Output artifact fetched locally as `.context/comm_bench_2x4_eth0_20260406_175803.json`. Summary: `1 MB -> 15.139 ms / 0.116 / cv 0.005`, `4 MB -> 59.982 ms / 0.117 / cv 0.001`, `16 MB -> 140.073 ms / 0.200 / cv 0.015`, `64 MB -> 552.722 ms / 0.203 / cv 0.007`.
+- [2026-04-07] First full-size Ethernet benchmark attempt on `sd-1/sd-2` failed by timeout rather than launch/setup failure. Command used default `1/4/16/64/256 MB × 20` recipe under `.context/run_comm_bench.sh 2x4`; ranks launched cleanly on both nodes, printed results through `64 MB`, but `256 MB` did not finish within the launcher `timeout 300`, and the job exited `124`.
 
+- [2026-03-28] `2x4` rerun `dual8_tp4pp1dp2_20260328_r2` first-failure block (around line ~884 of `/home/sd/Megatron-DeepSpeed/.context/dual8_tp4pp1dp2_20260328_r2.log`) shows distributed init failing with `torch.distributed.DistBackendError: NCCL ... Failed to CUDA calloc async 4 bytes`, then cascading NCCL watchdog/TCPStore broken-pipe shutdown.
+- [2026-03-28] Remote contention snapshot: `nvidia-smi` on `DGX2-1` reports all 16 GPUs near `~29.8 GiB` used at sampling time; this explains immediate allocator failure for the intended `GPU0-3` run. A detached watcher (`screen`: `dual8_tp4pp1dp2_watch_20260328`) now polls for free GPUs and auto-launches collection when available.
+- [2026-03-28] Remote run is in-flight for `2x4` source topology acquisition: `screen -S dual8_tp4pp1dp2_20260328` on `sd@v100x16-1`; log path `/home/sd/Megatron-DeepSpeed/.context/dual8_tp4pp1dp2_20260328.log`. Early log confirms deepspeed multinode launch command started for frequency `990 MHz`.
+- [2026-03-28] Dataset-readiness gate for strict `2x4 -> 2x8` transfer is now available via `scripts/check_transfer_dataset_readiness.py`. Current snapshot check (`source: 2,4,4,1,2`, `target: 2,8,4,1,4`) reports `{source_matches: 0, target_matches: 0, ready: false}` with exit code `2`.
+- [2026-03-27] Exposure-calibration replay artifact is saved at `.context/dual8_generalization_20260327_exposure_calibration/comparison.json` with summary in `summary.md`. This run uses the available dual8 held-out set (workspace snapshot currently has no explicit `2x4` samples): source `tp2pp4dp2,tp2pp2dp4,tp1pp4dp4`, target `tp4pp1dp4`. Before/after stays identical (`time MAPE=0.6827366585`, `energy MAPE=0.5094818431`, default `1110 MHz`), and calibrated exposure knobs remain `pp=1.0, dp=1.0, tp=1.0, dp_group_gain=0.5, pp_bubble_gain=0.5`.
+- [2026-03-26] Multi-topology base-prior replay for held-out `tp4pp1dp4` is saved at `.context/dual8_generalization_20260326/leave_one_tp4pp1dp4_multi_topology_prior_20260326/comparison.json` with a concise write-up in `summary.md`. The explicit fitted topology residuals remain zero, but the new always-on pooled-topology prior still improves the held-out target to `time MAPE ≈ 68.274%`, `energy MAPE ≈ 50.948%`, with default moving to `1110 MHz` and recommended frequencies `[1110, 1117, 1125]`.
+- [2026-03-26] Full predictor validation after the new multi-topology prior: `python3 -m pytest --noconftest -q tests/unit_tests/test_freq_model.py` passes with `33 passed in 123.42s`.
+- [2026-03-26] Latest `tp4pp1dp4` leave-one-topology-out replay after topology base + shape scaling is saved at `.context/dual8_generalization_20260326/leave_one_tp4pp1dp4_topology_shape_scaling_20260326/comparison.json` with a readable recap in `summary.md`. Before/after remain numerically identical: `time MAPE = 85.752%`, `energy MAPE = 70.756%`, default `600 MHz`, recommended `[600, 607, 615]`, and fitted topology sensitivities all stay at `0.0`.
+- [2026-03-26] Predictor implementation validation after the latest topology-shape/base-scaling changes: `python3 -m pytest --noconftest -q tests/unit_tests/test_freq_model.py` passes with `31 passed in 100.02s`.
+- [2026-03-26] Leave-one-topology-out pooled-calibration replay for target `tp4pp1dp4` is saved at `.context/dual8_generalization_20260326/leave_one_tp4pp1dp4_after_fix/comparison.json`. Before/after the pooled-reference fix, time MAPE stays about `85.744% -> 85.752%` and energy MAPE about `70.740% -> 70.756%`; the main visible change is in calibration metadata (`reference_topology_count: 1 -> 3`, `reference_topology_dispersion: 0.0 -> 0.213`), not in predictive quality.
+- [2026-03-26] Focused `8+8` transfer-damping comparison lives at `.context/dual8_generalization_20260326/focused_transfer_compare_after_fix/comparison_two_pairs.json`. Representative results are essentially unchanged before/after the patch: `tp2pp4dp2 -> tp4pp1dp4` stays at about `85.9%` time MAPE / `70.7%` energy MAPE with default `615 MHz`, while `tp4pp1dp4 -> tp2pp4dp2` stays at about `636%` time MAPE / `218%` energy MAPE with default moving only `547 -> 555 MHz`.
+- [2026-03-26] Local `2x8 -> 2x16` transfer replay artifacts are staged under `.context/dual16_to_dual32_transfer_20260326/` with per-mode payloads in `no_network/prediction.json` and `with_network/prediction.json`, plus a compact summary in `summary.md`. On target `dual32_tp4pp1dp8`, both modes are numerically identical: `time MAPE ≈ 73.7%`, `energy MAPE ≈ 14.0%`, default `480 MHz`. Representative misses: `990 MHz -> 2046.8 s / 1205.7 W / 2.468 MJ` measured vs `4817.4 s / 513.7 W / 2.475 MJ` predicted, and `1155 MHz -> 2252.6 s / 1245.8 W / 2.806 MJ` measured vs `4494.7 s / 656.7 W / 2.952 MJ` predicted.
+- [2026-03-26] Local replay summary for the completed `2x8` control is saved at `.context/dual16_tp4pp1dp4_prediction_compare_20260326/summary.json` and `.context/dual16_tp4pp1dp4_prediction_compare_20260326/summary.md`. On `990/1080/1155 MHz`, analytic self-replay is about `13.0%` MAPE on total time and `6.8%` on total energy; predicted sampled-point ordering is time `1155 < 1080 < 990` and energy `990 < 1080 < 1155`, while measured ordering is `990 < 1155 < 1080` for both.
+- [2026-03-26] Replay blocker discovered and fixed: the new dual-node `8+8` runs contain valid Zeus interval metrics in `events.jsonl`, but their `run.json` omits `freq_policy.mode/static_clock_mhz`. `analysis/freq_model/workload.py` now infers `static<freq>` from naming metadata so completed static runs remain loadable without hand-editing artifacts.
+
+- [2026-03-26] Predictor implementation validation: `python3 -m pytest --noconftest -q tests/unit_tests/test_freq_model.py` passes with `23 passed in 82.77s`. New coverage checks both the benchmark summarization path and cross-node penalty scaling under worse measured bandwidth/jitter, plus CLI propagation via `--network-benchmark-json`.
+- [2026-03-26] Completed dual-node `8+8` comparison results: `dual16_tp4pp1dp4_static990_20260325_235717_DGX2-1 -> 2117.98 s / 588.21 W / 1245818.77 J`, `dual16_tp4pp1dp4_static1080_20260326_003510_DGX2-1 -> 2955.33 s / 565.34 W / 1670769.34 J`, `dual16_tp4pp1dp4_static1155_20260326_012657_DGX2-1 -> 2466.87 s / 605.89 W / 1494653.14 J`. Local comparison artifact: `.context/dual_topology_control_compare_20260326.json`.
+- [2026-03-26] Same-transport communication benchmark completed successfully under remote artifact `/home/sd/Megatron-DeepSpeed/.context/comm_bench_dual8_tailscale_20260326.json`. For `world_size=16` (`8+8`) with `tailscale0` and `NCCL_IB_DISABLE=1`, measured `busbw` stays near `0.207-0.212 GB/s`; `cv` is `~0.096` at `4 MB`, `~0.136` at `16 MB`, `~0.008` at `64 MB`, and `~0.012` at `256 MB`.
+- [2026-03-26] Detached dual-node `8+8` comparison batch is running in remote `screen` session `dual16_tp4pp1dp4_20260325`. Launcher script: `/home/sd/Megatron-DeepSpeed/.context/dual16_tp4pp1dp4_compare_20260325.sh`; live log: `/home/sd/Megatron-DeepSpeed/.context/dual16_tp4pp1dp4_20260325.log`. The first `990 MHz` run has passed `[after megatron is initialized]` and reached `training ... [before the start of training step]` without cache/init regressions.
+- [2026-03-26] Same-transport communication benchmark artifacts are staged under remote `.context`: benchmark script `/home/sd/Megatron-DeepSpeed/.context/torch_nccl_comm_bench.py`, launcher `/home/sd/Megatron-DeepSpeed/.context/comm_bench_torchrun_dual8.sh`, watcher session `dual16_post_comm_watch_20260325`, and future log path `/home/sd/Megatron-DeepSpeed/.context/comm_bench_dual8_tailscale_20260325.log`. This probe intentionally matches the current training transport (`tailscale0`, `NCCL_IB_DISABLE=1`) instead of assuming IB.
+- [2026-03-25] Current-code 32-GPU transfer-prediction replay is saved at remote `/home/sd/Megatron-DeepSpeed/.context/dual32_tp4pp1dp8_prediction_compare_20260325/prediction_bundle.json` and summarized locally at `.context/dual32_tp4pp1dp8_pred_vs_measured_20260325.json`. Key predicted vs measured points: `1050 MHz -> 683.2 s / 2455.1 W / 1.677 MJ` vs `2473.0 s / 1166.0 W / 2.884 MJ`, `1125 MHz -> 656.3 s / 2670.3 W / 1.753 MJ` vs `3216.3 s / 1144.4 W / 3.681 MJ`, `1200 MHz -> 633.4 s / 2902.8 W / 1.839 MJ` vs `2871.6 s / 1213.5 W / 3.485 MJ`.
+- [2026-03-25] Detached 32-GPU refinement batch is running in remote `screen` session `dual32_refine_20260325`. Launcher script: `/home/sd/Megatron-DeepSpeed/.context/dual32_tp4pp1dp8_refine_20260325.sh`; live log: `/home/sd/Megatron-DeepSpeed/.context/dual32_refine_20260325.log`. Planned frequencies are `990`, `1020`, `1050`, `1080`, and `1155 MHz`; the first `990 MHz` run has already passed `[after megatron is initialized]` and completed `iteration 1/20` (`steps: 1 loss: 12.6476 iter time (s): 139.022`) without repeating the earlier cache-miss failure.
+- [2026-03-25] Launched detached 32-GPU static validation batch in remote `screen` session `dual32_static_20260325`. Launcher script: `/home/sd/Megatron-DeepSpeed/.context/dual32_tp4pp1dp8_batch_20260325.sh`; live boot/log file: `/home/sd/Megatron-DeepSpeed/.context/dual32_static_20260325.log`. Planned frequencies are `1050`, `1125`, and `1200 MHz` for `TP=4, PP=1, DP=8`, `train-iters=20`. Early health check confirms the first `1050 MHz` run passed distributed initialization and model build with GPUs allocated on both nodes.
+- [2026-03-25] 32-GPU `.local` smoke validation artifact: remote screen log `/home/sd/Megatron-DeepSpeed/.context/dual32_smoke_20260325.log`, experiment dir `/home/sd/Megatron-DeepSpeed/experiments/dual32_tp4pp1dp8_smoke1050_20260325_130312_DGX2-1/`. First attempt exposed the real failure signature on `DGX2-2`: missing `index-cache/87922b4c8bcca7cc5c0cfc95a72dd19d_{doc,sample,shuffle}.npy`. After syncing those files, the rerun progressed through model/ZeRO setup, dataset loading, and into training; rank-0 log shows `steps: 1 loss: 12.6476 iter time (s): 88.552`, while rank-1 aggregate log reports `iteration 1/2 ... number of skipped iterations: 0 ... number of nan iterations: 0`.
 - [2026-03-22] End-to-end replay after the calibration-forwarding fix shows the new shared-fit path is now actually visible in predictor outputs. On `.context/dual-node-validation-20260322/multi_topology_global_refit_20260322.md`, the real dual-node replay APEs are roughly `3.13/1.35/4.10%` (time/power/energy) for `TP=2,PP=4,DP=2` and `2.14/3.19/5.15%` for `TP=2,PP=2,DP=4`. The main remaining observability signal is that legacy coarse anchors still diverge strongly on time overhead (`avg_overhead_ape≈82.8%`), which points to a modeling mismatch rather than a logging issue.
 
 ## 2026-03-17 Local/Remote Replay Check
@@ -131,3 +362,6 @@
 - [2026-03-21] Generalization-first replay artifacts after backing off the overfit residual are `.context/dual-node-validation-20260321/current_replay_generalized_fit.json` and `.context/dual-node-validation-20260321/legacy_topology_revalidation_generalized_fit.json`.
 - [2026-03-21] Consolidated multi-topology predictor-quality snapshot is saved at `.context/dual-node-validation-20260321/multi_topology_accuracy_summary_20260321.md` and `.context/dual-node-validation-20260321/multi_topology_accuracy_summary_20260321.json`.
 - [2026-03-22] Real dual-node validation artifacts for current-code `TP=2, PP=2, DP=4` are saved at `.context/dual-node-validation-20260322/tp2pp2dp4_current_dual_real_vs_pred_20260322.json` and `.md`; measured points are `1072 MHz -> 466.5 s / ~2123 W / ~990.6 kJ`, `1080 MHz -> 447.4 s / ~2198 W / ~983.7 kJ`, `1087 MHz -> 459.3 s / ~2168 W / ~995.8 kJ` (cluster-est power/energy via `2x` node0 Zeus). Current generalized predictor is directionally close but still low-biases time/power on this topology (`avg_time_ape≈6.20%`, `avg_power_ape≈8.20%`, `avg_energy_ape≈13.91%`).
+- [2026-03-31] `dual8_tp4pp1dp2_smoke990_20260331_153159_DGX2-1` first gets past missing-index-cache errors after syncing `2d90..._*` and `e1ad..._*` to `DGX2-2`, then fails earlier than training with `torch.distributed.DistBackendError` inside `torch.distributed.new_group()`. The first concrete NCCL lines are `include/alloc.h:228 NCCL WARN Cuda failure 2 'out of memory'` and `Failed to CUDA calloc async 16 bytes` on ranks `0-3` of `DGX2-1`.
+- [2026-03-31] Live occupancy snapshot during the failing `2x4` smoke: `DGX2-1` is fully consumed by external `VLLM::Worker_TP0..15` processes (about `31472 MiB` on every GPU), and `DGX2-2` still has `/usr/bin/python3` leftovers on `GPU1-3` plus another `python` process on `GPU0` (~`4.1 GiB`). This explains why tiny NCCL allocations fail immediately and why the current one-sided watcher is insufficient.
+- [2026-03-31] The active watcher `watch_and_launch_dual8_tp4pp1dp2_20260331.sh` no longer monitors `GPU0-3`; it now gates launch on `GPU8-11` on both hosts and logs `target_gpus=8,9,10,11` in each polling snapshot. Initial armed state shows `DGX2-1 GPU8-11` free while `DGX2-2 GPU8-11` are free but the host still fails the residual-process check because stale `/usr/bin/python3` ranks remain alive.

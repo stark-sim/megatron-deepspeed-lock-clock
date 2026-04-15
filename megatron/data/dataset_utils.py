@@ -84,11 +84,14 @@ def compile_helper():
     is invoked on a single process."""
     import os
     import subprocess
+    import sys
     path = os.path.abspath(os.path.dirname(__file__))
-    ret = subprocess.run(['make', '-C', path])
+    env = os.environ.copy()
+    # Build against the active training interpreter instead of system python.
+    env.setdefault('PYTHON', sys.executable)
+    ret = subprocess.run(['make', '-C', path], env=env)
     if ret.returncode != 0:
         print("Making C++ dataset helpers module failed, exiting.")
-        import sys
         sys.exit(1)
 
 

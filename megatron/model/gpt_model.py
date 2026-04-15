@@ -20,7 +20,13 @@ from megatron.model import LayerNorm, RMSNorm
 from .language_model import EmbeddingPipe
 from .transformer import ParallelTransformerLayerPipe, LMHeadPipe, get_num_experts_per_layer
 from deepspeed.pipe import PipelineModule, LayerSpec, TiedLayerSpec
-from deepspeed.sequence.fpdt_layer import FPDT_LogitsLoss
+
+try:
+    from deepspeed.sequence.fpdt_layer import FPDT_LogitsLoss
+    fpdt_logits_supported = True
+except ImportError:
+    FPDT_LogitsLoss = None
+    fpdt_logits_supported = False
 
 
 try:         
@@ -36,6 +42,16 @@ except ImportError:
     DS_UNIVERSAL_CHECKPOINT_INFO = False  
 
 
+def _require_fpdt_logits_support():
+    if fpdt_logits_supported:
+        return
+    raise ImportError(
+        "DeepSpeed FPDT sequence parallel support is not available in the current "
+        "environment. Disable --ds-sequence-parallel-fpdt or install a DeepSpeed "
+        "build that provides deepspeed.sequence.fpdt_layer."
+    )
+
+
 def post_language_model_processing(lm_output, labels, logit_weights,
                                    parallel_output,
                                    fp16_lm_cross_entropy):
@@ -43,6 +59,7 @@ def post_language_model_processing(lm_output, labels, logit_weights,
     # Output. Format [s b h]
     args = get_args()
     if args.ds_sequence_parallel_fpdt:
+        _require_fpdt_logits_support()
         seq_len = lm_output.shape[0]
         num_chunks_ce = int(seq_len // (args.ds_sequence_parallel_fpdt_chunk_size // mpu.get_sequence_parallel_world_size() // 32))
         loss = FPDT_LogitsLoss.apply(lm_output, labels, logit_weights, mpu.get_sequence_parallel_rank(), mpu.get_sequence_parallel_world_size(), mpu.get_sequence_parallel_group(), num_chunks_ce)

@@ -9,6 +9,19 @@ PY
 }
 
 
+resolve_python_bin() {
+    if [[ -n "${PYTHON_BIN:-}" ]]; then
+        printf '%s\n' "${PYTHON_BIN}"
+        return
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        command -v python3
+        return
+    fi
+    command -v python
+}
+
+
 generate_run_id() {
     local prefix="$1"
     local ts host sanitized_prefix
@@ -89,11 +102,23 @@ write_command_snapshot() {
 lock_gpu_clocks() {
     local gpu_indices_csv="$1"
     local clock_mhz="$2"
+    local python_bin
+    python_bin="$(resolve_python_bin)"
 
-    sudo -n python3 - "$gpu_indices_csv" "$clock_mhz" <<'PY'
+    sudo -n "$python_bin" - "$gpu_indices_csv" "$clock_mhz" <<'PY'
+import os
 import sys
 
-sys.path.insert(0, '/home/sd/.local/lib/python3.10/site-packages')
+site_candidates = [
+    os.path.expanduser('~/.local/lib/python3.10/site-packages'),
+    '/home/sd/.local/lib/python3.10/site-packages',
+]
+sandbox_user = os.environ.get('SUDO_USER') or os.environ.get('USER')
+if sandbox_user:
+    site_candidates.insert(0, f'/home/{sandbox_user}/.local/lib/python3.10/site-packages')
+for fallback in site_candidates:
+    if os.path.isdir(fallback) and fallback not in sys.path:
+        sys.path.insert(0, fallback)
 import pynvml
 
 indices = [int(x) for x in sys.argv[1].split(',') if x.strip()]
@@ -113,11 +138,23 @@ PY
 
 reset_gpu_clocks() {
     local gpu_indices_csv="$1"
+    local python_bin
+    python_bin="$(resolve_python_bin)"
 
-    sudo -n python3 - "$gpu_indices_csv" <<'PY'
+    sudo -n "$python_bin" - "$gpu_indices_csv" <<'PY'
+import os
 import sys
 
-sys.path.insert(0, '/home/sd/.local/lib/python3.10/site-packages')
+site_candidates = [
+    os.path.expanduser('~/.local/lib/python3.10/site-packages'),
+    '/home/sd/.local/lib/python3.10/site-packages',
+]
+sandbox_user = os.environ.get('SUDO_USER') or os.environ.get('USER')
+if sandbox_user:
+    site_candidates.insert(0, f'/home/{sandbox_user}/.local/lib/python3.10/site-packages')
+for fallback in site_candidates:
+    if os.path.isdir(fallback) and fallback not in sys.path:
+        sys.path.insert(0, fallback)
 import pynvml
 
 indices = [int(x) for x in sys.argv[1].split(',') if x.strip()]
@@ -144,11 +181,23 @@ PY
 assert_static_clock_supported() {
     local gpu_indices_csv="$1"
     local clock_mhz="$2"
+    local python_bin
+    python_bin="$(resolve_python_bin)"
 
-    sudo -n python3 - "$gpu_indices_csv" "$clock_mhz" <<'PY'
+    sudo -n "$python_bin" - "$gpu_indices_csv" "$clock_mhz" <<'PY'
+import os
 import sys
 
-sys.path.insert(0, '/home/sd/.local/lib/python3.10/site-packages')
+site_candidates = [
+    os.path.expanduser('~/.local/lib/python3.10/site-packages'),
+    '/home/sd/.local/lib/python3.10/site-packages',
+]
+sandbox_user = os.environ.get('SUDO_USER') or os.environ.get('USER')
+if sandbox_user:
+    site_candidates.insert(0, f'/home/{sandbox_user}/.local/lib/python3.10/site-packages')
+for fallback in site_candidates:
+    if os.path.isdir(fallback) and fallback not in sys.path:
+        sys.path.insert(0, fallback)
 import pynvml
 
 indices = [int(x) for x in sys.argv[1].split(',') if x.strip()]
@@ -252,6 +301,186 @@ PY
 }
 
 
+sync_file_to_host() {
+    local source_path="$1"
+    local host="$2"
+    local destination_path="$3"
+    local destination_dir
+    destination_dir="$(dirname "$destination_path")"
+
+    ssh "$host" "mkdir -p '$destination_dir'"
+    ssh "$host" "cat > '$destination_path'" < "$source_path"
+}
+
+
+is_local_host_alias() {
+    local host="$1"
+    python3 - "$host" <<'PY'
+import os
+import socket
+import subprocess
+import sys
+
+candidate = sys.argv[1].strip()
+if not candidate:
+    print("0")
+    raise SystemExit(0)
+
+loopback_names = {"localhost", "127.0.0.1", "::1"}
+if candidate in loopback_names:
+    print("1")
+    raise SystemExit(0)
+
+local_names = set()
+for value in [os.environ.get("HOSTNAME")]:
+    if value:
+        local_names.add(value)
+        local_names.add(value.split(".", 1)[0])
+
+for getter in (socket.gethostname, socket.getfqdn):
+    try:
+        value = getter()
+    except Exception:
+        continue
+    if value:
+        local_names.add(value)
+        local_names.add(value.split(".", 1)[0])
+
+candidate_names = {candidate, candidate.split(".", 1)[0]}
+if local_names & candidate_names:
+    print("1")
+    raise SystemExit(0)
+
+def resolve_all(name: str):
+    resolved = set()
+    try:
+        infos = socket.getaddrinfo(name, None, proto=socket.IPPROTO_TCP)
+    except Exception:
+        infos = []
+    for info in infos:
+        addr = info[4][0]
+        resolved.add(addr)
+    return resolved
+
+local_ips = {"127.0.0.1", "::1"}
+for name in list(local_names):
+    local_ips.update(resolve_all(name))
+
+try:
+    hostname_i = subprocess.run(
+        ["hostname", "-I"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+except Exception:
+    hostname_i = ""
+
+for addr in hostname_i.split():
+    local_ips.add(addr.strip())
+
+candidate_ips = resolve_all(candidate)
+print("1" if (candidate_ips and local_ips & candidate_ips) else "0")
+PY
+}
+
+
+_run_remote_gpu_clock_action() {
+    local host="$1"
+    local conda_env="$2"
+    local action="$3"
+    local gpu_indices_csv="$4"
+    local clock_mhz="${5:-}"
+
+    ssh "$host" "CONDA_ENV='$conda_env' ACTION='$action' GPU_INDICES='$gpu_indices_csv' CLOCK_MHZ='$clock_mhz' bash -s" <<'EOS'
+set -euo pipefail
+
+if [[ -n "${CONDA_ENV:-}" && -f "${HOME}/miniconda3/etc/profile.d/conda.sh" ]]; then
+    # shellcheck disable=SC1091
+    source "${HOME}/miniconda3/etc/profile.d/conda.sh"
+    conda activate "${CONDA_ENV}"
+fi
+
+python_bin="$(command -v python3 2>/dev/null || command -v python)"
+sudo -n ACTION="${ACTION}" GPU_INDICES="${GPU_INDICES}" CLOCK_MHZ="${CLOCK_MHZ}" "$python_bin" - <<'PY'
+import os
+import sys
+
+site_candidates = [
+    os.path.expanduser('~/.local/lib/python3.10/site-packages'),
+    '/home/sd/.local/lib/python3.10/site-packages',
+]
+sandbox_user = os.environ.get('SUDO_USER') or os.environ.get('USER')
+if sandbox_user:
+    site_candidates.insert(0, f'/home/{sandbox_user}/.local/lib/python3.10/site-packages')
+for fallback in site_candidates:
+    if os.path.isdir(fallback) and fallback not in sys.path:
+        sys.path.insert(0, fallback)
+import pynvml
+
+action = os.environ['ACTION']
+indices = [int(x) for x in os.environ.get('GPU_INDICES', '').split(',') if x.strip()]
+clock_mhz = int(os.environ.get('CLOCK_MHZ') or 0)
+
+pynvml.nvmlInit()
+try:
+    for index in indices:
+        handle = pynvml.nvmlDeviceGetHandleByIndex(index)
+        if action == 'assert':
+            mem_clocks = pynvml.nvmlDeviceGetSupportedMemoryClocks(handle)
+            mem_clock = mem_clocks[0]
+            graphics = pynvml.nvmlDeviceGetSupportedGraphicsClocks(handle, mem_clock)
+            if clock_mhz not in graphics:
+                raise SystemExit(f'GPU {index} does not support static clock {clock_mhz} MHz; supported: {graphics}')
+            print(f'GPU {index} supports {clock_mhz} MHz')
+        elif action == 'lock':
+            pynvml.nvmlDeviceSetGpuLockedClocks(handle, clock_mhz, clock_mhz)
+            print(f'GPU {index} locked to {clock_mhz} MHz')
+        elif action == 'reset':
+            try:
+                pynvml.nvmlDeviceResetGpuLockedClocks(handle)
+            except pynvml.NVMLError:
+                pass
+            try:
+                pynvml.nvmlDeviceResetApplicationsClocks(handle)
+            except pynvml.NVMLError:
+                pass
+            print(f'GPU {index} reset to default clocks')
+        else:
+            raise SystemExit(f'Unknown action: {action}')
+finally:
+    pynvml.nvmlShutdown()
+PY
+EOS
+}
+
+
+assert_remote_static_clock_supported() {
+    local host="$1"
+    local conda_env="$2"
+    local gpu_indices_csv="$3"
+    local clock_mhz="$4"
+    _run_remote_gpu_clock_action "$host" "$conda_env" "assert" "$gpu_indices_csv" "$clock_mhz"
+}
+
+
+lock_remote_gpu_clocks() {
+    local host="$1"
+    local conda_env="$2"
+    local gpu_indices_csv="$3"
+    local clock_mhz="$4"
+    _run_remote_gpu_clock_action "$host" "$conda_env" "lock" "$gpu_indices_csv" "$clock_mhz"
+}
+
+
+reset_remote_gpu_clocks() {
+    local host="$1"
+    local conda_env="$2"
+    local gpu_indices_csv="$3"
+    _run_remote_gpu_clock_action "$host" "$conda_env" "reset" "$gpu_indices_csv"
+}
+
+
 run_remote_preflight() {
     local host="$1"
     local base_path="$2"
@@ -260,9 +489,19 @@ run_remote_preflight() {
     local static_clock="$5"
     local cuda_visible_devices="$6"
     local launcher="$7"
+    local dataset="$8"
+    local tokenizer_path="$9"
+    local conda_env="${10}"
 
-    ssh "$host" "BASE_PATH='$base_path' EXPECTED_TP='$expected_tp' EXPERIMENT_MODE='$mode' STATIC_CLOCK_MHZ='$static_clock' CUDA_VISIBLE_DEVICES='$cuda_visible_devices' LAUNCHER='$launcher' bash -s" <<'EOS'
+    ssh "$host" "BASE_PATH='$base_path' EXPECTED_TP='$expected_tp' EXPERIMENT_MODE='$mode' STATIC_CLOCK_MHZ='$static_clock' CUDA_VISIBLE_DEVICES='$cuda_visible_devices' LAUNCHER='$launcher' DATASET='$dataset' TOKENIZER_PATH='$tokenizer_path' CONDA_ENV='$conda_env' bash -s" <<'EOS'
 set -euo pipefail
+
+if [[ -n "${CONDA_ENV:-}" && -f "${HOME}/miniconda3/etc/profile.d/conda.sh" ]]; then
+    # shellcheck disable=SC1091
+    source "${HOME}/miniconda3/etc/profile.d/conda.sh"
+    conda activate "${CONDA_ENV}"
+fi
+
 cd "$BASE_PATH"
 python3 - <<'PY'
 import json
@@ -270,8 +509,6 @@ import os
 import socket
 import subprocess
 import sys
-
-sys.path.insert(0, '/home/sd/.local/lib/python3.10/site-packages')
 
 result = {
     'hostname': socket.gethostname(),
@@ -296,10 +533,31 @@ result['local_gpu_count'] = len(gpu_indices)
 expected_tp = int(os.environ['EXPECTED_TP'])
 result['checks']['tp_fits_local_node'] = len(gpu_indices) >= expected_tp
 result['checks']['repo_exists'] = os.path.exists(os.getcwd())
-result['checks']['deepspeed_available'] = command_ok(['bash', '-lc', 'command -v deepspeed >/dev/null 2>&1'])[0]
 result['checks']['python_available'] = command_ok(['python3', '--version'])[0]
 result['checks']['nvidia_smi_available'] = command_ok(['bash', '-lc', 'command -v nvidia-smi >/dev/null 2>&1'])[0]
+dataset_prefix = os.environ.get('DATASET', '')
+tokenizer_path = os.environ.get('TOKENIZER_PATH', '')
+result['checks']['dataset_exists'] = (
+    bool(dataset_prefix)
+    and os.path.exists(f'{dataset_prefix}.bin')
+    and os.path.exists(f'{dataset_prefix}.idx')
+)
+result['checks']['tokenizer_exists'] = (
+    bool(tokenizer_path)
+    and os.path.isdir(tokenizer_path)
+    and (
+        os.path.exists(os.path.join(tokenizer_path, 'tokenizer.json'))
+        or os.path.exists(os.path.join(tokenizer_path, 'tokenizer_config.json'))
+    )
+)
+if os.environ.get('LAUNCHER', 'deepspeed') == 'deepspeed':
+    result['checks']['launcher_available'] = command_ok(['bash', '-lc', 'command -v deepspeed >/dev/null 2>&1'])[0]
+else:
+    result['checks']['launcher_available'] = command_ok(['python3', '-m', 'torch.distributed.run', '--help'])[0]
 try:
+    fallback = os.path.expanduser('~/.local/lib/python3.10/site-packages')
+    if os.path.isdir(fallback) and fallback not in sys.path:
+        sys.path.insert(0, fallback)
     import pynvml
     result['checks']['pynvml_available'] = True
 except Exception:
