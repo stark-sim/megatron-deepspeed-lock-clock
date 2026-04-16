@@ -32,6 +32,17 @@
 - [x] [2026-03-31] Completed a clean `2x4` smoke on the user-approved `GPU 8,9,10,11` slice of both hosts: `dual8_tp4pp1dp2_smoke990_20260331_163556_DGX2-1` finished 2 iterations successfully with validation, confirming the `8-11` path is runnable for `TP=4, PP=1, DP=2, ZeRO-1`.
 - [x] [2026-03-31] Switched from smoke to source-data acquisition immediately after the successful `8-11` smoke: launched `screen` session `dual8_tp4pp1dp2_collect_20260331` running `/home/sd/Megatron-DeepSpeed/.context/dual8_tp4pp1dp2_collect_20260328.sh` for `990/1080/1155 MHz`.
 # Progress
+- [x] [2026-04-16] **将学术化 PPT 进一步强化为图表版**：
+  - `汇报总结_20260415/generate_ppt.py` 已将案例 A/B 页面改为相对 baseline 的多序列柱状图，并保留右侧精简 delta 表和 baseline 锚点
+  - 受控结论页新增 `runtime delta vs avg power delta` trade-off 象限图，直接展示 7 个 static 点整体落在“功率显著下降、时间基本不变”的区域
+  - IB replay 页面已改为 `Observed vs Predicted` 时间/功率图；Ethernet replay 页面已改为 `Observed vs Predicted` 时间图 + 逐频点 APE 图
+  - 重新生成后的 `汇报总结_20260415/GPU能效优化_20%+功耗节省方案.pptx` 仍为 13 页，但关键结果页已不再以表格为主
+- [x] [2026-04-16] **将汇报 PPT 重构为更具学术风格的证据链版本**：
+  - 重写 `汇报总结_20260415/generate_ppt.py`，把 deck 主线改为：研究问题 -> 公平对照口径 -> Baseline vs Static 证据 -> Predictor formal replay -> 结论与边界
+  - 新 deck 不再以缺少支撑的“20%+ headline”作为前置页面，而是显式加入 Baseline 对照表，直接展示 `ΔTime / ΔPower / ΔEnergy`
+  - 新增设计文档：`docs/plans/2026-04-16-academic-ppt-redesign.md`
+  - 同步更新 `汇报总结_20260415/02_PPT提纲.md`、`03_PPT页面文案.md` 与 `08_完整PPT与汇报材料.md`
+  - 当前 PPT 的关键表达边界也已同步写入内容：受控节能证据来自 Baseline/static + Zeus，对 predictor 的正式 claim 主要来自本地 formal replay，而 Ethernet 与 IB 因 topology 不同不直接做一维排名
 - [x] [2026-04-15] **完成汇报材料单目录重组，并统一改为中文版本**：
   - 新增根目录：`汇报总结_20260415/`
   - 将此前分散在 `.context/`、`docs/plans/` 和顶层 `scripts/` 的汇报相关内容收拢到一个目录下
