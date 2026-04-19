@@ -1,0 +1,27 @@
+{
+  "entries": [
+    {
+      "hostname": "sd-1",
+      "slots": 4
+    },
+    {
+      "hostname": "sd-2",
+      "slots": 4
+    }
+  ],
+  "path": "/tmp/hostfile_eth_topology_compare_tpge2_kv4_20260419_tp4pp2dp1_20260419_094109_sd-1",
+  "preflight_required": true,
+  "raw_text": "sd-1 slots=4\nsd-2 slots=4\n",
+  "selected_hosts": [
+    {
+      "hostname": "sd-1",
+      "slots": 4
+    },
+    {
+      "hostname": "sd-2",
+      "slots": 4
+    }
+  ],
+  "selection_reason": "first 2 host(s) from hostfile order",
+  "sha1": "e6350edaea30964d9e171c29c7fa619295f4542b"
+}

@@ -1,4 +1,49 @@
 # Tech Context
+[2026-04-19] **真实 Qwen7B Ethernet 线当前需要两个额外的运行时约束**：
+- `sd-2` 的根分区空间不足以承受训练输出 checkpoint：
+  - 在删除前，`df -h /home/user` 仅余 `43M`
+  - 当前训练型目录 `baseline_formal20...` 与 `baseline_smoke5...` 会分别占用约 `31G` / `50G`
+  - 对真实 checkpoint benchmarking，当前稳定口径应默认设置 `DISABLE_SAVE_CHECKPOINT=1`
+- clean-shell rerun 不能依赖隐式继承的 JIT/build 缓存环境：
+  - 若不显式设置 `/dev/shm` 下的 `TORCH_EXTENSIONS_DIR`、`TMPDIR`、`PYTHONPYCACHEPREFIX`，`sd-2` 侧 `CPUAdamBuilder().load()` 会尝试写 `/home/user/.cache/torch_extensions/py310_cu128`
+  - 当前该路径会在 `sd-2` 上报 `PermissionError: [Errno 13] Permission denied`
+  - 这说明“能在某个旧 shell 成功”并不代表 launcher 自身已经完整编码了这些环境依赖
+[2026-04-19] **`Qwen2.5-7B-Instruct` 的 HF 词表元数据与 tokenizer 值不一致，转换器必须按 checkpoint/config 对齐**：
+- 在 `sd-1` 上直接核对得到：
+  - `config.json.vocab_size = 152064`
+  - `AutoTokenizer.vocab_size = 151643`
+  - `len(tokenizer) = 151665`
+- 仅依赖 tokenizer 值会让 `hf2megads` 在 embedding copy 时触发行数断言或后续 partition shape mismatch。
+- 当前稳定修复是：
+  - 若 HF 参数字典中存在 `model.embed_tokens.weight`，使用其 `shape[0]` 作为 `token_vocab`
+  - 在模型构建前读取 HF `config.json.vocab_size`，把 `args.padded_vocab_size` 提升到满足 TP 可整除的最小合法值
+[2026-04-19] **`sd-1/sd-2` 的真实 Qwen7B 本地转换运行时现已确认可用**：
+- 两台 Ethernet 节点都可在 `/home/user/miniconda3/envs/tp4bit/bin/deepspeed` 下本地执行 `Qwen2.5-7B-Instruct` 的 `TP=2 / PP=2 / 4 GPUs` 转换
+- 成功产物：
+  - `sd-1`: `/home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_fixvocab2_20260419_114318`
+  - `sd-2`: `/home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_sd2_20260419_114724`
+- 两边输出目录都约 `15G`，都含 `latest=global_step0` 与 `67` 个 `global_step0` 顶层条目
+[2026-04-19] **当前 launcher 的真实 checkpoint 接入仍是“同一路径 load/save”语义**：
+- `scripts/run_experiment.sh` 中 `LOAD_CHECKPOINT=1` 会对同一个 `CHECKPOINT_PATH` 同时追加 `--load` 和 `--save`
+- 这意味着若直接用现有 launcher 接真实预训练转换产物做短跑，最稳的方式要么是复用该 checkpoint 目录作为 run path，要么扩展 launcher 支持分离的 `LOAD_CHECKPOINT_PATH` 与 `SAVE_CHECKPOINT_PATH`
+- 在正式 baseline/static 前，建议先做一次多节点 `--load` smoke，确认这一路径的目录语义不会污染或覆盖初始化 checkpoint
+[2026-04-19] **Megatron topology legality now has an explicit GQA runtime fact**：
+- For the current Qwen-style launcher path, `TP` must divide both `num_attention_heads` and `num_key_value_heads`; otherwise model build fails inside `ParallelAttention` with `AssertionError: <kv_heads> is not divisible by <TP>`.
+- This surfaced concretely during the `TP>=2` topology comparison: `kv_heads=2` works for `TP=2` but is illegal for `TP=4`, so the final fair comparison switched to `kv_heads=4`.
+- Practical implication: when planning topology sweeps that raise `TP`, verify the GQA shape first instead of assuming a previously valid model can be reused unchanged.
+[2026-04-19] **Latest dual-node common-workload runtime facts**：
+- The stable completed `2x4` dual-node sweep for both Ethernet and IB now uses:
+  - `DATA_CACHE_PATH=<repo>/data/index-cache`
+  - `TORCH_EXTENSIONS_DIR=/dev/shm/megatron_common_qwen3b_20260419/torch_extensions_*`
+  - `TMPDIR=/dev/shm/megatron_common_qwen3b_20260419/tmp`
+  - `PYTHONPYCACHEPREFIX=/dev/shm/megatron_common_qwen3b_20260419/pycache`
+- Required per-node cache hashes for this workload:
+  - Ethernet (`sd-1/sd-2`): `33c91528b53c7a971dc9e5a3b24c9665`
+  - IB (`v100x16-1/v100x16-2`): `2025292d291ff386fedc1b73e7aace6c`
+- Runtime implication: node-local `/dev/shm/.../index-cache` is not a drop-in replacement for `data/index-cache` on multi-node launches unless those hash files are preseeded on every node.
+[2026-04-19] **Canonical launcher environment propagation has been hardened**：
+- `scripts/run_experiment.sh` now rewrites managed `.deepspeed_env` keys from the current launch environment instead of carrying forward stale backup lines.
+- This change was required to stop failed reruns from reusing old `TMPDIR` / `TORCH_EXTENSIONS_DIR` values and to ensure remote workers inherit the current `PATH`/`PYTHONPATH` needed for `ninja` and JIT extension builds.
 [2026-04-12] **Current remote-vs-local artifact retention state for paper inputs**：
 - The fresh formal IB run directories on `sd@v100x16-1` remain available and still hash-match the local copies under:
   - `.context/ib_formal_rerun_20260410/source_curated/`
@@ -224,6 +269,23 @@
 [2026-04-01] **OOM 解决方案**：对于 `2x4` 等跨节点配置，20-step 阶段可能遇到 CUDA OOM。已通过设置环境变量 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` 解决，该配置允许 CUDA 分配器使用可扩展段来更好地管理大内存分配。
 
 - Remote repo note: `/home/sd/Megatron-DeepSpeed/run_experiment.sh` is stale relative to `/home/sd/Megatron-DeepSpeed/scripts/run_experiment.sh`; use the `scripts/` launcher for current short-run energy workflows.
+
+[2026-04-19] **Remote Qwen checkpoint inventory (verified by SSH)**:
+- `user@sd-1`:
+  - full, non-quantized HF snapshots: `Qwen2.5-1.5B`, `Qwen2.5-1.5B-Instruct`, `Qwen2.5-3B-Instruct`, `Qwen2.5-7B-Instruct`, `Qwen3-4B-Instruct-2507`, `Qwen3-8B`
+  - quantized only / not suitable as primary training checkpoint: `Qwen2.5-7B-Instruct-GPTQ-Int8`
+  - other partial/non-CausalLM artifacts also exist, e.g. `Qwen2-Audio-7B-Instruct`
+- `user@sd-2`:
+  - full, non-quantized HF snapshots: `Qwen2.5-1.5B`, `Qwen2.5-3B-Instruct`, `Qwen2.5-7B-Instruct`, `Qwen3-0.6B`, `Qwen3-4B-Instruct-2507`
+- `sd@v100x16-1`:
+  - full HF snapshots: `Qwen2.5-0.5B`, `Qwen2.5-14B`
+  - cache stubs / incomplete entries also exist for `Qwen2.5-1.5B`, `Qwen2.5-3B`, `Qwen2.5-7B`, `Qwen3-8B`, but they should not be treated as ready-to-run checkpoints
+- `sd@v100x16-2`:
+  - full local model dirs: `/home/sd/models/Qwen2.5-7B` (4/4 shards present), `/home/sd/models/Qwen3-8B`
+  - `/home/sd/models/Qwen3-8B` currently appears incomplete: local dir has only `3/5` shard files while index references `5/5`; do not treat it as ready until repaired
+- Practical implication:
+  - easiest symmetric Ethernet candidates already present on both `sd-1/sd-2`: `Qwen2.5-3B-Instruct`, `Qwen2.5-7B-Instruct`, `Qwen3-4B-Instruct-2507`
+  - easiest small IB candidate currently present as a full checkpoint is asymmetric (`0.5B` only on `v100x16-1`, `7B` only on `v100x16-2`), so IB formal runs will likely need checkpoint syncing before launch
 
 ## Cross-Node Penalty Model (当前状态 2026-03-23)
 [2026-03-26] **Implementation status**: the predictor now has explicit plumbing for transport quality. `DerivedModelFeatures` carries `network_transport_label`, `network_effective_bandwidth_gbps`, and jitter metrics; `CalibrationParams` carries reference transport quality; and `model.py` multiplies cross-node penalties by relative bandwidth/jitter factors. The current script entry point for this is `scripts/predict_freq_sweet_spot.py --network-benchmark-json <path>`.
