@@ -32,6 +32,170 @@
 - [x] [2026-03-31] Completed a clean `2x4` smoke on the user-approved `GPU 8,9,10,11` slice of both hosts: `dual8_tp4pp1dp2_smoke990_20260331_163556_DGX2-1` finished 2 iterations successfully with validation, confirming the `8-11` path is runnable for `TP=4, PP=1, DP=2, ZeRO-1`.
 - [x] [2026-03-31] Switched from smoke to source-data acquisition immediately after the successful `8-11` smoke: launched `screen` session `dual8_tp4pp1dp2_collect_20260331` running `/home/sd/Megatron-DeepSpeed/.context/dual8_tp4pp1dp2_collect_20260328.sh` for `990/1080/1155 MHz`.
 # Progress
+- [x] [2026-04-19] **完成 Ethernet 双机真实 `Qwen2.5-7B-Instruct` 首组同拓扑 baseline/static 正式对照，并把工件回拉到本地**：
+  - 工作负载：
+    - `sd-1 + sd-2`
+    - `2 nodes x 4 GPUs`, 每机 `GPU 0,1,2,3`
+    - `TP=2 / PP=2 / DP=2`
+    - `28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4`
+    - `micro_batch_size=1 / global_batch_size=4 / seq_length=2048 / train-iters=20`
+    - `bf16 / ZeRO-1 + CPU optimizer/offload / num_workers=0`
+    - `dataset=qwen_data_text_document`
+    - `tokenizer=Qwen2.5-7B-Instruct snapshot a09a35458c702b33eeacc393d103063234e8bc28`
+    - `--load /home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_real_main --finetune`
+  - 运行结果：
+    - baseline `eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+      - `status=completed`, `final_iteration=20`
+      - `229.49s / 73478.54J / 320.18W / 2.230 tokens/J`
+    - static `1395 MHz` `eth_real_qwen25_7b_tp2pp2dp2_static1395_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+      - `status=completed`, `final_iteration=20`
+      - `254.42s / 56385.52J / 221.63W / 2.906 tokens/J`
+  - 相对 baseline：
+    - runtime `+10.86%`
+    - avg_power `-30.78%`
+    - energy `-23.26%`
+    - tokens_per_j `+30.31%`
+  - 本地工件：
+    - `.context/eth_real_qwen25_7b_baseline_static_20260419/artifacts/`
+  - 中文摘要：
+    - `汇报总结_20260415/11_真实模型基线与定频补充.md`
+- [x] [2026-04-19] **按用户要求清理真实 Qwen7B Ethernet 线的训练输出 checkpoint，并把 `sd-2` 空间从“几乎打满”恢复到可继续实验**：
+  - 删除目录（保留真实预训练转换 checkpoint `qwen25_7b_instruct_hf2megads_tp2pp2_real_main` 不动）：
+    - `sd-1`: `.../eth_real_qwen25_7b_tp2pp2dp2_20260419/{baseline_formal20_finetune_nw0,baseline_smoke5_finetune_nw0}_20260419_sd-1`
+    - `sd-2`: 同名两目录
+  - 删除前容量：
+    - `sd-1`: `baseline_formal20 ≈ 50G`, `baseline_smoke5 ≈ 50G`
+    - `sd-2`: `baseline_formal20 ≈ 31G`, `baseline_smoke5 ≈ 50G`
+    - `sd-2 /` 仅余 `43M`
+  - 删除后容量：
+    - `sd-1 /home/user`: `5.3T` 总量中约 `1.1T` 可用
+    - `sd-2 /home/user`: `1.8T` 总量中约 `109G` 可用
+  - 直接触发原因：
+    - `eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_20260419_sd-1` 的训练主体已完成 `20/20`
+    - 但在 final checkpoint save 时，`sd-2` 报 `OSError: [Errno 28] No space left on device`
+    - 这进一步确认后续真实 checkpoint benchmarking 不应继续保存训练输出 checkpoint
+- [x] [2026-04-19] **`scripts/run_experiment.sh` 已支持“保留 `--load`，禁用 `--save`”的新语义**：
+  - 新增环境变量：`DISABLE_SAVE_CHECKPOINT=1`
+  - 行为：
+    - 保留 `LOAD_CHECKPOINT_PATH` / `--load` / `--finetune`
+    - 跳过 `--save`
+    - 将 `SAVE_INTERVAL` 压为 `0`
+  - 目的：
+    - 允许真实预训练 checkpoint benchmarking 不再因为 final save 占满 `sd-2` 根分区而失败
+- [x] [2026-04-19] **no-save clean-shell rerun 的 CPUAdam JIT blocker 已解决，并被真实 baseline/static 对照实跑验证**：
+  - 根因：
+    - 新 shell 没继承此前成功 run 的 `/dev/shm` 构建缓存环境，`CPUAdamBuilder().load()` 回退到 `/home/user/.cache/torch_extensions/py310_cu128`
+  - 修复方式：
+    - clean shell 显式恢复 `TORCH_EXTENSIONS_DIR=/dev/shm/...`、`TMPDIR=/dev/shm/...`、`PYTHONPYCACHEPREFIX=/dev/shm/...`、`TRITON_CACHE_DIR=/dev/shm/...`
+    - 同时保留 `PYTHONDONTWRITEBYTECODE=1`、`TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1`、`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`、`TORCH_NCCL_BLOCKING_WAIT=1`
+    - `scripts/run_experiment.sh` 现在也会把 `TRITON_CACHE_DIR` 透传进远端 `.deepspeed_env`
+  - 验证结果：
+    - `eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+    - `eth_real_qwen25_7b_tp2pp2dp2_static1395_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+    - 两者都完成 `20/20`，未再触发 `/home/user/.cache/torch_extensions/py310_cu128` 权限错误
+- [x] [2026-04-19] **完成 `Qwen2.5-7B-Instruct` 在 `sd-1/sd-2` 上的顺序 HF->Megatron 转换验证**：
+  - 目标模型与权重：
+    - HF snapshot `Qwen2.5-7B-Instruct/a09a35458c702b33eeacc393d103063234e8bc28`
+    - 真实 `28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4`
+  - 转换拓扑：
+    - 两台 Ethernet 节点各自本地 `4 GPUs`
+    - `TP=2 / PP=2 / DP=1`
+    - 运行时：`/home/user/miniconda3/envs/tp4bit/bin/{python,deepspeed}`
+  - 关键修复：
+    - `tools/hf2megads_weight_converter.py` 不再信任 `tokenizer.vocab_size` 作为 Qwen 词表行数
+    - 若 HF checkpoint 含 `model.embed_tokens.weight`，直接以其行数作为 `token_vocab`
+    - 在构建 DS 模型前读取 HF `config.json.vocab_size`，必要时上调 `args.padded_vocab_size`
+  - 成功产物：
+    - `sd-1`: `/home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_fixvocab2_20260419_114318`
+    - `sd-2`: `/home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_sd2_20260419_114724`
+    - 两边日志都以 `save checkpoint completed` 结束
+    - 两边目录都约 `15G`，`global_step0` 顶层条目数都为 `67`，`latest=global_step0`
+  - 一致性检查：
+    - `layer_01-model_00-model_states.pt` 与 `layer_16-model_01-model_states.pt` 在双机上的 `sha256` 完全一致
+    - `mp_rank_00_model_states.pt` 哈希不同，当前判断更像保存路径/元数据差异，而不是核心层权重分片不一致
+  - 结论：
+    - 现有 `hf2megads` 已足以支撑真实 Qwen2.5-7B-Instruct 权重主线，不必立刻切换到 `Megatron-Bridge`
+    - 下一步 blocker 已变为“真实 checkpoint 的多节点 `--load` smoke”，而不是“能否转换”
+- [x] [2026-04-19] **完成“四组主结果是否为真实 `Qwen2.5-7B-Instruct`”的 provenance 审计**：
+  - 当前四组正式 `baseline/static` 对照来自 `.context/dual_env_topology_compare_tpge2_20260419/artifacts/{eth_static,ib_static}/`
+  - 核对 `run.json.config.model` 与 `command.argv` 后确认，其 workload 为 `36L / hidden 2048 / ffn 11008 / heads 16 / kv_heads 4`
+  - 数据集使用真实 mmap prefix `qwen_data_text_document`，tokenizer 使用 `Qwen2.5-7B-Instruct` 路径或本地平铺 tokenizer
+  - 命令中没有 `--load` / checkpoint 参数，因此这些结果不是“真实 Qwen2.5-7B-Instruct 权重”实验
+  - PPT headline 数据来自历史 V100 双机案例 `TP=1 / PP=4 / DP=4` 与 `TP=2 / PP=2 / DP=4`；它们更接近 `28L / hidden 3584 / ffn 18944 / heads 28 / kv_heads 4` 的 7B-like 结构，但 baseline provenance 仍以 `memory-bank/observability.md` preserved summary 为主
+  - 当前结论：后续若要以“真实 7B workload”作为主证据，需要在 latest code 上补跑 7B-like 配置；若要求“真实预训练权重”，则需要单独设计 checkpoint 加载路径
+- [x] [2026-04-19] **完成用户修正口径下的“双环境、同拓扑 baseline/static 正式对照”，并本地沉淀中文总结**：
+  - 主对照口径：
+    - 只比较同一拓扑下 `baseline` 与 `static fixed clock`
+    - 不再把不同拓扑之间的差异当作主结论
+  - 共同 workload：
+    - `2 nodes x 4 GPUs`
+    - `36L / hidden 2048 / ffn 11008 / heads 16 / kv_heads 4`
+    - `micro=1 / global=4 / seq=2048 / train-iters=20`
+    - `ZeRO-1 + CPU optimizer/offload`
+    - dataset `qwen_data_text_document`
+  - 环境与拓扑：
+    - Ethernet：`sd-1/sd-2`，GPU `0,1,2,3`
+    - IB：`v100x16-1/v100x16-2`，GPU `8,9,10,11`
+    - topology `TP=2 / PP=2 / DP=2`
+    - topology `TP=4 / PP=2 / DP=1`
+  - 本地原始工件：
+    - `.context/dual_env_topology_compare_tpge2_20260419/artifacts/eth_static/`
+    - `.context/dual_env_topology_compare_tpge2_20260419/artifacts/ib_static/`
+  - 中文汇总：
+    - `汇报总结_20260415/10_同拓扑下基线与定频对比.md`
+  - 关键结果范围：
+    - Ethernet `TP=2 / PP=2 / DP=2`：能耗 `-22.5% ~ -26.0%`，时间 `+6.3% ~ +16.7%`
+    - Ethernet `TP=4 / PP=2 / DP=1`：能耗 `-28.0% ~ -28.5%`，时间 `+3.9% ~ +7.2%`
+    - IB `TP=2 / PP=2 / DP=2`：能耗 `-25.1% ~ -27.8%`，时间 `+21.6% ~ +34.7%`
+    - IB `TP=4 / PP=2 / DP=1`：能耗 `-29.2% ~ -31.4%`，时间 `+17.5% ~ +29.3%`
+  - 当前更适合拿来做汇报代表点的是：
+    - Ethernet `TP=4 / PP=2 / DP=1 @ 1395 MHz`
+    - IB `TP=4 / PP=2 / DP=1 @ 1080 MHz` 或 `1155 MHz`
+- [x] [2026-04-19] **完成 `TP>=2` 的双环境 topology-only 对比，并把工件全部回拉到本地**：
+  - 共同 workload：`2 nodes x 4 GPUs`，`36L / hidden 2048 / ffn 11008 / heads 16 / kv_heads 4 / micro=1 / global=4 / seq=2048 / train-iters=20 / ZeRO-1 + CPU optimizer/offload`
+  - 数据集：`qwen_data_text_document`
+  - 对比拓扑：
+    - `TP=2 / PP=2 / DP=2`
+    - `TP=4 / PP=2 / DP=1`
+  - 环境：
+    - Ethernet：`sd-1/sd-2`，GPU `0,1,2,3`
+    - IB：`v100x16-1/v100x16-2`，GPU `8,9,10,11`
+  - 本地工件路径：`.context/dual_env_topology_compare_tpge2_20260419/artifacts/{eth,ib}/`
+  - 本地摘要：`.context/dual_env_topology_compare_tpge2_20260419/results_summary_kv4.md`
+  - Zeus 结果：
+    - Ethernet `tp2pp2dp2`: `129.39s / 40490.20J / 312.94W`
+    - Ethernet `tp4pp2dp1`: `158.06s / 48914.50J / 309.47W`
+    - IB `tp2pp2dp2`: `155.21s / 105340.95J / 678.72W`
+    - IB `tp4pp2dp1`: `127.52s / 97714.23J / 766.27W`
+  - 相对 `tp2pp2dp2`：
+    - Ethernet `tp4pp2dp1`: `time +22.16%`, `energy +20.81%`, `avg_power -1.11%`
+    - IB `tp4pp2dp1`: `time -17.84%`, `energy -7.24%`, `avg_power +12.90%`
+- [x] [2026-04-19] **补上 launcher 的 GQA/TP 前置合法性检查，避免非法拓扑晚爆炸**：
+  - `scripts/run_experiment.sh` 现在会在启动前直接校验：
+    - `NUM_HEADS % TP == 0`
+    - `NUM_KV_HEADS % TP == 0`
+  - 触发背景：最初的 `kv_heads=2` 拓扑对比脚本在 `TP=4 / PP=2 / DP=1` 下直到 `ParallelAttention` 构图阶段才报 `AssertionError: 2 is not divisible by 4`
+  - 结果：当前这类非法 GQA/TP 组合会在 launcher/preflight 阶段更早、更明确地失败，减少远端长日志排查成本
+- [x] [2026-04-19] **完成 Ethernet / IB 双环境同负载 `2x4` 正式 sweep，并把工件全部保存在本地**：
+  - 共同 workload：`2 nodes x 4 GPUs`，`TP=1 / PP=2 / DP=4 / 36L / hidden 2048 / ffn 11008 / heads 16 / kv_heads 2 / micro=1 / global=4 / seq=2048 / train-iters=20 / ZeRO-1 + CPU optimizer/offload`
+  - Ethernet 运行节点：`sd-1/sd-2`，GPU `0,1,2,3`；IB 运行节点：`v100x16-1/v100x16-2`，GPU `8,9,10,11`
+  - 本地工件路径：`.context/dual_env_common_workload_20260419/artifacts/{eth,ib}/`
+  - Ethernet Zeus 汇总：
+    - baseline: `168.22s / 51438.76J / 305.79W`
+    - static1005: `198.73s / 40212.95J / 202.35W` (`time +18.14%`, `energy -21.82%`, `avg_power -33.83%`)
+    - static1200: `184.72s / 38400.35J / 207.89W` (`time +9.81%`, `energy -25.35%`, `avg_power -32.02%`)
+    - static1395: `181.38s / 38436.71J / 211.91W` (`time +7.82%`, `energy -25.28%`, `avg_power -30.70%`)
+  - IB Zeus 汇总：
+    - baseline: `182.48s / 114005.41J / 624.75W`
+    - static990: `244.73s / 88633.16J / 362.17W` (`time +34.11%`, `energy -22.26%`, `avg_power -42.03%`)
+    - static1080: `229.77s / 86021.34J / 374.38W` (`time +25.91%`, `energy -24.55%`, `avg_power -40.07%`)
+    - static1155: `212.35s / 84274.51J / 396.86W` (`time +16.37%`, `energy -26.08%`, `avg_power -36.48%`)
+  - 这批结果可作为“同 workload、不同网络/硬件环境”的最新 baseline/static 对照基础，但其 runtime 惩罚明显大于此前某些 headline 案例，后续汇报应按 workload-matched 证据如实表述。
+- [x] [2026-04-19] **完成 workload 级实验数据图表总览，并显式区分“当前可支撑”与“必须补跑”的实验**：
+  - 新增 `汇报总结_20260415/脚本/生成实验数据图表总览.py`，直接从本地 `run.json` 和 formal replay report 生成图表与 Markdown 总览
+  - 新增 `汇报总结_20260415/09_实验数据图表总览.md`，按 workload 元数据、source/target 曲线和 replay 精度组织当前主证据
+  - 新增 `汇报总结_20260415/图表/{ib_formal_curves,eth_formal_curves,formal_replay_mape}.png`
+  - 当前文档已明确：2026-04 的 IB formal rerun 与 Ethernet formal replay 可以作为 workload 级主图；历史 `TP=1,PP=4,DP=4` / `TP=2,PP=2,DP=4` headline 案例因 baseline 工件缺失或元数据过旧，暂只保留为待补实验
 - [x] [2026-04-16] **将学术化 PPT 进一步强化为图表版**：
   - `汇报总结_20260415/generate_ppt.py` 已将案例 A/B 页面改为相对 baseline 的多序列柱状图，并保留右侧精简 delta 表和 baseline 锚点
   - 受控结论页新增 `runtime delta vs avg power delta` trade-off 象限图，直接展示 7 个 static 点整体落在“功率显著下降、时间基本不变”的区域

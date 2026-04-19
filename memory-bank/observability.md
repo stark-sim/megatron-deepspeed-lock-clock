@@ -2,6 +2,147 @@
 - [2026-03-31] Successful `8-11` smoke artifact: `dual8_tp4pp1dp2_smoke990_20260331_163556_DGX2-1` logs `iteration 1/2` and `iteration 2/2` with remote rank-4 summary lines plus local `steps: 1/2` markers. Observed iter times are about `67.8s` and `66.3s`, samples/sec about `0.118-0.121`, and the run reaches `validation loss at iteration 2`.
 - [2026-03-31] Full source collection is now live in `screen` session `dual8_tp4pp1dp2_collect_20260331`. The first full point `dual8_tp4pp1dp2_static990_20260331_164228_DGX2-1` has begun on `GPU8-11` and currently sits in distributed initialization / early startup without an immediate `FileNotFoundError`, indicating the latest cache syncs covered the previously exposed dataset hashes.
 # Observability
+- [2026-04-19] First artifact-backed real-model same-topology baseline/static pair is now complete under `.context/eth_real_qwen25_7b_baseline_static_20260419/artifacts/`:
+  - shared workload:
+    - `sd-1 + sd-2`
+    - `2 nodes x 4 GPUs`, GPU slice `0-3` on each node
+    - `TP=2 / PP=2 / DP=2`
+    - `Qwen2.5-7B-Instruct`, `28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4`
+    - `--load /home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_real_main --finetune`
+    - `qwen_data_text_document`, `micro=1`, `global=4`, `seq=2048`, `train-iters=20`
+    - `bf16`, `ZeRO-1 + CPU optimizer/offload`, `NUM_WORKERS=0`
+    - `DISABLE_SAVE_CHECKPOINT=1`
+  - baseline:
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+    - `status=completed`, `final_iteration=20`, `ended_at=2026-04-19T13:37:58Z`
+    - Zeus: `229.492s / 73478.543J / 320.179W / 2.2298 tokens/J`
+  - static:
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1395_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+    - `status=completed`, `final_iteration=20`, `ended_at=2026-04-19T13:46:08Z`
+    - Zeus: `254.418s / 56385.520J / 221.626W / 2.9057 tokens/J`
+  - delta (`static 1395` vs baseline):
+    - runtime `+10.86%`
+    - avg_power `-30.78%`
+    - energy `-23.26%`
+    - tokens_per_j `+30.31%`
+  - metadata quality:
+    - both local copies include `run.json`, `events.jsonl`, `command.sh`, `ds_config.json`, `hostfile_snapshot.json`, `preflight.json`, `topology.json`
+    - both runs were collected after the `DISABLE_SAVE_CHECKPOINT` + `/dev/shm` JIT-cache env fixes, so they do not suffer from the earlier checkpoint-save disk failure or CPUAdam permission fallback
+- [2026-04-19] Real `Qwen2.5-7B-Instruct` Ethernet dual-node baseline run `eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_20260419_sd-1` completed the full `20/20` training window before failing only at final checkpoint save:
+  - training-window metrics from the primary log:
+    - step range: `1-20`
+    - Zeus: `224.7s / 72390.0J / 322.2W`
+    - final logged training step: `step=20`, `iter time (s)=9.705`, `skipped=0`
+  - failure surface:
+    - `sd-2` ranks failed during `torch.save()` of ZeRO optimizer states
+    - exact storage error: `OSError: [Errno 28] No space left on device`
+    - follow-on symptom: `RuntimeError: unexpected pos ...` during zip writer finalization
+  - disk evidence collected immediately after:
+    - `sd-2 /dev/sda2` showed `1.8T total / 1.7T used / 43M avail / 100%`
+    - failed checkpoint directory size on `sd-2`: about `31G`
+- [2026-04-19] Post-cleanup space state after removing generated training-output checkpoints:
+  - removed checkpoint families on both `sd-1` and `sd-2`:
+    - `eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_20260419_sd-1`
+    - `eth_real_qwen25_7b_tp2pp2dp2_baseline_smoke5_finetune_nw0_20260419_sd-1`
+  - post-delete `df -h /home/user`:
+    - `sd-1`: `/dev/mapper/vg0-root 5.3T total, 1.1T avail`
+    - `sd-2`: `/dev/sda2 1.8T total, 109G avail`
+- [2026-04-19] First no-save clean-shell rerun surfaced a different startup failure unrelated to disk:
+  - run id: `eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_nosave_20260419_sd-1`
+  - failure site on `sd-2`:
+    - `DeepSpeedCPUAdam` JIT load
+    - `PermissionError: [Errno 13] Permission denied: '/home/user/.cache/torch_extensions/py310_cu128'`
+  - interpretation:
+    - the no-save launcher logic is not the blocker
+    - the clean shell did not inherit the previously successful `/dev/shm` extension-cache envs
+- [2026-04-19] Real `Qwen2.5-7B-Instruct` HF->Megatron conversion artifacts are now present on both Ethernet nodes:
+  - `sd-1`
+    - checkpoint: `/home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_fixvocab2_20260419_114318`
+    - log: `/home/user/Megatron-DeepSpeed/.context/qwen25_7b_instruct_hf2megads_tp2pp2_fixvocab2_20260419_114318.log`
+    - terminal success marker: `save checkpoint completed`
+  - `sd-2`
+    - checkpoint: `/home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_sd2_20260419_114724`
+    - log: `/home/user/Megatron-DeepSpeed/.context/qwen25_7b_instruct_hf2megads_tp2pp2_sd2_20260419_114724.log`
+    - terminal success marker: `save checkpoint completed`
+  - shared artifact shape:
+    - each output directory is about `15G`
+    - each `global_step0` contains `67` top-level entries
+    - each root directory contains `latest=global_step0`
+  - consistency spot-check:
+    - `layer_01-model_00-model_states.pt` hash matches across `sd-1/sd-2`: `5b903c6411fb252bc3dd6dd9361f67240644f6255b3a2590be85de38d21ea0e6`
+    - `layer_16-model_01-model_states.pt` hash matches across `sd-1/sd-2`: `f96c08b21267307d3ef4b4aaa0e205b5047d3e123e509a7bed79c7494d478c2a`
+    - `mp_rank_00_model_states.pt` hash differs between hosts, so if later需要做更严格一致性审计，应优先直接比 layer shards 或展开 state dict 做字段级 diff
+- [2026-04-19] User-corrected primary evidence is now artifact-backed as **same-topology baseline/static comparison** under `.context/dual_env_topology_compare_tpge2_20260419/artifacts/{eth_static,ib_static}/`:
+  - shared workload:
+    - `2 nodes x 4 GPUs`
+    - `TP/PP/DP in {2/2/2, 4/2/1}`
+    - `36 layers`, `hidden=2048`, `ffn=11008`, `heads=16`, `kv_heads=4`
+    - `micro_batch_size=1`, `global_batch_size=4`, `seq_length=2048`, `train-iters=20`
+    - `ZeRO-1 + CPU optimizer/offload`, dataset `qwen_data_text_document`
+  - Ethernet (`sd-1/sd-2`, GPU `0-3`):
+    - `TP=2 / PP=2 / DP=2` baseline `128.5s / 40345.8J / 314.1W`
+    - `1005 MHz` `149.9s / 31288.0J / 208.8W` (`time +16.7%`, `energy -22.5%`)
+    - `1200 MHz` `141.0s / 30194.9J / 214.2W` (`time +9.7%`, `energy -25.2%`)
+    - `1395 MHz` `136.6s / 29873.3J / 218.7W` (`time +6.3%`, `energy -26.0%`)
+    - `TP=4 / PP=2 / DP=1` baseline `160.9s / 49457.5J / 307.3W`
+    - `1005 MHz` `172.5s / 35384.5J / 205.1W` (`time +7.2%`, `energy -28.5%`)
+    - `1200 MHz` `171.7s / 35629.6J / 207.5W` (`time +6.7%`, `energy -28.0%`)
+    - `1395 MHz` `167.2s / 35556.0J / 212.7W` (`time +3.9%`, `energy -28.1%`)
+  - IB (`v100x16-1/v100x16-2`, GPU `8-11`):
+    - `TP=2 / PP=2 / DP=2` baseline `152.5s / 105381.0J / 691.2W`
+    - `990 MHz` `205.3s / 78912.9J / 384.4W` (`time +34.7%`, `energy -25.1%`)
+    - `1080 MHz` `188.3s / 76058.7J / 403.8W` (`time +23.5%`, `energy -27.8%`)
+    - `1155 MHz` `185.4s / 77563.7J / 418.4W` (`time +21.6%`, `energy -26.4%`)
+    - `TP=4 / PP=2 / DP=1` baseline `133.0s / 99678.1J / 749.4W`
+    - `990 MHz` `172.0s / 70556.1J / 410.1W` (`time +29.3%`, `energy -29.2%`)
+    - `1080 MHz` `159.2s / 68333.0J / 429.3W` (`time +19.7%`, `energy -31.4%`)
+    - `1155 MHz` `156.3s / 69418.2J / 444.2W` (`time +17.5%`, `energy -30.4%`)
+  - provenance:
+    - raw manifests: `.context/dual_env_topology_compare_tpge2_20260419/artifacts/{eth_static,ib_static}/`
+    - Chinese report summary: `汇报总结_20260415/10_同拓扑下基线与定频对比.md`
+- [2026-04-19] Dual-environment `TP>=2` topology-only comparison is now artifact-backed under `.context/dual_env_topology_compare_tpge2_20260419/artifacts/{eth,ib}/`:
+  - shared workload:
+    - `2 nodes x 4 GPUs`
+    - `TP/PP/DP in {2/2/2, 4/2/1}`
+    - `36 layers`, `hidden=2048`, `ffn=11008`, `heads=16`, `kv_heads=4`
+    - `micro_batch_size=1`, `global_batch_size=4`, `seq_length=2048`, `train-iters=20`
+    - `ZeRO-1 + CPU optimizer/offload`, dataset `qwen_data_text_document`
+  - Ethernet (`sd-1/sd-2`, GPU `0-3`) Zeus totals:
+    - `TP=2 / PP=2 / DP=2`: `129.386s / 40490.202J / 312.942W`
+    - `TP=4 / PP=2 / DP=1`: `158.058s / 48914.498J / 309.471W`
+    - relative change (`tp4pp2dp1` vs `tp2pp2dp2`): runtime `+22.16%`, energy `+20.81%`, avg power `-1.11%`
+  - IB (`v100x16-1/v100x16-2`, GPU `8-11`) Zeus totals:
+    - `TP=2 / PP=2 / DP=2`: `155.205s / 105340.952J / 678.719W`
+    - `TP=4 / PP=2 / DP=1`: `127.520s / 97714.232J / 766.267W`
+    - relative change (`tp4pp2dp1` vs `tp2pp2dp2`): runtime `-17.84%`, energy `-7.24%`, avg power `+12.90%`
+  - provenance:
+    - Ethernet manifest: `.context/dual_env_topology_compare_tpge2_20260419/artifacts/eth/eth_topology_compare_tpge2_kv4_20260419_manifest_20260419_093732.txt`
+    - IB manifest: `.context/dual_env_topology_compare_tpge2_20260419/artifacts/ib/ib_topology_compare_tpge2_kv4_20260419_manifest_20260419_173732.txt`
+    - local summary: `.context/dual_env_topology_compare_tpge2_20260419/results_summary_kv4.md`
+  - diagnostic note:
+    - the original `kv_heads=2` plan failed for `TP=4 / PP=2 / DP=1` with `AssertionError: 2 is not divisible by 4`; the final formal comparison reran both topologies with `kv_heads=4` to keep the model legal and comparable
+- [2026-04-19] Dual-environment common-workload `2x4` sweep is now fully artifact-backed under `.context/dual_env_common_workload_20260419/artifacts/{eth,ib}/`:
+  - shared workload:
+    - `2 nodes x 4 GPUs`
+    - `TP=1`, `PP=2`, `DP=4`
+    - `36 layers`, `hidden=2048`, `ffn=11008`, `heads=16`, `kv_heads=2`
+    - `micro_batch_size=1`, `global_batch_size=4`, `seq_length=2048`, `train-iters=20`
+    - `ZeRO-1 + CPU optimizer/offload`, dataset `qwen_data_text_document`
+  - Ethernet (`sd-1/sd-2`, GPU `0-3`) Zeus totals:
+    - baseline `168.216s / 51438.765J / 305.790W`
+    - `1005 MHz` `198.728s / 40212.953J / 202.352W`
+    - `1200 MHz` `184.716s / 38400.352J / 207.889W`
+    - `1395 MHz` `181.379s / 38436.713J / 211.914W`
+    - relative to baseline: runtime `+18.14% / +9.81% / +7.82%`, energy `-21.82% / -25.35% / -25.28%`, avg power `-33.83% / -32.02% / -30.70%`
+  - IB (`v100x16-1/v100x16-2`, GPU `8-11`) Zeus totals:
+    - baseline `182.482s / 114005.406J / 624.750W`
+    - `990 MHz` `244.728s / 88633.158J / 362.170W`
+    - `1080 MHz` `229.767s / 86021.344J / 374.385W`
+    - `1155 MHz` `212.352s / 84274.511J / 396.863W`
+    - relative to baseline: runtime `+34.11% / +25.91% / +16.37%`, energy `-22.26% / -24.55% / -26.08%`, avg power `-42.03% / -40.07% / -36.48%`
+  - operational bring-up notes captured by this sweep:
+    - current canonical launcher fix successfully eliminated stale `.deepspeed_env` pollution (`PATH`, `TMPDIR`, `TORCH_EXTENSIONS_DIR`, `PYTHONPYCACHEPREFIX`) that had been causing reused-temp-path failures
+    - node-local `/dev/shm/.../index-cache` is not a safe multi-node `DATA_CACHE_PATH` unless every node is preseeded; the completed sweep used persistent per-node `data/index-cache` with Ethernet hash `33c91528b53c7a971dc9e5a3b24c9665` and IB hash `2025292d291ff386fedc1b73e7aace6c` present on both nodes
 - [2026-04-11] Fresh IB formal remote sanity check completed against live DGX2 artifacts:
   - verified on `sd@v100x16-1`:
     - source `ib_dual8_tp4pp1dp2_formal_990_20260410_20260410_161719_DGX2-1`
