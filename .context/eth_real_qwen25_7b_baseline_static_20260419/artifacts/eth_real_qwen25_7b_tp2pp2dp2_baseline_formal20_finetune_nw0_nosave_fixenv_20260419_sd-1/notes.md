@@ -1,0 +1,69 @@
+# Experiment eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1
+
+## Metadata
+- experiment_name: `eth_real_qwen25_7b_tp2pp2dp2_20260419`
+- run_id: `eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+- mode: `baseline`
+- status: `completed`
+- run_dir: `/home/user/Megatron-DeepSpeed/experiments/eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+- command_sha1: `7e91dac894760f0a9a976fbc2d26258bdc30de3c`
+- framework: `Megatron-DeepSpeed + DeepSpeed launcher + Zeus`
+- git_commit: `f275844f71e86e543de51c623956e5445a9232bc`
+- topology: `sd-1 + sd-2`, 每机 `GPU 0,1,2,3`, `TP=2 / PP=2 / DP=2`, `world_size=8`
+- workload: `Qwen2.5-7B-Instruct`, `28L / H3584 / FFN18944 / A28 / KV4`, `--load qwen25_7b_instruct_hf2megads_tp2pp2_real_main --finetune`
+- dataset: `/home/user/Megatron-DeepSpeed/data/qwen_data_text_document`
+- tokenizer: `Qwen2.5-7B-Instruct` snapshot `a09a35458c702b33eeacc393d103063234e8bc28`
+- training_window: `train-iters=20`, `seq=2048`, `micro=1`, `global=4`, `bf16`, `ZeRO-1 + CPU optimizer/offload`, `num_workers=0`
+
+## Command
+```bash
+/home/user/miniconda3/envs/tp4bit/bin/python3.10 pretrain_gpt.py --local_rank=0 --tensor-model-parallel-size 2 --pipeline-model-parallel-size 2 --num-layers 28 --hidden-size 3584 --ffn-hidden-size 18944 --num-attention-heads 28 --num-key-value-heads 4 --micro-batch-size 1 --global-batch-size 4 --num-workers 0 --seq-length 2048 --max-position-embeddings 2048 --train-iters 20 --data-path /home/user/Megatron-DeepSpeed/data/qwen_data_text_document --data-cache-path /home/user/Megatron-DeepSpeed/data/index-cache --data-impl mmap --tokenizer-type HFTokenizer --tokenizer-model /home/user/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28 --split 98,2,0 --distributed-backend nccl --lr 1e-5 --lr-decay-style cosine --min-lr 1e-6 --weight-decay 0.01 --clip-grad 1.0 --lr-warmup-iters 1 --optimizer adam --cpu-optimizer --adam-beta1 0.9 --adam-beta2 0.95 --adam-eps 1e-8 --log-interval 1 --save-interval 0 --eval-interval 100 --eval-iters 0 --no-query-key-layer-scaling --attention-dropout 0 --hidden-dropout 0 --use-rotary-position-embeddings --untie-embeddings-and-output-weights --swiglu --normalization rmsnorm --disable-bias-linear --no-position-embedding --no-masked-softmax-fusion --no-bias-gelu-fusion --no-bias-dropout-fusion --recompute-granularity full --recompute-method uniform --deepspeed-activation-checkpointing --zero-stage=1 --deepspeed_config=/home/user/Megatron-DeepSpeed/experiments/eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1/ds_config.json --deepspeed --experiment-run-id eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1 --experiment-name eth_real_qwen25_7b_tp2pp2dp2_20260419 --experiment-root-dir /home/user/Megatron-DeepSpeed/experiments --bf16 --load /home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_real_main --finetune
+```
+
+## Hypothesis
+- 作为真实模型主证据的控制组，记录 Ethernet 双机 `Qwen2.5-7B-Instruct` 在不锁频情况下的时间、功率和能耗基线。
+- 与同 workload 的 `static 1395 MHz` 做公平对照，确认固定频率是否能在真实 checkpoint + 真实数据集上继续带来可观节能。
+
+## Setup Notes
+- GPU / node: `sd-1 + sd-2`, 每机 `GPU 0,1,2,3`
+- network / backend: 仅使用 Ethernet, `NCCL_SOCKET_IFNAME=eth0`, `NCCL_IB_DISABLE=1`, `distributed-backend=nccl`
+- clock policy: `baseline`, 不做固定 GPU 时钟锁定
+- launch mode: `deepspeed --hostfile /tmp/hostfile_real_qwen7b_eth_tp2pp2dp2 --include sd-1:0,1,2,3@sd-2:0,1,2,3`
+- runtime envs:
+  - `DISABLE_SAVE_CHECKPOINT=1`
+  - `TORCH_EXTENSIONS_DIR=/dev/shm/megatron_real_qwen7b_eth_20260419/torch_extensions_tp4bit`
+  - `TMPDIR=/dev/shm/megatron_real_qwen7b_eth_20260419/tmp`
+  - `PYTHONPYCACHEPREFIX=/dev/shm/megatron_real_qwen7b_eth_20260419/pycache`
+  - `TRITON_CACHE_DIR=/dev/shm/megatron_real_qwen7b_eth_20260419/triton_cache_baseline_nosave_fixenv`
+  - `PYTHONDONTWRITEBYTECODE=1`
+  - `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1`
+  - `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
+  - `TORCH_NCCL_BLOCKING_WAIT=1`
+- no-save reason: `sd-2` 根分区空间不足，保存训练输出 checkpoint 会触发磁盘写满；本 run 保留 `--load` 真实初始权重，但跳过 `--save`
+- preflight: 两节点 `dataset_exists / tokenizer_exists / launcher_available / repo_exists / python_available / pynvml_available / tp_fits_local_node` 全部通过
+
+## Key Metrics
+- final_iteration: `20`
+- total_time_s: `229.492`
+- avg_step_time_ms: `11473.2`
+- avg_step_time_ms_excluding_step1: `11160.1`
+- last_step_time_ms: `10584.3`
+- total_tokens: `163840`
+- tokens_per_second_window: `713.93`
+- avg_power_w: `320.179`
+- total_energy_j: `73478.543`
+- tokens_per_j: `2.2298`
+- last_loss: `4.676264E+00`
+- loss curve note: `step 1` 到 `step 20` 的 `lm loss` 从 `1.080963E+01` 下降到 `4.676264E+00`，窗口内未出现 skipped / nan iterations
+
+## Comparison
+- paired_static_run_id: `eth_real_qwen25_7b_tp2pp2dp2_static1395_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+- compared dimensions:
+  - 工作负载一致：同一真实 checkpoint、同一模型结构、同一数据集、同一 tokenizer、同一 batch、同一拓扑、同一 `20-step` 窗口
+  - 唯一实验变量：`static` 额外启用 `STATIC_CLOCK_MHZ=1395`
+- relative delta versus paired static:
+  - runtime: `-9.79%` 相对 static 更短
+  - avg_power: `+44.47%`
+  - energy: `+30.31%`
+  - tokens_per_j: `-23.26%`
+- conclusion: 该 baseline 是真实模型 Ethernet 主证据中的控制组；它在时间上更快，但功率和能耗显著高于 `static 1395 MHz`

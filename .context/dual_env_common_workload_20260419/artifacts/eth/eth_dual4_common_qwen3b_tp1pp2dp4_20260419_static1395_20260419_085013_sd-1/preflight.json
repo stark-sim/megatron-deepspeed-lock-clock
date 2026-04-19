@@ -1,0 +1,53 @@
+{
+  "node_results": [
+    {
+      "checks": {
+        "dataset_exists": true,
+        "launcher_available": true,
+        "nvidia_smi_available": true,
+        "pynvml_available": true,
+        "python_available": true,
+        "repo_exists": true,
+        "static_clock_supported": true,
+        "tokenizer_exists": true,
+        "tp_fits_local_node": true
+      },
+      "cuda_visible_devices": "0,1,2,3",
+      "gpu_indices": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "hostname": "sd-1",
+      "local_gpu_count": 4,
+      "ok": true,
+      "repo_path": "/home/user/Megatron-DeepSpeed"
+    },
+    {
+      "checks": {
+        "dataset_exists": true,
+        "launcher_available": true,
+        "nvidia_smi_available": true,
+        "pynvml_available": true,
+        "python_available": true,
+        "repo_exists": true,
+        "static_clock_supported": true,
+        "tokenizer_exists": true,
+        "tp_fits_local_node": true
+      },
+      "cuda_visible_devices": "0,1,2,3",
+      "gpu_indices": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "hostname": "sd-2",
+      "local_gpu_count": 4,
+      "ok": true,
+      "repo_path": "/home/user/Megatron-DeepSpeed"
+    }
+  ],
+  "ok": true
+}
