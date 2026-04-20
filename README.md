@@ -59,6 +59,32 @@
 
 ## 3. 快速开始
 
+### 3.0 Python 环境复现
+
+在新机器上复现训练环境时，不建议只手工 `pip install`。本项目当前把“装包”和“运行前预热”分成两步：
+
+```bash
+# 1) 创建并安装 Python 环境
+STACK_PROFILE=sd-eth bash scripts/setup_python_env.sh
+
+# 可选 profile:
+# STACK_PROFILE=sd-eth    # 当前 sd-1 / sd-2 Ethernet 线
+# STACK_PROFILE=dgx-v100  # 当前 V100 / DGX 线
+
+# 2) 激活运行时缓存/JIT 环境
+conda activate megatron-lock-clock
+source scripts/activate_runtime_env.sh
+
+# 3) 验证 apex / DeepSpeed CPUAdam / Zeus / Megatron 导入与预热
+python scripts/verify_python_env.py --warmup
+```
+
+说明：
+- `scripts/setup_python_env.sh` 会创建 `conda` 环境，安装 `torch / deepspeed / transformers / apex / zeus-ml` 等依赖，并预编译 `DeepSpeed CPUAdam/FusedAdam`。
+- `scripts/activate_runtime_env.sh` 会把 `TORCH_EXTENSIONS_DIR`、`TMPDIR`、`PYTHONPYCACHEPREFIX`、`TRITON_CACHE_DIR` 统一放到 `/dev/shm`；这一步是为了避免 clean shell 下首次运行因为 `CPUAdam` 或其他 JIT 扩展写缓存失败而报错。
+- `scripts/verify_python_env.py --warmup` 会直接触发 `apex`、`DeepSpeedCPUAdam`、`FusedAdam` 和 `pretrain_gpt.py` 的真实导入/小步预热，确认不是“包装好了但首跑仍炸”。
+- 该路径默认需要：`conda` 或 `mamba`、`git`、`nvcc`、可用 CUDA 驱动。
+
 ### 3.1 网络基准测试
 
 ```bash

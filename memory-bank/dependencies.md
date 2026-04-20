@@ -11,6 +11,21 @@
 | `sentencepiece` | `0.2.1` | Tokenization support |
 | `regex` | installed | Tokenizer/runtime dependency |
 
+## Reproducible Profiles
+| Profile | Python | `torch` | `deepspeed` | `einops` | `zeus-ml` | Intended Hosts |
+|---------|--------|---------|-------------|----------|-----------|----------------|
+| `sd-eth` | `3.10` | `2.10.0+cu128` | `0.14.0` | `0.8.2` | `0.11.0.post1` | `sd-1` / `sd-2` Ethernet line |
+| `dgx-v100` | `3.10` | `2.9.1+cu128` | `0.18.3` | `0.8.1` | `0.11.0.post1` | `v100x16-1` / `v100x16-2` |
+
+## Build-Time Requirements
+| Tool / Package | Purpose |
+|----------------|---------|
+| `conda` or `mamba` | Create the canonical Python runtime |
+| `git` | Fetch `NVIDIA/apex` source when not pre-provided |
+| `nvcc` | Build `apex` CUDA extensions and prebuild DeepSpeed Adam ops |
+| `APEX_CPP_EXT=1`, `APEX_CUDA_EXT=1` | Required for the Megatron CUDA apex path used by this repo |
+| `DS_BUILD_CPU_ADAM=1`, `DS_BUILD_FUSED_ADAM=1` | Prebuild DeepSpeed Adam ops during environment setup |
+
 ## Dev Dependencies
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -37,6 +52,7 @@
 - [2026-04-07] On `sd-1` / `sd-2`, successful short Megatron runs currently rely on `tp4bit` plus `TORCH_EXTENSIONS_DIR=/tmp/torch_extensions_user` and `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`.
 - [2026-04-08] On `sd-1` / `sd-2`, the synced runtime path must include `megatron/gpu_freq_manager.py` together with `megatron/experiment_tracker.py`; otherwise `collect_nvml_device_snapshot` import fails before training startup.
 - [2026-04-08] Manual `deepspeed` launches on `sd-1` / `sd-2` can now emit `run.json/events.jsonl`, but topology and hostfile snapshots remain empty unless `MEGATRON_HOSTFILE_JSON` and `MEGATRON_TOPOLOGY_JSON` are exported alongside the launch.
+- [2026-04-20] Fresh-machine bring-up should now use `scripts/setup_python_env.sh` plus `scripts/activate_runtime_env.sh` rather than ad-hoc `pip install` notes. The second script is part of the dependency contract because `CPUAdam` and other JIT paths depend on writable low-latency cache directories (`TORCH_EXTENSIONS_DIR`, `TMPDIR`, `PYTHONPYCACHEPREFIX`, `TRITON_CACHE_DIR`).
 
 ## Upgrade Notes
 - If DeepSpeed or Torch versions change, revalidate checkpoint, Zeus integration, and distributed exit behavior.

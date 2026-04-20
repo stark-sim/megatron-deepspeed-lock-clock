@@ -1,4 +1,39 @@
 # Tech Context
+[2026-04-20] **Python 环境 bring-up 已被脚本化，且当前必须把“安装环境”和“运行时预热”分开处理**：
+- 新增脚本：
+  - `scripts/setup_python_env.sh`
+  - `scripts/activate_runtime_env.sh`
+  - `scripts/verify_python_env.py`
+- 运行原因：
+  - 这个项目的可运行性不只取决于 Python 包是否已安装，还取决于 clean shell 下 `TORCH_EXTENSIONS_DIR`、`TMPDIR`、`PYTHONPYCACHEPREFIX`、`TRITON_CACHE_DIR` 是否指向可写且低延迟的位置
+  - `DeepSpeedCPUAdam`、`deepspeed.ops.adam.FusedAdam`、`apex` layer norm / optimizer 路径都可能在首次运行时触发 JIT 或扩展加载；因此单纯 `pip list` 正常不代表训练入口就能启动
+- 当前脚本化策略：
+  - `setup_python_env.sh` 负责建 `conda` 环境、装包、预编译 `CPUAdam/FusedAdam`、安装 `apex`
+  - `activate_runtime_env.sh` 负责把 runtime cache/JIT 写入统一导到 `/dev/shm`
+  - `verify_python_env.py --warmup` 负责做一次真实的小步预热，直接暴露 `adam/apex/Megatron` 的首次启动问题
+[2026-04-20] **`sd-1/sd-2` 上的 RTX 4080 SUPER 高频锁频范围已通过 runtime 预检确认可继续上探**：
+- `nvidia-smi -q -d SUPPORTED_CLOCKS` 的 graphics clocks 高端尾部至少达到 `2820 .. 3105 MHz`
+- 这意味着 Ethernet real-model formal sweep 不必在 `1395 / 1650 / 1950 MHz` 等点位人为截断
+- 当前 `1500 / 1650 / 1800 / 1950 / 2100 / 2250 MHz` 都已实跑完成；若还需要继续加密曲线，可继续沿 `2400+ MHz` 区间上探，但从当前趋势看，高频端已更像是在验证“稳定但不更优”
+[2026-04-20] **V100 内部真实模型同步的源端与断点形态已进一步核实**：
+- 源端是 `sd@v100x16-2:/home/sd/models/Qwen2.5-7B`
+- 该路径通过软链接实际指向完整 `Qwen2.5-7B-Instruct` 目录，`du -shL` 为约 `15G`
+- 四个源 shard 分别约为 `3.7G / 3.6G / 3.6G / 3.4G`
+- 目标端 `sd@v100x16-1:/home/sd/models/Qwen2.5-7B-Instruct-full` 当前的 `model-00002-of-00004.safetensors` 仅约 `317M`
+- 现场无活跃复制进程，因此“怎么会这么慢”的更准确答案是：之前的顺序同步已经断掉，并非还在持续低速传输
+[2026-04-20] **V100 真实权重存在一个“名字误导”和一个“残缺副本”运行时事实**：
+- `sd@v100x16-2` 上的完整真实权重并不是以直观目录名出现：
+  - `/home/sd/models/Qwen2.5-7B` 实际是软链接到 `Qwen2.5-7B-Instruct`
+  - 链路为：`/home/sd/models/Qwen2.5-7B -> /home/sd/cache/modelscope/Qwen/Qwen2.5-7B-Instruct -> /home/sd/cache/modelscope/Qwen/Qwen2___5-7B-Instruct`
+  - 该目录当前可见完整 `model-00001..00004-of-00004.safetensors`，总量约 `15G`
+- `sd@v100x16-1` 现有的 `/home/sd/models/Qwen2.5-7B-Instruct` 不能再被当作“差两片的可补全副本”：
+  - `model-00001-of-00004.safetensors = 1705896960`
+  - `model-00004-of-00004.safetensors = 887808000`
+  - 对照 `DGX2-2` 源端同名文件 `3945441440` / `3556377672`
+  - 结论是 `DGX2-1` 的现有 shard 已经截断，继续在其上补 `00002/00003` 没有意义
+- 运行策略含义：
+  - 若要恢复 V100 线真实 7B 主实验，当前优先路径应是 `DGX2-2 -> DGX2-1` 的内部复制到新目录，再基于完整目录做 HF->Megatron 转换
+  - `DGX2-1` 的外网/代理链路虽然仍不通，但已不再是继续推进真实 7B 的唯一 blocker
 [2026-04-19] **真实 Qwen7B Ethernet 线当前需要两个额外的运行时约束**：
 - `sd-2` 的根分区空间不足以承受训练输出 checkpoint：
   - 在删除前，`df -h /home/user` 仅余 `43M`
@@ -251,6 +286,25 @@
 - [2026-04-08] Remote runtime parity on `sd-1/sd-2` must include `megatron/gpu_freq_manager.py` whenever `megatron/experiment_tracker.py` is synced. A partial sync reproduces `ImportError: cannot import name 'collect_nvml_device_snapshot'` before training startup.
 - [2026-03-18] Dual-node V100 bring-up target is now `sd@v100x16-1` (`DGX2-1`) + `sd@v100x16-2` (`DGX2-2`) over `192.168.205.201/202` on `enp6s0`; `tailscale0` is reachable too, but local LAN is lower-latency for first 32-GPU startup checks.
 - [2026-03-18] `sd@v100x16-2` has `/home/sd/Megatron-DeepSpeed` plus dataset files, but it is a repo snapshot without `.git`; for predictor/launcher parity, code had to be resynced from `sd@v100x16-1`.
+- [2026-04-19] V100 rerun preflight re-confirmed that this old split state still exists: `DGX2-1` currently runs a dirty historical worktree near `6629a33`, while `DGX2-2` still exposes `/home/sd/Megatron-DeepSpeed` as a plain snapshot without `.git`. Treat any “latest-code rerun on V100” claim as invalid until both nodes are resynced from the local workspace.
+- [2026-04-19] The current V100 copies of `data/qwen_data_text_document.bin` and `.idx` are tiny placeholder files (`968B` / `242B`), not the full real dataset used on the Ethernet line. Do not launch any “real dataset” V100 experiment against these files.
+- [2026-04-19] The real Qwen checkpoint used on the Ethernet line, `qwen25_7b_instruct_hf2megads_tp2pp2_real_main`, is not present on either `sd@v100x16-1` or `sd@v100x16-2` yet.
+- [2026-04-19] `sd@v100x16-1` already has a full HF snapshot for base `Qwen2.5-7B` at `/home/sd/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B/snapshots/d149729398750b98c0af14eb82c78cfe92750796/`; its config confirms the same `28L / 3584 / 18944 / 28 / kv4` architecture as `Qwen2.5-7B-Instruct`.
+- [2026-04-19] Cross-environment transfer from `user@sd-1` to `sd@v100x16-1` for the `Qwen2.5-7B-Instruct` HF snapshot is functionally possible but currently very slow. Both `scp -r` and `ssh+tar` create the expected target snapshot path `.../models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28`, but throughput is low enough that this should not be treated as a fast setup path.
+- [2026-04-20] `sd@v100x16-1` has multiple nominal download paths configured, but none currently produce a working HF self-download:
+  - direct `huggingface.co` HTTPS: TCP connect times out
+  - `http_proxy=http://192.168.205.201:7890`: proxy accepts CONNECT but TLS immediately ends with `unexpected eof while reading`
+  - `socks5h://192.168.205.201:7890`: after vendoring `PySocks`, the client can establish a TCP session to the proxy (`ESTAB`), but downstream HTTPS still does not complete within a short timeout
+  - `hf-mirror.com` direct: also times out
+- [2026-04-20] To enable SOCKS tests on `DGX2-1` without pulling packages from the internet, a tiny local vendor copy of `PySocks` (`socks.py`, `sockshandler.py`) was placed under `/home/sd/Megatron-DeepSpeed/.context/pysocks_vendor/`; use `PYTHONPATH=/home/sd/Megatron-DeepSpeed/.context/pysocks_vendor:$PYTHONPATH` when retrying SOCKS-based HTTP clients.
+- [2026-04-20] `sd@v100x16-1` contains two misleadingly promising local model roots that are both incomplete for conversion use:
+  - `/home/sd/models/Qwen2.5-7B-Instruct/`
+    - has tokenizer files and `model.safetensors.index.json`
+    - but only `model-00001-of-00004.safetensors` and `model-00004-of-00004.safetensors` are present
+  - `/home/sd/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B/snapshots/d149729398750b98c0af14eb82c78cfe92750796/`
+    - currently only exposes `config.json`
+    - no weight shards are cached locally
+- [2026-04-20] A local conversion attempt on `DGX2-1` using `/home/sd/models/Qwen2.5-7B-Instruct` and the updated converter failed at tokenizer construction before reaching shard loading: the current remote Transformers/Qwen2 tokenizer path throws `TypeError: expected str, bytes or os.PathLike object, not NoneType` when pointed directly at that model directory. The host already has a working flat tokenizer directory at `/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat/`, so future retries should use that tokenizer path if/when a complete model directory becomes available.
 - [2026-03-25] User correction: this project's canonical remote runtime is still the user-site Python 3.10 environment exposed via `~/.local/bin` and `~/.local/lib/python3.10/site-packages`, which is also what previous successful Megatron-DeepSpeed examples used. Do not treat the `tp4bit` Conda env as the default runtime for this repo.
 - [2026-03-25] Reframe the previous Apex note as a non-canonical-path issue: the observed `amp_C` undefined `c10::cuda` symbol failure came from trying a `tp4bit` / copied-extension path, not from the established `.local` runtime that had already worked for this project. Future 32-GPU bring-up should first be reproduced in the `.local` environment before considering any Apex rebuild.
 ## Data / Tokenizer Context

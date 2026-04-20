@@ -32,6 +32,155 @@
 - [x] [2026-03-31] Completed a clean `2x4` smoke on the user-approved `GPU 8,9,10,11` slice of both hosts: `dual8_tp4pp1dp2_smoke990_20260331_163556_DGX2-1` finished 2 iterations successfully with validation, confirming the `8-11` path is runnable for `TP=4, PP=1, DP=2, ZeRO-1`.
 - [x] [2026-03-31] Switched from smoke to source-data acquisition immediately after the successful `8-11` smoke: launched `screen` session `dual8_tp4pp1dp2_collect_20260331` running `/home/sd/Megatron-DeepSpeed/.context/dual8_tp4pp1dp2_collect_20260328.sh` for `990/1080/1155 MHz`.
 # Progress
+- [x] [2026-04-20] **补齐面向新机器 bring-up 的 Python 环境复现脚本与预热校验脚本**：
+  - 新增 `scripts/setup_python_env.sh`
+    - 支持 `STACK_PROFILE=sd-eth` 与 `STACK_PROFILE=dgx-v100`
+    - 统一创建 Python `3.10` 的 `conda` 环境
+    - 安装 `torch / deepspeed / transformers / sentencepiece / einops / pynvml / zeus-ml`
+    - 显式预编译 `DeepSpeed CPUAdam/FusedAdam`
+    - 支持从 `NVIDIA/apex` 源码安装 `APEX_CPP_EXT=1` 与 `APEX_CUDA_EXT=1`
+  - 新增 `scripts/activate_runtime_env.sh`
+    - 统一导出 `TORCH_EXTENSIONS_DIR`、`TMPDIR`、`PYTHONPYCACHEPREFIX`、`TRITON_CACHE_DIR`
+    - 默认落到 `/dev/shm/<tag>/...`，避免 clean shell 下 JIT/cache 写入用户目录导致 `CPUAdamBuilder().load()` 失败
+  - 新增 `scripts/verify_python_env.py`
+    - 检查 `torch / deepspeed / transformers / apex / zeus / pynvml`
+    - `--warmup` 模式下直接触发 `apex.FusedAdam`、`MixedFusedRMSNorm`、`DeepSpeedCPUAdam`、`deepspeed.ops.adam.FusedAdam` 和 `pretrain_gpt.py` 导入链路
+  - README 已补充新机器复现步骤，后续其他机器上的 first-run bring-up 应以这套脚本为主
+- [x] [2026-04-20] **完成 Ethernet 真实 `Qwen2.5-7B-Instruct` `TP=2 / PP=2 / DP=2` 的 `1005 / 1200 / 1500 / 1650 MHz` 正式补测，并将五个 static 点工件全部回拉到本地**：
+  - baseline（已存在）：
+    - `229.492s / 73478.543J / 320.179W / 2.2298 tokens/J`
+  - 新增 `1005 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1005_formal20_finetune_nw0_nosave_fixenv_20260420_r2_20260419_174710_sd-1`
+    - `267.575s / 57177.500J / 213.688W / 2.8655 tokens/J`
+    - 相对 baseline：`runtime +16.59% / avg_power -33.26% / energy -22.18% / tokens_per_j +28.51%`
+  - 新增 `1200 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1200_formal20_finetune_nw0_nosave_fixenv_20260420_r2_20260419_175317_sd-1`
+    - `261.969s / 57168.610J / 218.226W / 2.8659 tokens/J`
+    - 相对 baseline：`runtime +14.15% / avg_power -31.84% / energy -22.20% / tokens_per_j +28.53%`
+  - 新增 `1500 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1500_formal20_finetune_nw0_nosave_fixenv_20260420_r4_20260420_002554_sd-1`
+    - `248.866s / 55554.388J / 223.230W / 2.9492 tokens/J`
+    - 相对 baseline：`runtime +8.44% / avg_power -30.28% / energy -24.39% / tokens_per_j +32.26%`
+  - 新增 `1650 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1650_formal20_finetune_nw0_nosave_fixenv_20260420_r4_20260420_003214_sd-1`
+    - `238.310s / 54380.384J / 228.192W / 3.0129 tokens/J`
+    - 相对 baseline：`runtime +3.84% / avg_power -28.73% / energy -25.99% / tokens_per_j +35.12%`
+  - 当前同拓扑五点比较：
+    - `1200 MHz` 基本支配 `1005 MHz`：总能耗几乎相同，但总时长减少约 `5.61s`
+    - `1500 MHz` 已同时优于 `1395 MHz` 的运行时间与总能耗
+    - `1650 MHz` 是当前 Ethernet 真实模型曲线里时间代价最小且总能耗最低的点
+  - 本地工件目录：
+    - `.context/eth_real_qwen25_7b_baseline_static_20260419/artifacts/`
+  - 口径注意：
+    - 模型/checkpoint 是真实 `Qwen2.5-7B-Instruct`
+    - 但 `qwen_data_text_document.{bin,idx}` 仍偏小，因此这条线更适合表述为“真实模型 + 当前项目数据前缀”的功耗/时间证据，而不是“大规模真实语料训练”
+- [x] [2026-04-20] **继续完成 Ethernet 真实 `Qwen2.5-7B-Instruct` `TP=2 / PP=2 / DP=2` 的 `1800 / 1950 MHz` 正式补测，并确认高频段不会立刻破坏训练稳定性**：
+  - 新增 `1800 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1800_formal20_finetune_nw0_nosave_fixenv_20260420_r5_20260420_010053_sd-1`
+    - `239.220s / 55380.942J / 231.506W / 2.9584 tokens/J`
+    - 相对 baseline：`runtime +4.24% / avg_power -27.69% / energy -24.63% / tokens_per_j +32.68%`
+  - 新增 `1950 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1950_formal20_finetune_nw0_nosave_fixenv_20260420_r5_20260420_010704_sd-1`
+    - `237.601s / 55839.752J / 235.015W / 2.9341 tokens/J`
+    - 相对 baseline：`runtime +3.53% / avg_power -26.60% / energy -24.01% / tokens_per_j +31.59%`
+  - 当前同拓扑七点比较：
+    - `1950 MHz` 已把运行时间压到当前最低，但只比 `1650 MHz` 快约 `0.71s`
+    - `1650 MHz` 仍保持更低总能耗（`54380J` vs `55840J`）与更高 `tokens/J`（`3.0129` vs `2.9341`）
+    - 因此当前 Ethernet 真实模型线的更稳主代表点仍应优先保留 `1650 MHz`
+  - 稳定性结论：
+    - `1800` 与 `1950` 两组 `20 step` 都完成且 `skipped=0`
+    - 这说明 `1500+ MHz` 在该 Ethernet 真实模型 workload 上不是“一上去就炸”的不稳定区间
+- [x] [2026-04-20] **继续把 Ethernet 真实模型曲线上探到 `2100 / 2250 MHz`，并确认高频端的“稳定但不再更省电”趋势**：
+  - 新增 `2100 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static2100_formal20_finetune_nw0_nosave_fixenv_20260420_r6_20260420_011555_sd-1`
+    - `239.100s / 56694.104J / 237.115W / 2.8899 tokens/J`
+    - 相对 baseline：`runtime +4.19% / avg_power -25.94% / energy -22.84% / tokens_per_j +29.61%`
+  - 新增 `2250 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static2250_formal20_finetune_nw0_nosave_fixenv_20260420_r6_20260420_012206_sd-1`
+    - `238.292s / 57151.293J / 239.837W / 2.8668 tokens/J`
+    - 相对 baseline：`runtime +3.83% / avg_power -25.09% / energy -22.22% / tokens_per_j +28.57%`
+  - 高频端结论：
+    - `2100` 与 `2250` 也都完成 `20 step` 且 `skipped=0`
+    - `2250` 的 runtime 已几乎与 `1650` 持平（仅约 `0.02s` 差异），但总能耗比 `1650` 高约 `2771J`
+    - 这进一步确认了：高频端仍然稳定，但 sweet spot 并没有继续向上移动，`1650` 仍是当前最佳主代表点
+- [x] [2026-04-20] **确认 V100 线不必再把“代理下载 Qwen7B”当成唯一主线，`DGX2-2` 已持有完整真实权重，可直接走双机内部同步**：
+  - 当前状态：
+    - `sd@v100x16-1` 与 `sd@v100x16-2` 现都空闲，16 张 V100 无外部进程占用
+    - `sd@v100x16-2` 暴露的 `/home/sd/models/Qwen2.5-7B` 实际是软链接：`/home/sd/models/Qwen2.5-7B -> /home/sd/cache/modelscope/Qwen/Qwen2.5-7B-Instruct -> /home/sd/cache/modelscope/Qwen/Qwen2___5-7B-Instruct`
+    - 沿该路径可见完整 `model-00001..00004-of-00004.safetensors`，目录体积约 `15G`
+  - 对 `sd@v100x16-1` 现有副本的复核：
+    - `/home/sd/models/Qwen2.5-7B-Instruct/model-00001-of-00004.safetensors = 1705896960`
+    - `/home/sd/models/Qwen2.5-7B-Instruct/model-00004-of-00004.safetensors = 887808000`
+    - 同名文件在 `DGX2-2` 源端分别为 `3945441440` 与 `3556377672`
+    - 这说明 `DGX2-1` 上现有 Instruct 目录不是“只缺两片”的完整副本，而是已经截断的坏副本
+  - 已采取动作：
+    - 启动 `v100x16-2 -> v100x16-1` 的直接权重同步
+    - 目标目录：`/home/sd/models/Qwen2.5-7B-Instruct-full`
+    - 截至最新检查，目标目录已增长到约 `11G`
+    - 进一步核对后确认：`00001 / 00003 / 00004` 基本完整，但 `model-00002-of-00004.safetensors` 仅约 `317M`
+    - 现场已无任何活跃 `scp/rsync/tar` 进程，因此当前慢点不是“仍在低速拷贝”，而是此前同步已中断并留下半截 shard
+  - 含义：
+    - 后续 V100 线主 blocker 已从“修好代理自下载”切换为“恢复/重启内部同步 -> 同步最新 converter/launcher -> 做真实 7B smoke”
+- [x] [2026-04-19] **完成 V100 双机 latest-code 重跑前预检，确认当前 IB 线仍未达到“直接开跑真实 Qwen7B”状态**：
+  - `sd@v100x16-1 (DGX2-1)`:
+    - 16 张 V100 当前全部空闲
+    - `/home/sd/Megatron-DeepSpeed` 的 live tree 仍是历史基线 `6629a33` 附近的 dirty worktree，和本地当前 `169e5dc` 不一致
+    - `qwen_data_text_document.{bin,idx}` 存在但仅 `968B / 242B`，当前更像占位文件而不是正式训练集
+    - `checkpoints/` 下尚无 `qwen25_7b_instruct_hf2megads_tp2pp2_real_main`
+  - `sd@v100x16-2 (DGX2-2)`:
+    - 16 张 V100 全被外部 `VLLM::Worker_TP0..15` 占满
+    - `/home/sd/Megatron-DeepSpeed` 仍是无 `.git` 的 repo snapshot
+    - `qwen_data_text_document.{bin,idx}` 同样只有几百字节
+    - `checkpoints/` 下同样没有真实 Qwen7B Megatron checkpoint
+  - 结论：
+    - 当前不能把 V100 线视为“latest code + real model workload ready”
+    - 下一步准备顺序应为：等待 `DGX2-2` 空闲 -> 同步本地最新代码到两机 -> 补齐真实 checkpoint 与真实数据集 -> 先做 `VALIDATE_ONLY`/smoke，再跑 baseline/static
+- [x] [2026-04-19] **确认 `v100x16-1` 已有可用的 `Qwen2.5-7B` base 权重，且架构与 `Qwen2.5-7B-Instruct` 一致**：
+  - 位置：`/home/sd/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B/snapshots/d149729398750b98c0af14eb82c78cfe92750796/`
+  - 关键结构：`28L / hidden 3584 / ffn 18944 / heads 28 / kv_heads 4`
+  - 含义：
+    - 如果只需“真实 7B 架构+真实权重”来验证最新框架的性能路径，它可作为临时 fallback
+    - 但若要严格沿用户当前主线，仍应使用 `Qwen2.5-7B-Instruct`
+- [x] [2026-04-19] **尝试为 `v100x16-1` 准备 `Qwen2.5-7B-Instruct` HF snapshot，但当前跨环境传输过慢，未在本 turn 内完成**：
+  - 来源：`user@sd-1:/home/user/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28`
+  - 尝试方式：
+    - remote-to-remote `scp -r` 整个 HF cache 目录
+    - `ssh user@sd-1 'tar ... a09a...' | ssh sd@v100x16-1 'tar -xf -'`
+  - 结果：
+    - `DGX2-1` 上已创建 snapshot 目录 `.../models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28`
+    - 中止前目录体积约 `73M`
+    - 根因更像带宽/链路慢，而不是权限或路径错误
+- [x] [2026-04-20] **按用户要求切换为 “V100 本机自行下载 Qwen2.5-7B-Instruct”，并完成网络链路诊断**：
+  - 用户偏好：
+    - 不再允许 `sd-1 -> v100` 传输模型本体，避免额外流量消耗
+  - `DGX2-1` 现状：
+    - `huggingface_hub` 与 `transformers` 已安装
+    - 无本地 HF token 文件，但 `Qwen2.5-7B-Instruct` 作为公开模型不应因此受阻
+    - `~/.bashrc` 中存在代理配置：`http_proxy=http://192.168.205.201:7890`，并提供 `all_proxy=socks5h://192.168.205.201:7890`
+  - 实测结果：
+    - 直连 `huggingface.co:443` 超时
+    - 经 `http_proxy` 访问时，代理返回 `HTTP/1.1 200 Connection established`，但 TLS 握手报 `unexpected eof while reading`
+    - `hf-mirror.com` 直连同样超时
+    - 为测试 SOCKS 路径，已把本地 `PySocks` 的 `socks.py` / `sockshandler.py` 小文件复制到 `DGX2-1` 的 `.context/pysocks_vendor/`
+    - 之后 Python 进程可与 `192.168.205.201:7890` 建立 `ESTAB` 连接，但 `curl --socks5-hostname 192.168.205.201:7890 https://huggingface.co` 仍超时
+  - 结论：
+    - 当前 V100 self-download 的 blocker 已缩小为外网/代理连通性，而不是 HF 权限、包依赖、或下载命令本身
+- [x] [2026-04-20] **完成 `DGX2-1` 本地真实 7B 资产完整性审计，并确认当前仍不足以启动 HF->Megatron 转换**：
+  - 已同步新版 `tools/hf2megads_weight_converter.py` 到 `sd@v100x16-1`，其中包含：
+    - 优先信任 `model.embed_tokens.weight.shape[0]`
+    - 必要时上调 `padded_vocab_size`
+  - 已按 `sd-1` 成功口径在 `DGX2-1` 启动过一次本地转换尝试：
+    - run log: `/home/sd/Megatron-DeepSpeed/.context/qwen25_7b_instruct_local_hf2megads_tp2pp2_dgx1_20260420_003409.log`
+    - 第一轮失败原因为 `tokenizer-model=/home/sd/models/Qwen2.5-7B-Instruct` 在当前 Transformers/Qwen2 tokenizer 路径下触发 `vocab_file=None`
+    - 随后确认 `/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat/` 是可用 fallback tokenizer
+  - 更关键的资产事实：
+    - `/home/sd/models/Qwen2.5-7B-Instruct` 只有 `model-00001-of-00004.safetensors` 与 `model-00004-of-00004.safetensors`
+    - `model.safetensors.index.json` 明确需要 `00001..00004` 四个 shard
+    - 定点搜索 `DGX2-1` 全机后，没有找到缺失的 `model-00002-of-00004.safetensors` / `model-00003-of-00004.safetensors`
+    - `/home/sd/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B/snapshots/d149.../` 也只有 `config.json`，没有权重 shard
+  - 结论：
+    - 当前 `DGX2-1` 上既没有完整的 `Qwen2.5-7B-Instruct`，也没有完整的 `Qwen2.5-7B`
+    - V100 线目前还不能基于本机现有资产完成真实 7B HF->Megatron 转换
 - [x] [2026-04-19] **完成 Ethernet 双机真实 `Qwen2.5-7B-Instruct` 首组同拓扑 baseline/static 正式对照，并把工件回拉到本地**：
   - 工作负载：
     - `sd-1 + sd-2`

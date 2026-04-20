@@ -2,6 +2,65 @@
 - [2026-03-31] Successful `8-11` smoke artifact: `dual8_tp4pp1dp2_smoke990_20260331_163556_DGX2-1` logs `iteration 1/2` and `iteration 2/2` with remote rank-4 summary lines plus local `steps: 1/2` markers. Observed iter times are about `67.8s` and `66.3s`, samples/sec about `0.118-0.121`, and the run reaches `validation loss at iteration 2`.
 - [2026-03-31] Full source collection is now live in `screen` session `dual8_tp4pp1dp2_collect_20260331`. The first full point `dual8_tp4pp1dp2_static990_20260331_164228_DGX2-1` has begun on `GPU8-11` and currently sits in distributed initialization / early startup without an immediate `FileNotFoundError`, indicating the latest cache syncs covered the previously exposed dataset hashes.
 # Observability
+- [2026-04-20] Ethernet real-model same-topology curve on `sd-1 + sd-2` now includes five fixed-frequency points for `TP=2 / PP=2 / DP=2` and all artifacts are local under `.context/eth_real_qwen25_7b_baseline_static_20260419/artifacts/`:
+  - shared workload:
+    - `Qwen2.5-7B-Instruct`, `28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4`
+    - `--load /home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_real_main --finetune`
+    - `micro=1`, `global=4`, `seq=2048`, `train-iters=20`
+    - `bf16`, `ZeRO-1 + CPU optimizer/offload`, `NUM_WORKERS=0`
+    - `DISABLE_SAVE_CHECKPOINT=1`
+    - dataset prefix remains `/home/user/Megatron-DeepSpeed/data/qwen_data_text_document`, but the current `.bin/.idx` are still very small, so this line should not yet be marketed as “large-scale real corpus training”
+  - baseline:
+    - `229.492s / 73478.543J / 320.179W / 2.2298 tokens/J`
+  - `static 1005 MHz`:
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1005_formal20_finetune_nw0_nosave_fixenv_20260420_r2_20260419_174710_sd-1`
+    - `267.575s / 57177.500J / 213.688W / 2.8655 tokens/J`
+    - delta vs baseline: `runtime +16.59% / avg_power -33.26% / energy -22.18% / tokens_per_j +28.51%`
+  - `static 1200 MHz`:
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1200_formal20_finetune_nw0_nosave_fixenv_20260420_r2_20260419_175317_sd-1`
+    - `261.969s / 57168.610J / 218.226W / 2.8659 tokens/J`
+    - delta vs baseline: `runtime +14.15% / avg_power -31.84% / energy -22.20% / tokens_per_j +28.53%`
+  - `static 1395 MHz`:
+    - `254.418s / 56385.520J / 221.626W / 2.9057 tokens/J`
+    - delta vs baseline: `runtime +10.86% / avg_power -30.78% / energy -23.26% / tokens_per_j +30.31%`
+  - `static 1500 MHz`:
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1500_formal20_finetune_nw0_nosave_fixenv_20260420_r4_20260420_002554_sd-1`
+    - `248.866s / 55554.388J / 223.230W / 2.9492 tokens/J`
+    - delta vs baseline: `runtime +8.44% / avg_power -30.28% / energy -24.39% / tokens_per_j +32.26%`
+  - `static 1650 MHz`:
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1650_formal20_finetune_nw0_nosave_fixenv_20260420_r4_20260420_003214_sd-1`
+    - `238.310s / 54380.384J / 228.192W / 3.0129 tokens/J`
+    - delta vs baseline: `runtime +3.84% / avg_power -28.73% / energy -25.99% / tokens_per_j +35.12%`
+  - interpretation:
+    - `1200 MHz` almost dominates `1005 MHz`: nearly identical total energy, but noticeably shorter runtime
+    - `1500 MHz` already improves on `1395 MHz` in both runtime and total energy
+    - `1650 MHz` is currently the strongest observed time-energy trade-off on this real-model Ethernet line
+- [2026-04-20] Ethernet real-model same-topology curve on `sd-1 + sd-2` has now been extended into the higher-frequency region with `1800 MHz` and `1950 MHz`:
+  - `static 1800 MHz`:
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1800_formal20_finetune_nw0_nosave_fixenv_20260420_r5_20260420_010053_sd-1`
+    - `239.220s / 55380.942J / 231.506W / 2.9584 tokens/J`
+    - delta vs baseline: `runtime +4.24% / avg_power -27.69% / energy -24.63% / tokens_per_j +32.68%`
+  - `static 1950 MHz`:
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1950_formal20_finetune_nw0_nosave_fixenv_20260420_r5_20260420_010704_sd-1`
+    - `237.601s / 55839.752J / 235.015W / 2.9341 tokens/J`
+    - delta vs baseline: `runtime +3.53% / avg_power -26.60% / energy -24.01% / tokens_per_j +31.59%`
+  - interpretation:
+    - both new high-frequency points completed `20/20` with `skipped=0`, so the Ethernet real-model line remains stable above `1500 MHz`
+    - `1950 MHz` is now the fastest observed fixed point, but the speed win over `1650 MHz` is small
+    - `1650 MHz` still dominates on energy and `tokens/J`, so it remains the best current sweet spot for this topology
+- [2026-04-20] Ethernet real-model same-topology curve on `sd-1 + sd-2` has now been extended further with `2100 MHz` and `2250 MHz`:
+  - `static 2100 MHz`:
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static2100_formal20_finetune_nw0_nosave_fixenv_20260420_r6_20260420_011555_sd-1`
+    - `239.100s / 56694.104J / 237.115W / 2.8899 tokens/J`
+    - delta vs baseline: `runtime +4.19% / avg_power -25.94% / energy -22.84% / tokens_per_j +29.61%`
+  - `static 2250 MHz`:
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static2250_formal20_finetune_nw0_nosave_fixenv_20260420_r6_20260420_012206_sd-1`
+    - `238.292s / 57151.293J / 239.837W / 2.8668 tokens/J`
+    - delta vs baseline: `runtime +3.83% / avg_power -25.09% / energy -22.22% / tokens_per_j +28.57%`
+  - interpretation:
+    - both new higher-frequency points also completed `20/20` with `skipped=0`, so the line remains operationally stable even above `1950 MHz`
+    - `2250 MHz` offers almost no runtime benefit versus `1650 MHz`, while clearly losing on energy and tokens/J
+    - this strengthens the conclusion that `1650 MHz` remains the best current sweet spot rather than merely an artifact of sparse sampling
 - [2026-04-19] First artifact-backed real-model same-topology baseline/static pair is now complete under `.context/eth_real_qwen25_7b_baseline_static_20260419/artifacts/`:
   - shared workload:
     - `sd-1 + sd-2`
