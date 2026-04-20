@@ -1,0 +1,271 @@
+============================================
+[watch] 2026-04-03 00:40:28 Starting watch loop
+============================================
+============================================
+[watch] 2026-04-03 00:42:03 Starting watch loop
+============================================
+============================================
+[watch] 2026-04-03 00:42:26 Starting watch loop
+============================================
+============================================
+[watch] 2026-04-03 00:42:35 Starting watch loop
+============================================
+============================================
+[watch] 2026-04-03 00:43:27 Starting watch loop
+============================================
+[watch] System clean at 2026年 04月 03日 星期五 00:43:27 CST. loadavg=0.73, no nsys stats. Proceeding.
+[watch] Running preflight before recollection...
+==============================================
+  Preflight Check Report
+==============================================
+Target GPUs : [8,9,10,11]
+Nodes       : [localhost,192.168.205.202]
+
+--- Node: localhost [PASS] ---
+  [PASS] node reachable
+  [PASS] GPU 8 utilization=0% (<= 5%)
+  [PASS] GPU 8 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 8 temp=30°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 9 utilization=0% (<= 5%)
+  [PASS] GPU 9 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 9 temp=30°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 10 utilization=0% (<= 5%)
+  [PASS] GPU 10 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 10 temp=34°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 11 utilization=0% (<= 5%)
+  [PASS] GPU 11 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 11 temp=34°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] loadavg=0.73 (< 1.0*4)
+  [WARN] found running python/CUDA processes on node
+  [INFO]   root        4229  0.0  0.0  38512 18028 ?        Ss    2025   0:00 /usr/bin/python3 /usr/bin/networkd-dispatcher --run-startup-triggers
+  [INFO]   root     1575944  0.0  0.0 565464 35332 ?        Ssl  3月06   5:33 /usr/bin/python3 /usr/sbin/notifier_nvsm
+  [PASS] no active compute processes on target GPUs [8,9,10,11]
+  [PASS] network ping to localhost OK
+
+--- Node: 192.168.205.202 [PASS] ---
+  [PASS] node reachable
+  [PASS] GPU 8 utilization=0% (<= 5%)
+  [PASS] GPU 8 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 8 temp=30°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 9 utilization=0% (<= 5%)
+  [PASS] GPU 9 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 9 temp=30°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 10 utilization=0% (<= 5%)
+  [PASS] GPU 10 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 10 temp=33°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 11 utilization=0% (<= 5%)
+  [PASS] GPU 11 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 11 temp=36°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] loadavg=0.34 (< 1.0*4)
+  [PASS] no obvious residue python/CUDA processes
+  [PASS] no active compute processes on target GPUs [8,9,10,11]
+  [PASS] network ping to 192.168.205.202 OK
+
+--- NCCL / Network ---
+  [true] SKIP: no NCCL test script provided
+
+==============================================
+  RESULT: ALL CHECKS PASSED
+==============================================
+
+============================================
+[collect] Freq=1080MHz | run_id=dual8_tp4pp1dp2_static1080_20260403_004329_DGX2-1
+============================================
+[collect] Freq=1080MHz completed.
+
+============================================
+[collect] Freq=1155MHz | run_id=dual8_tp4pp1dp2_static1155_20260403_011044_DGX2-1
+============================================
+============================================
+[watch] 2026-04-03 01:44:49 Starting watch loop
+============================================
+[watch] System clean at 2026年 04月 03日 星期五 01:44:49 CST. loadavg=1.18, no nsys stats. Proceeding.
+[watch] Running preflight before recollection...
+==============================================
+  Preflight Check Report
+==============================================
+Target GPUs : [8,9,10,11]
+Nodes       : [localhost,192.168.205.202]
+
+--- Node: localhost [PASS] ---
+  [PASS] node reachable
+  [PASS] GPU 8 utilization=0% (<= 5%)
+  [PASS] GPU 8 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 8 temp=34°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 9 utilization=0% (<= 5%)
+  [PASS] GPU 9 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 9 temp=34°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 10 utilization=0% (<= 5%)
+  [PASS] GPU 10 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 10 temp=38°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 11 utilization=0% (<= 5%)
+  [PASS] GPU 11 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 11 temp=38°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] loadavg=1.18 (< 1.0*4)
+  [WARN] found running python/CUDA processes on node
+  [INFO]   root        4229  0.0  0.0  38512 18028 ?        Ss    2025   0:00 /usr/bin/python3 /usr/bin/networkd-dispatcher --run-startup-triggers
+  [INFO]   root     1575944  0.0  0.0 565464 35332 ?        Ssl  3月06   5:33 /usr/bin/python3 /usr/sbin/notifier_nvsm
+  [PASS] no active compute processes on target GPUs [8,9,10,11]
+  [PASS] network ping to localhost OK
+
+--- Node: 192.168.205.202 [PASS] ---
+  [PASS] node reachable
+  [PASS] GPU 8 utilization=0% (<= 5%)
+  [PASS] GPU 8 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 8 temp=33°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 9 utilization=0% (<= 5%)
+  [PASS] GPU 9 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 9 temp=33°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 10 utilization=0% (<= 5%)
+  [PASS] GPU 10 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 10 temp=36°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 11 utilization=0% (<= 5%)
+  [PASS] GPU 11 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 11 temp=39°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] loadavg=0.44 (< 1.0*4)
+  [PASS] no obvious residue python/CUDA processes
+  [PASS] no active compute processes on target GPUs [8,9,10,11]
+  [PASS] network ping to 192.168.205.202 OK
+
+--- NCCL / Network ---
+  [true] SKIP: no NCCL test script provided
+
+==============================================
+  RESULT: ALL CHECKS PASSED
+==============================================
+
+============================================
+[collect] Freq=1080MHz | run_id=dual8_tp4pp1dp2_static1080_20260403_014451_DGX2-1
+============================================
+============================================
+[watch] 2026-04-03 01:51:25 Starting watch loop
+============================================
+[watch] System clean at 2026年 04月 03日 星期五 01:51:25 CST. loadavg=3.17, no nsys stats. Proceeding.
+[watch] Running preflight before recollection...
+==============================================
+  Preflight Check Report
+==============================================
+Target GPUs : [8,9,10,11]
+Nodes       : [localhost,192.168.205.202]
+
+--- Node: localhost [PASS] ---
+  [PASS] node reachable
+  [PASS] GPU 8 utilization=0% (<= 5%)
+  [PASS] GPU 8 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 8 temp=32°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 9 utilization=0% (<= 5%)
+  [PASS] GPU 9 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 9 temp=32°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 10 utilization=0% (<= 5%)
+  [PASS] GPU 10 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 10 temp=37°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 11 utilization=0% (<= 5%)
+  [PASS] GPU 11 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 11 temp=37°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] loadavg=3.17 (< 1.0*4)
+  [WARN] found running python/CUDA processes on node
+  [INFO]   root        4229  0.0  0.0  38512 18028 ?        Ss    2025   0:00 /usr/bin/python3 /usr/bin/networkd-dispatcher --run-startup-triggers
+  [INFO]   root     1575944  0.0  0.0 565464 35332 ?        Ssl  3月06   5:33 /usr/bin/python3 /usr/sbin/notifier_nvsm
+  [PASS] no active compute processes on target GPUs [8,9,10,11]
+  [PASS] network ping to localhost OK
+
+--- Node: 192.168.205.202 [PASS] ---
+  [PASS] node reachable
+  [PASS] GPU 8 utilization=0% (<= 5%)
+  [PASS] GPU 8 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 8 temp=32°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 9 utilization=0% (<= 5%)
+  [PASS] GPU 9 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 9 temp=31°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 10 utilization=0% (<= 5%)
+  [PASS] GPU 10 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 10 temp=35°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 11 utilization=0% (<= 5%)
+  [PASS] GPU 11 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 11 temp=38°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] loadavg=2.65 (< 1.0*4)
+  [PASS] no obvious residue python/CUDA processes
+  [PASS] no active compute processes on target GPUs [8,9,10,11]
+  [PASS] network ping to 192.168.205.202 OK
+
+--- NCCL / Network ---
+  [true] SKIP: no NCCL test script provided
+
+==============================================
+  RESULT: ALL CHECKS PASSED
+==============================================
+
+============================================
+[collect] Freq=1080MHz | run_id=dual8_tp4pp1dp2_static1080_20260403_015127_DGX2-1
+============================================
+============================================
+[watch] 2026-04-03 01:59:24 Starting watch loop
+============================================
+[watch] System clean at 2026年 04月 03日 星期五 01:59:24 CST. loadavg=3.21, no nsys stats. Proceeding.
+[watch] Running preflight before recollection...
+==============================================
+  Preflight Check Report
+==============================================
+Target GPUs : [8,9,10,11]
+Nodes       : [localhost,192.168.205.202]
+
+--- Node: localhost [PASS] ---
+  [PASS] node reachable
+  [PASS] GPU 8 utilization=0% (<= 5%)
+  [PASS] GPU 8 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 8 temp=32°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 9 utilization=0% (<= 5%)
+  [PASS] GPU 9 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 9 temp=32°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 10 utilization=0% (<= 5%)
+  [PASS] GPU 10 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 10 temp=37°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 11 utilization=0% (<= 5%)
+  [PASS] GPU 11 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 11 temp=37°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] loadavg=3.21 (< 1.0*4)
+  [WARN] found running python/CUDA processes on node
+  [INFO]   root        4229  0.0  0.0  38512 18028 ?        Ss    2025   0:00 /usr/bin/python3 /usr/bin/networkd-dispatcher --run-startup-triggers
+  [INFO]   root     1575944  0.0  0.0 565464 35332 ?        Ssl  3月06   5:33 /usr/bin/python3 /usr/sbin/notifier_nvsm
+  [PASS] no active compute processes on target GPUs [8,9,10,11]
+  [PASS] network ping to localhost OK
+
+--- Node: 192.168.205.202 [PASS] ---
+  [PASS] node reachable
+  [PASS] GPU 8 utilization=0% (<= 5%)
+  [PASS] GPU 8 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 8 temp=32°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 9 utilization=0% (<= 5%)
+  [PASS] GPU 9 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 9 temp=31°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 10 utilization=0% (<= 5%)
+  [PASS] GPU 10 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 10 temp=36°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] GPU 11 utilization=0% (<= 5%)
+  [PASS] GPU 11 memory.used=0MB (<= 1024MB)
+  [INFO] GPU 11 temp=39°C clock=135/1380MHz name=Tesla V100-SXM3-32GB
+  [PASS] loadavg=3.08 (< 1.0*4)
+  [PASS] no obvious residue python/CUDA processes
+  [PASS] no active compute processes on target GPUs [8,9,10,11]
+  [PASS] network ping to 192.168.205.202 OK
+
+--- NCCL / Network ---
+  [true] SKIP: no NCCL test script provided
+
+==============================================
+  RESULT: ALL CHECKS PASSED
+==============================================
+
+============================================
+[collect] Freq=1080MHz | run_id=dual8_tp4pp1dp2_static1080_20260403_015926_DGX2-1
+============================================
+[collect] Freq=1080MHz completed.
+
+============================================
+[collect] Freq=1155MHz | run_id=dual8_tp4pp1dp2_static1155_20260403_020750_DGX2-1
+============================================
+[collect] Freq=1155MHz completed.
+
+============================================
+[collect] All re-collection frequencies completed.
+============================================

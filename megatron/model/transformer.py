@@ -24,7 +24,14 @@ from megatron.model.utils import attention_mask_func, openai_gelu, erf_gelu
 import deepspeed
 from deepspeed.moe.layer import MoE
 from deepspeed.accelerator import get_accelerator
-from deepspeed.sequence.fpdt_layer import FPDT_FFN, FPDT_Attention
+
+try:
+    from deepspeed.sequence.fpdt_layer import FPDT_FFN, FPDT_Attention
+    fpdt_supported = True
+except ImportError:
+    FPDT_FFN = None
+    FPDT_Attention = None
+    fpdt_supported = False
 
 try:
     from deepspeed.sequence.layer import DistributedAttention
@@ -56,6 +63,16 @@ except ImportError:
 
 FlashAttentionBuilder = get_accelerator().get_op_builder("FlashAttentionBuilder")
 flash_attn_builder = None
+
+
+def _require_fpdt_support():
+    if fpdt_supported:
+        return
+    raise ImportError(
+        "DeepSpeed FPDT sequence parallel support is not available in the current "
+        "environment. Disable --ds-sequence-parallel-fpdt or install a DeepSpeed "
+        "build that provides deepspeed.sequence.fpdt_layer."
+    )
 
 
 """ We use the following notation throughout this file:
@@ -161,6 +178,7 @@ class ParallelMLP(MegatronModule):
         
         self.ds_sequence_parallel_fpdt = args.ds_sequence_parallel_fpdt
         if self.ds_sequence_parallel_fpdt:
+            _require_fpdt_support()
             self.fpdt_FFN_chunk_size = int(args.ds_sequence_parallel_fpdt_chunk_size // mpu.get_sequence_parallel_world_size() // 2)
 
     def forward(self, hidden_states):
@@ -920,6 +938,7 @@ def bias_dropout_add_fused_inference(x: torch.Tensor,
 
 
 def launch_chunk_attention(args, config):
+    _require_fpdt_support()
     assert args.num_attention_heads % parallel_state.get_sequence_parallel_world_size() == 0
             
     projection_size = config.kv_channels * config.num_attention_heads

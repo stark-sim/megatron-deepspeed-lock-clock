@@ -1,0 +1,19 @@
+{
+  "entries": [
+    {
+      "hostname": "localhost",
+      "slots": 16
+    }
+  ],
+  "path": "/tmp/chicago_localhost_16.hostfile",
+  "preflight_required": false,
+  "raw_text": "localhost slots=16\n",
+  "selected_hosts": [
+    {
+      "hostname": "localhost",
+      "slots": 16
+    }
+  ],
+  "selection_reason": "first 1 host(s) from hostfile order",
+  "sha1": "5148e3f0e47df5ae8d39b4384df993b8984dccd5"
+}

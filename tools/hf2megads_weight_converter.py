@@ -2,6 +2,7 @@ import torch
 import re
 import sys
 import os
+import json
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch.distributed
 from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
@@ -139,8 +140,15 @@ class refactor:
         self.num_attention_heads = args.num_attention_heads
         self.num_key_value_heads = args.num_key_value_heads
         self.mega_lm_head_wnum = self.mega_norm_wnum + 1
-        self.token_vocab = tokenizer.vocab_size
-        self.padded_vocab_size = args.padded_vocab_size
+        # Qwen-family HF checkpoints can carry more embedding rows than
+        # tokenizer.vocab_size reports because of reserved/special rows.
+        # During HF -> Megatron conversion, trust the checkpoint tensor shape
+        # first so the embedding/lm_head copy does not assert on vocab mismatch.
+        if isinstance(hf_model, dict) and "model.embed_tokens.weight" in hf_model:
+            self.token_vocab = hf_model["model.embed_tokens.weight"].shape[0]
+        else:
+            self.token_vocab = tokenizer.vocab_size
+        self.padded_vocab_size = max(args.padded_vocab_size, self.token_vocab)
         self.more_padded = self.padded_vocab_size - self.token_vocab
         self.tp_size = mpu.get_tensor_model_parallel_world_size()
         self.tp_rank = mpu.get_tensor_model_parallel_rank()
@@ -475,9 +483,37 @@ def load_hf_weights(args, no_init):
         return load_and_print_hf_weight_auto(args.hf_ckpt_dir, no_init)
 
 
+def maybe_align_vocab_size_from_hf(args):
+    if args.to_hf_ckpt or not args.hf_ckpt_dir:
+        return
+
+    config_path = os.path.join(args.hf_ckpt_dir, "config.json")
+    if not os.path.isfile(config_path):
+        return
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        hf_vocab_size = json.load(f).get("vocab_size")
+
+    if not hf_vocab_size:
+        return
+
+    multiple = args.make_vocab_size_divisible_by * args.tensor_model_parallel_size
+    padded_hf_vocab_size = hf_vocab_size
+    while padded_hf_vocab_size % multiple != 0:
+        padded_hf_vocab_size += 1
+
+    if args.padded_vocab_size < padded_hf_vocab_size:
+        print_rank_0(
+            f"Adjusting padded_vocab_size from {args.padded_vocab_size} to {padded_hf_vocab_size} "
+            f"to match HF checkpoint vocab rows {hf_vocab_size}"
+        )
+        args.padded_vocab_size = padded_hf_vocab_size
+
+
 def convert_ckpt():
     """Build the model."""
     args = get_args()
+    maybe_align_vocab_size_from_hf(args)
     print_rank_0(f'building model ...')
     see_memory_usage(f"Before Building Model", force=True)
 

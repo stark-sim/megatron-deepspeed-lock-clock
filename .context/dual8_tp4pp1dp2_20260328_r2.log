@@ -1,0 +1,1220 @@
+[dual8] freq=990 port=29960 run_id=dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1
+[2026-03-28 00:24:12,790] [INFO] [multinode_runner.py:85:get_cmd] Running on the following workers: localhost,192.168.205.202
+[2026-03-28 00:24:12,790] [INFO] [runner.py:630:main] cmd = pdsh -S -f 1024 -w localhost,192.168.205.202 export NCCL_RAS_ENABLE=0; export NCCL_SOCKET_IFNAME=tailscale0; export PYTHONPATH=/home/sd/Megatron-DeepSpeed:/home/sd/Megatron-DeepSpeed:/home/sd/.local/lib/python3.10/site-packages:; export NCCL_IB_DISABLE=1;  cd /home/sd/Megatron-DeepSpeed; /usr/bin/python3 -u -m deepspeed.launcher.launch --world_info=eyJsb2NhbGhvc3QiOiBbMCwgMSwgMiwgM10sICIxOTIuMTY4LjIwNS4yMDIiOiBbMCwgMSwgMiwgM119 --node_rank=%n --master_addr=192.168.205.201 --master_port=29960 --enable_each_rank_log=None pretrain_gpt.py --tensor-model-parallel-size 4 --pipeline-model-parallel-size 1 --num-layers 28 --hidden-size 3584 --ffn-hidden-size 18944 --num-attention-heads 28 --num-key-value-heads 4 --micro-batch-size 1 --global-batch-size 8 --seq-length 2048 --max-position-embeddings 2048 --train-iters 20 --data-path /home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document --data-impl mmap --tokenizer-type HFTokenizer --tokenizer-model /home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat --split 98,2,0 --distributed-backend nccl --lr 1e-5 --lr-decay-style cosine --min-lr 1e-6 --weight-decay 0.01 --clip-grad 1.0 --lr-warmup-iters 19 --optimizer adam --adam-beta1 0.9 --adam-beta2 0.95 --adam-eps 1e-8 --log-interval 1 --save-interval 0 --eval-interval 100 --eval-iters 10 --no-query-key-layer-scaling --attention-dropout 0 --hidden-dropout 0 --use-rotary-position-embeddings --untie-embeddings-and-output-weights --swiglu --normalization rmsnorm --disable-bias-linear --no-position-embedding --no-masked-softmax-fusion --no-bias-gelu-fusion --no-bias-dropout-fusion --recompute-granularity full --recompute-method uniform --deepspeed-activation-checkpointing --zero-stage=1 --deepspeed_config=/home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json --deepspeed --experiment-run-id dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1 --experiment-name dual8_tp4pp1dp2_static990 --experiment-root-dir /home/sd/Megatron-DeepSpeed/experiments --bf16
+192.168.205.202: [2026-03-28 00:24:19,082] [INFO] [launch.py:155:main] 1 NCCL_RAS_ENABLE=0
+192.168.205.202: [2026-03-28 00:24:19,082] [INFO] [launch.py:155:main] 1 NCCL_SOCKET_IFNAME=tailscale0
+192.168.205.202: [2026-03-28 00:24:19,082] [INFO] [launch.py:155:main] 1 NCCL_IB_DISABLE=1
+192.168.205.202: [2026-03-28 00:24:19,082] [INFO] [launch.py:162:main] WORLD INFO DICT: {'localhost': [0, 1, 2, 3], '192.168.205.202': [0, 1, 2, 3]}
+192.168.205.202: [2026-03-28 00:24:19,083] [INFO] [launch.py:168:main] nnodes=2, num_local_procs=4, node_rank=1
+192.168.205.202: [2026-03-28 00:24:19,083] [INFO] [launch.py:179:main] global_rank_mapping=defaultdict(<class 'list'>, {'localhost': [0, 1, 2, 3], '192.168.205.202': [4, 5, 6, 7]})
+192.168.205.202: [2026-03-28 00:24:19,083] [INFO] [launch.py:180:main] dist_world_size=8
+192.168.205.202: [2026-03-28 00:24:19,083] [INFO] [launch.py:184:main] Setting CUDA_VISIBLE_DEVICES=0,1,2,3
+192.168.205.202: [2026-03-28 00:24:19,083] [INFO] [launch.py:272:main] process 484141 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=0', '--tensor-model-parallel-size', '4', '--pipeline-model-parallel-size', '1', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--micro-batch-size', '1', '--global-batch-size', '8', '--seq-length', '2048', '--max-position-embeddings', '2048', '--train-iters', '20', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--lr', '1e-5', '--lr-decay-style', 'cosine', '--min-lr', '1e-6', '--weight-decay', '0.01', '--clip-grad', '1.0', '--lr-warmup-iters', '19', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--log-interval', '1', '--save-interval', '0', '--eval-interval', '100', '--eval-iters', '10', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing', '--zero-stage=1', '--deepspeed_config=/home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json', '--deepspeed', '--experiment-run-id', 'dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1', '--experiment-name', 'dual8_tp4pp1dp2_static990', '--experiment-root-dir', '/home/sd/Megatron-DeepSpeed/experiments', '--bf16']
+192.168.205.202: [2026-03-28 00:24:19,084] [INFO] [launch.py:272:main] process 484142 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=1', '--tensor-model-parallel-size', '4', '--pipeline-model-parallel-size', '1', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--micro-batch-size', '1', '--global-batch-size', '8', '--seq-length', '2048', '--max-position-embeddings', '2048', '--train-iters', '20', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--lr', '1e-5', '--lr-decay-style', 'cosine', '--min-lr', '1e-6', '--weight-decay', '0.01', '--clip-grad', '1.0', '--lr-warmup-iters', '19', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--log-interval', '1', '--save-interval', '0', '--eval-interval', '100', '--eval-iters', '10', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing', '--zero-stage=1', '--deepspeed_config=/home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json', '--deepspeed', '--experiment-run-id', 'dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1', '--experiment-name', 'dual8_tp4pp1dp2_static990', '--experiment-root-dir', '/home/sd/Megatron-DeepSpeed/experiments', '--bf16']
+192.168.205.202: [2026-03-28 00:24:19,085] [INFO] [launch.py:272:main] process 484143 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=2', '--tensor-model-parallel-size', '4', '--pipeline-model-parallel-size', '1', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--micro-batch-size', '1', '--global-batch-size', '8', '--seq-length', '2048', '--max-position-embeddings', '2048', '--train-iters', '20', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--lr', '1e-5', '--lr-decay-style', 'cosine', '--min-lr', '1e-6', '--weight-decay', '0.01', '--clip-grad', '1.0', '--lr-warmup-iters', '19', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--log-interval', '1', '--save-interval', '0', '--eval-interval', '100', '--eval-iters', '10', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing', '--zero-stage=1', '--deepspeed_config=/home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json', '--deepspeed', '--experiment-run-id', 'dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1', '--experiment-name', 'dual8_tp4pp1dp2_static990', '--experiment-root-dir', '/home/sd/Megatron-DeepSpeed/experiments', '--bf16']
+192.168.205.202: [2026-03-28 00:24:19,085] [INFO] [launch.py:272:main] process 484144 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=3', '--tensor-model-parallel-size', '4', '--pipeline-model-parallel-size', '1', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--micro-batch-size', '1', '--global-batch-size', '8', '--seq-length', '2048', '--max-position-embeddings', '2048', '--train-iters', '20', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--lr', '1e-5', '--lr-decay-style', 'cosine', '--min-lr', '1e-6', '--weight-decay', '0.01', '--clip-grad', '1.0', '--lr-warmup-iters', '19', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--log-interval', '1', '--save-interval', '0', '--eval-interval', '100', '--eval-iters', '10', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing', '--zero-stage=1', '--deepspeed_config=/home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json', '--deepspeed', '--experiment-run-id', 'dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1', '--experiment-name', 'dual8_tp4pp1dp2_static990', '--experiment-root-dir', '/home/sd/Megatron-DeepSpeed/experiments', '--bf16']
+localhost: [2026-03-28 00:24:20,397] [INFO] [launch.py:155:main] 0 NCCL_RAS_ENABLE=0
+localhost: [2026-03-28 00:24:20,397] [INFO] [launch.py:155:main] 0 NCCL_SOCKET_IFNAME=tailscale0
+localhost: [2026-03-28 00:24:20,397] [INFO] [launch.py:155:main] 0 NCCL_IB_DISABLE=1
+localhost: [2026-03-28 00:24:20,397] [INFO] [launch.py:162:main] WORLD INFO DICT: {'localhost': [0, 1, 2, 3], '192.168.205.202': [0, 1, 2, 3]}
+localhost: [2026-03-28 00:24:20,397] [INFO] [launch.py:168:main] nnodes=2, num_local_procs=4, node_rank=0
+localhost: [2026-03-28 00:24:20,397] [INFO] [launch.py:179:main] global_rank_mapping=defaultdict(<class 'list'>, {'localhost': [0, 1, 2, 3], '192.168.205.202': [4, 5, 6, 7]})
+localhost: [2026-03-28 00:24:20,397] [INFO] [launch.py:180:main] dist_world_size=8
+localhost: [2026-03-28 00:24:20,397] [INFO] [launch.py:184:main] Setting CUDA_VISIBLE_DEVICES=0,1,2,3
+localhost: [2026-03-28 00:24:20,398] [INFO] [launch.py:272:main] process 3719419 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=0', '--tensor-model-parallel-size', '4', '--pipeline-model-parallel-size', '1', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--micro-batch-size', '1', '--global-batch-size', '8', '--seq-length', '2048', '--max-position-embeddings', '2048', '--train-iters', '20', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--lr', '1e-5', '--lr-decay-style', 'cosine', '--min-lr', '1e-6', '--weight-decay', '0.01', '--clip-grad', '1.0', '--lr-warmup-iters', '19', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--log-interval', '1', '--save-interval', '0', '--eval-interval', '100', '--eval-iters', '10', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing', '--zero-stage=1', '--deepspeed_config=/home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json', '--deepspeed', '--experiment-run-id', 'dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1', '--experiment-name', 'dual8_tp4pp1dp2_static990', '--experiment-root-dir', '/home/sd/Megatron-DeepSpeed/experiments', '--bf16']
+localhost: [2026-03-28 00:24:20,399] [INFO] [launch.py:272:main] process 3719420 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=1', '--tensor-model-parallel-size', '4', '--pipeline-model-parallel-size', '1', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--micro-batch-size', '1', '--global-batch-size', '8', '--seq-length', '2048', '--max-position-embeddings', '2048', '--train-iters', '20', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--lr', '1e-5', '--lr-decay-style', 'cosine', '--min-lr', '1e-6', '--weight-decay', '0.01', '--clip-grad', '1.0', '--lr-warmup-iters', '19', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--log-interval', '1', '--save-interval', '0', '--eval-interval', '100', '--eval-iters', '10', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing', '--zero-stage=1', '--deepspeed_config=/home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json', '--deepspeed', '--experiment-run-id', 'dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1', '--experiment-name', 'dual8_tp4pp1dp2_static990', '--experiment-root-dir', '/home/sd/Megatron-DeepSpeed/experiments', '--bf16']
+localhost: [2026-03-28 00:24:20,400] [INFO] [launch.py:272:main] process 3719421 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=2', '--tensor-model-parallel-size', '4', '--pipeline-model-parallel-size', '1', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--micro-batch-size', '1', '--global-batch-size', '8', '--seq-length', '2048', '--max-position-embeddings', '2048', '--train-iters', '20', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--lr', '1e-5', '--lr-decay-style', 'cosine', '--min-lr', '1e-6', '--weight-decay', '0.01', '--clip-grad', '1.0', '--lr-warmup-iters', '19', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--log-interval', '1', '--save-interval', '0', '--eval-interval', '100', '--eval-iters', '10', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing', '--zero-stage=1', '--deepspeed_config=/home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json', '--deepspeed', '--experiment-run-id', 'dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1', '--experiment-name', 'dual8_tp4pp1dp2_static990', '--experiment-root-dir', '/home/sd/Megatron-DeepSpeed/experiments', '--bf16']
+localhost: [2026-03-28 00:24:20,400] [INFO] [launch.py:272:main] process 3719422 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=3', '--tensor-model-parallel-size', '4', '--pipeline-model-parallel-size', '1', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--micro-batch-size', '1', '--global-batch-size', '8', '--seq-length', '2048', '--max-position-embeddings', '2048', '--train-iters', '20', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--lr', '1e-5', '--lr-decay-style', 'cosine', '--min-lr', '1e-6', '--weight-decay', '0.01', '--clip-grad', '1.0', '--lr-warmup-iters', '19', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--log-interval', '1', '--save-interval', '0', '--eval-interval', '100', '--eval-iters', '10', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing', '--zero-stage=1', '--deepspeed_config=/home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json', '--deepspeed', '--experiment-run-id', 'dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1', '--experiment-name', 'dual8_tp4pp1dp2_static990', '--experiment-root-dir', '/home/sd/Megatron-DeepSpeed/experiments', '--bf16']
+192.168.205.202: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+192.168.205.202:   def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+192.168.205.202: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+192.168.205.202:   def backward(ctx, grad_output):
+192.168.205.202: --------------------------------------------------
+192.168.205.202: DeepSpeed C++/CUDA extension op report
+192.168.205.202: --------------------------------------------------
+192.168.205.202: NOTE: Ops not installed will be just-in-time (JIT) compiled at
+192.168.205.202:       runtime if needed. Op compatibility means that your system
+192.168.205.202:       meet the required dependencies to JIT install the op.
+192.168.205.202: --------------------------------------------------
+192.168.205.202: JIT compiled ops requires ninja
+192.168.205.202: ninja .................. [91m[FAIL][0m
+192.168.205.202: --------------------------------------------------
+192.168.205.202: op name ................ installed .. compatible
+192.168.205.202: --------------------------------------------------
+192.168.205.202: [93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+192.168.205.202: [93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+192.168.205.202: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+192.168.205.202: async_io ............... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: [93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+192.168.205.202: evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: [93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+192.168.205.202: [93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+192.168.205.202: fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+192.168.205.202:   def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+192.168.205.202: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+192.168.205.202:   def backward(ctx, grad_output):
+192.168.205.202: --------------------------------------------------
+192.168.205.202: DeepSpeed C++/CUDA extension op report
+192.168.205.202: --------------------------------------------------
+192.168.205.202: NOTE: Ops not installed will be just-in-time (JIT) compiled at
+192.168.205.202:       runtime if needed. Op compatibility means that your system
+192.168.205.202:       meet the required dependencies to JIT install the op.
+192.168.205.202: --------------------------------------------------
+192.168.205.202: JIT compiled ops requires ninja
+192.168.205.202: ninja .................. [91m[FAIL][0m
+192.168.205.202: --------------------------------------------------
+192.168.205.202: op name ................ installed .. compatible
+192.168.205.202: --------------------------------------------------
+192.168.205.202: [93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+192.168.205.202: [93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+192.168.205.202: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+192.168.205.202: async_io ............... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: [93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+192.168.205.202: evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: [93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+192.168.205.202: [93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+192.168.205.202: fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: [93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+192.168.205.202: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+192.168.205.202:   def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+192.168.205.202: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+192.168.205.202:   def backward(ctx, grad_output):
+192.168.205.202: [93m [WARNING] [0m gds: please install the libaio-dev package with apt
+192.168.205.202: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+192.168.205.202: gds .................... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: [93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+192.168.205.202: [93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+192.168.205.202: sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: --------------------------------------------------
+192.168.205.202: DeepSpeed general environment info:
+192.168.205.202: torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+192.168.205.202: torch version .................... 2.9.1+cu128
+192.168.205.202: deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+192.168.205.202: deepspeed info ................... 0.18.3, unknown, unknown
+192.168.205.202: torch cuda version ............... 12.8
+192.168.205.202: torch hip version ................ None
+192.168.205.202: nvcc version ..................... 12.8
+192.168.205.202: deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+192.168.205.202: shared memory (/dev/shm) size .... 755.27 GB
+192.168.205.202: fatal: not a git repository (or any of the parent directories): .git
+192.168.205.202: **** Git info for Megatron: git_hash=unknown git_branch=unknown ****
+192.168.205.202: --------------------------------------------------
+192.168.205.202: DeepSpeed C++/CUDA extension op report
+192.168.205.202: --------------------------------------------------
+192.168.205.202: NOTE: Ops not installed will be just-in-time (JIT) compiled at
+192.168.205.202:       runtime if needed. Op compatibility means that your system
+192.168.205.202:       meet the required dependencies to JIT install the op.
+192.168.205.202: --------------------------------------------------
+192.168.205.202: JIT compiled ops requires ninja
+192.168.205.202: ninja .................. [91m[FAIL][0m
+192.168.205.202: --------------------------------------------------
+192.168.205.202: op name ................ installed .. compatible
+192.168.205.202: --------------------------------------------------
+192.168.205.202: [93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+192.168.205.202: [93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+192.168.205.202: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+192.168.205.202: async_io ............... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: [93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+192.168.205.202: evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: [93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+192.168.205.202: [93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+192.168.205.202: fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: [93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+192.168.205.202: [93m [WARNING] [0m gds: please install the libaio-dev package with apt
+192.168.205.202: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+192.168.205.202: gds .................... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: [93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+192.168.205.202: [93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+192.168.205.202: sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: --------------------------------------------------
+192.168.205.202: DeepSpeed general environment info:
+192.168.205.202: torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+192.168.205.202: torch version .................... 2.9.1+cu128
+192.168.205.202: deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+192.168.205.202: deepspeed info ................... 0.18.3, unknown, unknown
+192.168.205.202: torch cuda version ............... 12.8
+192.168.205.202: torch hip version ................ None
+192.168.205.202: nvcc version ..................... 12.8
+192.168.205.202: deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+192.168.205.202: shared memory (/dev/shm) size .... 755.27 GB
+192.168.205.202: fatal: not a git repository (or any of the parent directories): .git
+192.168.205.202: **** Git info for Megatron: git_hash=unknown git_branch=unknown ****
+192.168.205.202: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+192.168.205.202:   def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+192.168.205.202: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+192.168.205.202:   def backward(ctx, grad_output):
+192.168.205.202: [93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+192.168.205.202: [93m [WARNING] [0m gds: please install the libaio-dev package with apt
+192.168.205.202: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+192.168.205.202: gds .................... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: [93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+192.168.205.202: [93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+192.168.205.202: sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: --------------------------------------------------
+192.168.205.202: DeepSpeed general environment info:
+192.168.205.202: torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+192.168.205.202: torch version .................... 2.9.1+cu128
+192.168.205.202: deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+192.168.205.202: deepspeed info ................... 0.18.3, unknown, unknown
+192.168.205.202: torch cuda version ............... 12.8
+192.168.205.202: torch hip version ................ None
+192.168.205.202: nvcc version ..................... 12.8
+192.168.205.202: deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+192.168.205.202: shared memory (/dev/shm) size .... 755.27 GB
+192.168.205.202: fatal: not a git repository (or any of the parent directories): .git
+192.168.205.202: **** Git info for Megatron: git_hash=unknown git_branch=unknown ****
+192.168.205.202: --------------------------------------------------
+192.168.205.202: DeepSpeed C++/CUDA extension op report
+192.168.205.202: --------------------------------------------------
+192.168.205.202: NOTE: Ops not installed will be just-in-time (JIT) compiled at
+192.168.205.202:       runtime if needed. Op compatibility means that your system
+192.168.205.202:       meet the required dependencies to JIT install the op.
+192.168.205.202: --------------------------------------------------
+192.168.205.202: JIT compiled ops requires ninja
+192.168.205.202: ninja .................. [91m[FAIL][0m
+192.168.205.202: --------------------------------------------------
+192.168.205.202: op name ................ installed .. compatible
+192.168.205.202: --------------------------------------------------
+192.168.205.202: [93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+192.168.205.202: [93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+192.168.205.202: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+192.168.205.202: async_io ............... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: [93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+192.168.205.202: evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: [93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+192.168.205.202: [93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+192.168.205.202: fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: [93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+192.168.205.202: [93m [WARNING] [0m gds: please install the libaio-dev package with apt
+192.168.205.202: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+192.168.205.202: gds .................... [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: [93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+192.168.205.202: [93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+192.168.205.202: sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+192.168.205.202: spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+192.168.205.202: --------------------------------------------------
+192.168.205.202: DeepSpeed general environment info:
+192.168.205.202: torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+192.168.205.202: torch version .................... 2.9.1+cu128
+192.168.205.202: deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+192.168.205.202: deepspeed info ................... 0.18.3, unknown, unknown
+192.168.205.202: torch cuda version ............... 12.8
+192.168.205.202: torch hip version ................ None
+192.168.205.202: nvcc version ..................... 12.8
+192.168.205.202: deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+192.168.205.202: shared memory (/dev/shm) size .... 755.27 GB
+192.168.205.202: fatal: not a git repository (or any of the parent directories): .git
+192.168.205.202: **** Git info for Megatron: git_hash=unknown git_branch=unknown ****
+192.168.205.202: WARNING: WANDB writing requested but no legit wandb project or experiment name provided, therefore no WANDB logs will be written according to random generated project or experiment name.
+localhost: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+localhost:   def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+localhost: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+localhost:   def backward(ctx, grad_output):
+localhost: --------------------------------------------------
+localhost: DeepSpeed C++/CUDA extension op report
+localhost: --------------------------------------------------
+localhost: NOTE: Ops not installed will be just-in-time (JIT) compiled at
+localhost:       runtime if needed. Op compatibility means that your system
+localhost:       meet the required dependencies to JIT install the op.
+localhost: --------------------------------------------------
+localhost: JIT compiled ops requires ninja
+localhost: ninja .................. [91m[FAIL][0m
+localhost: --------------------------------------------------
+localhost: op name ................ installed .. compatible
+localhost: --------------------------------------------------
+localhost: [93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+localhost: [93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+localhost: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+localhost: async_io ............... [93m[NO][0m ....... [93m[NO][0m
+localhost: fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: [93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+localhost: evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+localhost: [93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+localhost: [93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+localhost: fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+localhost: fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: [93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+localhost: [93m [WARNING] [0m gds: please install the libaio-dev package with apt
+localhost: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+localhost: gds .................... [93m[NO][0m ....... [93m[NO][0m
+localhost: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+localhost:   def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+localhost: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+localhost:   def backward(ctx, grad_output):
+localhost: transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: [93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+localhost: [93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+localhost: sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+localhost: spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+localhost: utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: --------------------------------------------------
+localhost: DeepSpeed general environment info:
+localhost: torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+localhost: torch version .................... 2.9.1+cu128
+localhost: deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+localhost: deepspeed info ................... 0.18.3, unknown, unknown
+localhost: torch cuda version ............... 12.8
+localhost: torch hip version ................ None
+localhost: nvcc version ..................... 12.8
+localhost: deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+localhost: shared memory (/dev/shm) size .... 755.27 GB
+localhost: **** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+localhost: --------------------------------------------------
+localhost: DeepSpeed C++/CUDA extension op report
+localhost: --------------------------------------------------
+localhost: NOTE: Ops not installed will be just-in-time (JIT) compiled at
+localhost:       runtime if needed. Op compatibility means that your system
+localhost:       meet the required dependencies to JIT install the op.
+localhost: --------------------------------------------------
+localhost: JIT compiled ops requires ninja
+localhost: ninja .................. [91m[FAIL][0m
+localhost: --------------------------------------------------
+localhost: op name ................ installed .. compatible
+localhost: --------------------------------------------------
+localhost: [93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+localhost: [93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+localhost: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+localhost: async_io ............... [93m[NO][0m ....... [93m[NO][0m
+localhost: fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: [93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+localhost: evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+localhost: [93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+localhost: [93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+localhost: fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+localhost: fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+localhost:   def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+localhost: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+localhost:   def backward(ctx, grad_output):
+localhost: [93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+localhost: [93m [WARNING] [0m gds: please install the libaio-dev package with apt
+localhost: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+localhost: gds .................... [93m[NO][0m ....... [93m[NO][0m
+localhost: transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: --------------------------------------------------
+localhost: DeepSpeed C++/CUDA extension op report
+localhost: --------------------------------------------------
+localhost: NOTE: Ops not installed will be just-in-time (JIT) compiled at
+localhost:       runtime if needed. Op compatibility means that your system
+localhost:       meet the required dependencies to JIT install the op.
+localhost: --------------------------------------------------
+localhost: JIT compiled ops requires ninja
+localhost: ninja .................. [91m[FAIL][0m
+localhost: --------------------------------------------------
+localhost: op name ................ installed .. compatible
+localhost: --------------------------------------------------
+localhost: ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: [93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+localhost: [93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+localhost: sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+localhost: spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+localhost: utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: --------------------------------------------------
+localhost: DeepSpeed general environment info:
+localhost: torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+localhost: torch version .................... 2.9.1+cu128
+localhost: deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+localhost: deepspeed info ................... 0.18.3, unknown, unknown
+localhost: torch cuda version ............... 12.8
+localhost: torch hip version ................ None
+localhost: nvcc version ..................... 12.8
+localhost: deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+localhost: shared memory (/dev/shm) size .... 755.27 GB
+localhost: **** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+localhost: [93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+localhost: [93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+localhost: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+localhost: async_io ............... [93m[NO][0m ....... [93m[NO][0m
+localhost: fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: [93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+localhost: evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+localhost: [93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+localhost: [93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+localhost: fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+localhost: fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+localhost:   def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+localhost: /home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+localhost:   def backward(ctx, grad_output):
+localhost: --------------------------------------------------
+localhost: DeepSpeed C++/CUDA extension op report
+localhost: --------------------------------------------------
+localhost: NOTE: Ops not installed will be just-in-time (JIT) compiled at
+localhost:       runtime if needed. Op compatibility means that your system
+localhost:       meet the required dependencies to JIT install the op.
+localhost: --------------------------------------------------
+localhost: JIT compiled ops requires ninja
+localhost: ninja .................. [91m[FAIL][0m
+localhost: --------------------------------------------------
+localhost: op name ................ installed .. compatible
+localhost: --------------------------------------------------
+localhost: [93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+localhost: [93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+localhost: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+localhost: async_io ............... [93m[NO][0m ....... [93m[NO][0m
+localhost: fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: [93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+localhost: evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+localhost: [93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+localhost: [93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+localhost: fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+localhost: fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: [93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+localhost: [93m [WARNING] [0m gds: please install the libaio-dev package with apt
+localhost: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+localhost: gds .................... [93m[NO][0m ....... [93m[NO][0m
+localhost: transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: [93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+localhost: [93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+localhost: sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+localhost: spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+localhost: utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: --------------------------------------------------
+localhost: DeepSpeed general environment info:
+localhost: torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+localhost: torch version .................... 2.9.1+cu128
+localhost: deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+localhost: deepspeed info ................... 0.18.3, unknown, unknown
+localhost: torch cuda version ............... 12.8
+localhost: torch hip version ................ None
+localhost: nvcc version ..................... 12.8
+localhost: deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+localhost: shared memory (/dev/shm) size .... 755.27 GB
+localhost: **** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+localhost: [93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+localhost: [93m [WARNING] [0m gds: please install the libaio-dev package with apt
+localhost: [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+localhost: gds .................... [93m[NO][0m ....... [93m[NO][0m
+localhost: transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: [93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+localhost: [93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+localhost: sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+localhost: spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+localhost: transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+localhost: stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+localhost: utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+localhost: --------------------------------------------------
+localhost: DeepSpeed general environment info:
+localhost: torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+localhost: torch version .................... 2.9.1+cu128
+localhost: deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+localhost: deepspeed info ................... 0.18.3, unknown, unknown
+localhost: torch cuda version ............... 12.8
+localhost: torch hip version ................ None
+localhost: nvcc version ..................... 12.8
+localhost: deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+localhost: shared memory (/dev/shm) size .... 755.27 GB
+localhost: **** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+localhost: using world size: 8, data-parallel-size: 2, sequence-parallel size: 1, tensor-model-parallel size: 4, pipeline-model-parallel size: 1 
+localhost: WARNING: overriding default arguments for tokenizer_type:GPT2BPETokenizer                        with tokenizer_type:HFTokenizer
+localhost: accumulate and all-reduce gradients in fp32 for bfloat16 data type.
+localhost: using torch.bfloat16 for parameters ...
+localhost: ------------------------ arguments ------------------------
+localhost:   accumulate_allreduce_grads_in_fp32 .............. True
+localhost:   adam_beta1 ...................................... 0.9
+localhost:   adam_beta2 ...................................... 0.95
+localhost:   adam_eps ........................................ 1e-08
+localhost:   add_bias_linear ................................. False
+localhost:   add_position_embedding .......................... False
+localhost:   adlr_autoresume ................................. False
+localhost:   adlr_autoresume_interval ........................ 1000
+localhost:   aml_data_download_path .......................... None
+localhost:   apply_layernorm_1p .............................. False
+localhost:   apply_query_key_layer_scaling ................... False
+localhost:   apply_residual_connection_post_layernorm ........ False
+localhost:   async_tensor_model_parallel_allreduce ........... False
+localhost:   attention_dropout ............................... 0.0
+localhost:   attention_softmax_in_fp32 ....................... False
+localhost:   barrier_with_L1_time ............................ True
+localhost:   bert_binary_head ................................ True
+localhost:   bert_embedder_type .............................. megatron
+localhost:   bert_load ....................................... None
+localhost:   bf16 ............................................ True
+localhost:   bias_dropout_fusion ............................. False
+localhost:   bias_gelu_fusion ................................ False
+localhost:   biencoder_projection_dim ........................ 0
+localhost:   biencoder_shared_query_context_model ............ False
+localhost:   block_data_path ................................. None
+localhost:   checkpoint_activations .......................... False
+localhost:   checkpoint_in_cpu ............................... False
+localhost:   checkpoint_num_layers ........................... 1
+localhost:   classes_fraction ................................ 1.0
+localhost:   clip_grad ....................................... 1.0
+localhost:   comm_freq_dry_run ............................... False
+localhost:   comm_high_freq .................................. None
+localhost:   comm_low_freq ................................... 800
+localhost:   comm_min_elements ............................... 104857600
+localhost:   compression_training ............................ False
+localhost:   consumed_train_samples .......................... 0
+localhost:   consumed_train_tokens ........................... 0
+localhost:   consumed_valid_samples .......................... 0
+localhost:   contigious_checkpointing ........................ False
+localhost:   cpu_optimizer ................................... False
+localhost:   cpu_torch_adam .................................. False
+localhost:   create_moe_param_group .......................... False
+localhost:   curriculum_learning_legacy ...................... False
+localhost:   data_cache_path ................................. None
+localhost:   data_efficiency_curriculum_learning ............. False
+localhost:   data_impl ....................................... mmap
+localhost:   data_parallel_random_init ....................... False
+localhost:   data_parallel_size .............................. 2
+localhost:   data_path ....................................... ['/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document']
+localhost:   data_per_class_fraction ......................... 1.0
+localhost:   data_sharding ................................... True
+localhost:   dataloader_type ................................. single
+localhost:   DDP_impl ........................................ local
+localhost:   decoder_num_layers .............................. None
+localhost:   decoder_seq_length .............................. None
+localhost:   deepscale ....................................... False
+localhost:   deepscale_config ................................ None
+localhost:   deepspeed ....................................... True
+localhost:   deepspeed_activation_checkpointing .............. True
+localhost:   deepspeed_config ................................ /home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json
+localhost:   dino_bottleneck_size ............................ 256
+localhost:   dino_freeze_last_layer .......................... 1
+localhost:   dino_head_hidden_size ........................... 2048
+localhost:   dino_local_crops_number ......................... 10
+localhost:   dino_local_img_size ............................. 96
+localhost:   dino_norm_last_layer ............................ False
+localhost:   dino_teacher_temp ............................... 0.07
+localhost:   dino_warmup_teacher_temp ........................ 0.04
+localhost:   dino_warmup_teacher_temp_epochs ................. 30
+localhost:   distribute_checkpointed_activations ............. False
+localhost:   distribute_saved_activations .................... False
+localhost:   distributed_backend ............................. nccl
+localhost:   distributed_timeout_minutes ..................... 10
+localhost:   ds_fused_adam ................................... False
+localhost:   ds_inference .................................... False
+localhost:   ds_pipeline_enabled ............................. True
+localhost:   ds_sequence_parallel_fpdt ....................... False
+localhost:   ds_sequence_parallel_fpdt_chunk_size ............ 65536
+localhost:   ds_sequence_parallel_fpdt_offloading ............ False
+localhost:   ds_sequence_parallel_size ....................... 1
+localhost:   embedding_path .................................. None
+localhost:   embedding_weights_in_fp32 ....................... False
+localhost:   empty_unused_memory_level ....................... 0
+localhost:   enable_comm_freq_scaling ........................ False
+localhost:   enable_expert_tensor_parallelism ................ False
+localhost:   enable_zbh1_exact_semantics ..................... False
+localhost:   enable_zbh1_pipeline ............................ False
+localhost:   encoder_num_layers .............................. 28
+localhost:   encoder_seq_length .............................. 2048
+localhost:   end_weight_decay ................................ 0.01
+localhost:   eod_mask_loss ................................... False
+localhost:   eval_interval ................................... 100
+localhost:   eval_iters ...................................... 10
+localhost:   evidence_data_path .............................. None
+localhost:   exit_duration_in_mins ........................... None
+localhost:   exit_interval ................................... None
+localhost:   exit_on_missing_checkpoint ...................... False
+localhost:   exit_signal_handler ............................. False
+localhost:   experiment_name ................................. dual8_tp4pp1dp2_static990
+localhost:   experiment_root_dir ............................. /home/sd/Megatron-DeepSpeed/experiments
+localhost:   experiment_run_id ............................... dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1
+localhost:   expert_interval ................................. 2
+localhost:   ffn_hidden_size ................................. 18944
+localhost:   finetune ........................................ False
+localhost:   force_ds_sequence_parallel ...................... False
+localhost:   fp16 ............................................ False
+localhost:   fp16_lm_cross_entropy ........................... False
+localhost:   fp32_residual_connection ........................ False
+localhost:   fp8_amax_compute_algo ........................... most_recent
+localhost:   fp8_amax_history_len ............................ 1
+localhost:   fp8_e4m3 ........................................ False
+localhost:   fp8_hybrid ...................................... False
+localhost:   fp8_interval .................................... 1
+localhost:   fp8_margin ...................................... 0
+localhost:   fp8_wgrad ....................................... True
+localhost:   global_batch_size ............................... 8
+localhost:   gradient_accumulation_fusion .................... True
+localhost:   head_lr_mult .................................... 1.0
+localhost:   hidden_dropout .................................. 0.0
+localhost:   hidden_size ..................................... 3584
+localhost:   hidden_size_teacher ............................. None
+localhost:   hysteresis ...................................... 2
+localhost:   ict_head_size ................................... None
+localhost:   ict_load ........................................ None
+localhost:   img_h ........................................... 224
+localhost:   img_w ........................................... 224
+localhost:   indexer_batch_size .............................. 128
+localhost:   indexer_log_interval ............................ 1000
+localhost:   inference ....................................... False
+localhost:   inference_batch_times_seqlen_threshold .......... 512
+localhost:   init_method_std ................................. 0.02
+localhost:   init_method_xavier_uniform ...................... False
+localhost:   initial_loss_scale .............................. 4294967296
+localhost:   iter_per_epoch .................................. 1250
+localhost:   kd .............................................. False
+localhost:   kd_alpha_ce ..................................... 1
+localhost:   kd_beta_ce ...................................... 1
+localhost:   kd_temp ......................................... 1.0
+localhost:   kill_switch_file ................................ None
+localhost:   kv_channels ..................................... 128
+localhost:   layernorm_epsilon ............................... 1e-05
+localhost:   lazy_mpu_init ................................... None
+localhost:   load ............................................ None
+localhost:   load_tag ........................................ None
+localhost:   load_teacher .................................... None
+localhost:   local_rank ...................................... 0
+localhost:   log_batch_size_to_tensorboard ................... False
+localhost:   log_interval .................................... 1
+localhost:   log_learning_rate_to_tensorboard ................ True
+localhost:   log_loss_scale_to_tensorboard ................... True
+localhost:   log_memory_to_tensorboard ....................... False
+localhost:   log_num_zeros_in_grad ........................... False
+localhost:   log_optimizer_states_to_tensorboard ............. False
+localhost:   log_params_norm ................................. False
+localhost:   log_timers_to_tensorboard ....................... False
+localhost:   log_validation_ppl_to_tensorboard ............... False
+localhost:   log_world_size_to_tensorboard ................... False
+localhost:   loss_scale ...................................... None
+localhost:   loss_scale_window ............................... 1000
+localhost:   lr .............................................. 1e-05
+localhost:   lr_decay_iters .................................. None
+localhost:   lr_decay_samples ................................ None
+localhost:   lr_decay_style .................................. cosine
+localhost:   lr_decay_tokens ................................. None
+localhost:   lr_warmup_fraction .............................. None
+localhost:   lr_warmup_iters ................................. 19
+localhost:   lr_warmup_samples ............................... 0
+localhost:   lr_warmup_tokens ................................ None
+localhost:   make_vocab_size_divisible_by .................... 128
+localhost:   mask_factor ..................................... 1.0
+localhost:   mask_prob ....................................... 0.15
+localhost:   mask_type ....................................... random
+localhost:   masked_softmax_fusion ........................... False
+localhost:   max_position_embeddings ......................... 2048
+localhost:   max_tokens_to_oom ............................... 12000
+localhost:   mem_efficient_ln ................................ True
+localhost:   memory_centric_tiled_linear ..................... False
+localhost:   merge_file ...................................... None
+localhost:   micro_batch_size ................................ 1
+localhost:   min_loss_scale .................................. 1.0
+localhost:   min_lr .......................................... 1e-06
+localhost:   mlp_type ........................................ standard
+localhost:   mmap_warmup ..................................... False
+localhost:   moe_eval_capacity_factor ........................ 1.0
+localhost:   moe_expert_parallel_size ........................ 1
+localhost:   moe_loss_coeff .................................. 0.1
+localhost:   moe_min_capacity ................................ 4
+localhost:   moe_token_dropping .............................. True
+localhost:   moe_top2_2nd_expert_sampling .................... True
+localhost:   moe_train_capacity_factor ....................... 1.0
+localhost:   mos ............................................. False
+localhost:   no_load_lr_state ................................ False
+localhost:   no_load_optim ................................... None
+localhost:   no_load_rng ..................................... None
+localhost:   no_persist_layer_norm ........................... False
+localhost:   no_pipeline_parallel ............................ False
+localhost:   no_save_optim ................................... None
+localhost:   no_save_rng ..................................... None
+localhost:   normalization ................................... rmsnorm
+localhost:   num_attention_heads ............................. 28
+localhost:   num_attention_heads_teacher ..................... None
+localhost:   num_channels .................................... 3
+localhost:   num_classes ..................................... 1000
+localhost:   num_experts ..................................... [1]
+localhost:   num_experts_switch .............................. None
+localhost:   num_experts_teacher ............................. [1]
+localhost:   num_key_value_heads ............................. 4
+localhost:   num_layers ...................................... 28
+localhost:   num_layers_per_virtual_pipeline_stage ........... None
+localhost:   num_layers_teacher .............................. None
+localhost:   num_workers ..................................... 2
+localhost:   onnx_safe ....................................... None
+localhost:   openai_gelu ..................................... False
+localhost:   optimizer ....................................... adam
+localhost:   output_bert_embeddings .......................... False
+localhost:   overlap_p2p_comm ................................ False
+localhost:   override_opt_param_scheduler .................... False
+localhost:   params_dtype .................................... torch.bfloat16
+localhost:   partition_activations ........................... False
+localhost:   patch_dim ....................................... 16
+localhost:   perform_initialization .......................... True
+localhost:   pipeline_model_parallel_size .................... 1
+localhost:   pipeline_model_parallel_split_rank .............. None
+localhost:   profile ......................................... None
+localhost:   profile_backward ................................ False
+localhost:   profile_ranks ................................... None
+localhost:   profile_steps ................................... 2,3
+localhost:   query_in_block_prob ............................. 0.1
+localhost:   rampup_batch_size ............................... None
+localhost:   random_ltd ...................................... False
+localhost:   rank ............................................ 0
+localhost:   recompute_granularity ........................... full
+localhost:   recompute_method ................................ uniform
+localhost:   recompute_num_layers ............................ 1
+localhost:   remote_device ................................... none
+localhost:   repeated_dataloader ............................. False
+localhost:   reset_attention_mask ............................ False
+localhost:   reset_iteration ................................. False
+localhost:   reset_position_ids .............................. False
+localhost:   retriever_report_topk_accuracies ................ []
+localhost:   retriever_score_scaling ......................... False
+localhost:   retriever_seq_length ............................ 256
+localhost:   retro_add_retriever ............................. False
+localhost:   retro_cyclic_train_iters ........................ None
+localhost:   retro_encoder_attention_dropout ................. 0.1
+localhost:   retro_encoder_hidden_dropout .................... 0.1
+localhost:   retro_encoder_layers ............................ 2
+localhost:   retro_num_neighbors ............................. 2
+localhost:   retro_num_retrieved_chunks ...................... 2
+localhost:   retro_return_doc_ids ............................ False
+localhost:   retro_workdir ................................... None
+localhost:   return_data_index ............................... False
+localhost:   rope_theta ...................................... 10000
+localhost:   rotary_percent .................................. 1.0
+localhost:   sample_rate ..................................... 1.0
+localhost:   save ............................................ None
+localhost:   save_interval ................................... 0
+localhost:   scatter_gather_tensors_in_pipeline .............. True
+localhost:   scattered_embeddings ............................ False
+localhost:   seed ............................................ 1234
+localhost:   seq_length ...................................... 2048
+localhost:   sequence_parallel ............................... False
+localhost:   sgd_momentum .................................... 0.9
+localhost:   short_seq_prob .................................. 0.1
+localhost:   skip_train ...................................... False
+localhost:   split ........................................... 98,2,0
+localhost:   split_transformers .............................. False
+localhost:   squared_relu .................................... False
+localhost:   standalone_embedding_stage ...................... False
+localhost:   start_weight_decay .............................. 0.01
+localhost:   swiglu .......................................... True
+localhost:   swin_backbone_type .............................. tiny
+localhost:   synchronize_each_layer .......................... False
+localhost:   tensor_model_parallel_size ...................... 4
+localhost:   tensorboard_dir ................................. None
+localhost:   tensorboard_log_interval ........................ 1
+localhost:   tensorboard_queue_size .......................... 1000
+localhost:   test_data_path .................................. None
+localhost:   tile_factor ..................................... 1
+localhost:   timing_log_level ................................ 0
+localhost:   timing_log_option ............................... minmax
+localhost:   titles_data_path ................................ None
+localhost:   tokenizer_model ................................. /home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat
+localhost:   tokenizer_type .................................. HFTokenizer
+localhost:   topk ............................................ 1
+localhost:   train_data_exact_num_epochs ..................... None
+localhost:   train_data_path ................................. None
+localhost:   train_desc_path ................................. None
+localhost:   train_doc_idx_path .............................. None
+localhost:   train_idx_path .................................. None
+localhost:   train_iters ..................................... 20
+localhost:   train_sample_idx_path ........................... None
+localhost:   train_samples ................................... None
+localhost:   train_shuffle_idx_path .......................... None
+localhost:   train_tokens .................................... None
+localhost:   transformer_impl ................................ local
+localhost:   transformer_pipeline_model_parallel_size ........ 1
+localhost:   trust_remote_code ............................... False
+localhost:   universal_checkpoint ............................ False
+localhost:   untie_embeddings_and_output_weights ............. True
+localhost:   use_checkpoint_args ............................. False
+localhost:   use_checkpoint_opt_param_scheduler .............. False
+localhost:   use_contiguous_buffers_in_local_ddp ............. True
+localhost:   use_cpu_initialization .......................... None
+localhost:   use_dataset_only ................................ False
+localhost:   use_distributed_optimizer ....................... False
+localhost:   use_flash_attn .................................. False
+localhost:   use_flash_attn_builder .......................... False
+localhost:   use_flash_attn_triton ........................... False
+localhost:   use_flash_attn_v1 ............................... False
+localhost:   use_flash_attn_v2 ............................... False
+localhost:   use_one_sent_docs ............................... False
+localhost:   use_pin_memory .................................. False
+localhost:   use_ring_exchange_p2p ........................... False
+localhost:   use_rotary_position_embeddings .................. True
+localhost:   use_tutel ....................................... False
+localhost:   valid_data_path ................................. None
+localhost:   variable_seq_lengths ............................ False
+localhost:   virtual_pipeline_model_parallel_size ............ None
+localhost:   vision_backbone_type ............................ vit
+localhost:   vision_pretraining .............................. False
+localhost:   vision_pretraining_type ......................... classify
+localhost:   vocab_extra_ids ................................. 0
+localhost:   vocab_file ...................................... None
+localhost:   vocab_size ...................................... None
+localhost:   wandb_exp_name .................................. 
+localhost:   wandb_project ................................... 
+localhost:   wandb_save_dir .................................. 
+localhost:   weight_decay .................................... 0.01
+localhost:   weight_decay_incr_style ......................... constant
+localhost:   world_size ...................................... 8
+localhost:   zero_allgather_bucket_size ...................... 0.0
+localhost:   zero_contigious_gradients ....................... False
+localhost:   zero_reduce_bucket_size ......................... 0.0
+localhost:   zero_reduce_scatter ............................. False
+localhost:   zero_stage ...................................... 1
+localhost: -------------------- end of arguments ---------------------
+localhost: setting number of micro-batches to constant 4
+localhost: > building HFTokenizer tokenizer ...
+localhost:  > padded vocab (size: 151643) with 421 dummy tokens (new size: 152064)
+localhost: > initializing torch distributed ...
+192.168.205.202: [W328 00:24:36.298440018 socket.cpp:209] [c10d] The hostname of the client socket cannot be retrieved. err=-3
+192.168.205.202: [W328 00:24:36.408113907 socket.cpp:209] [c10d] The hostname of the client socket cannot be retrieved. err=-3
+192.168.205.202: [W328 00:24:36.423352037 socket.cpp:209] [c10d] The hostname of the client socket cannot be retrieved. err=-3
+192.168.205.202: [W328 00:24:36.477422320 socket.cpp:209] [c10d] The hostname of the client socket cannot be retrieved. err=-3
+localhost: [W328 00:24:37.338624960 socket.cpp:209] [c10d] The hostname of the client socket cannot be retrieved. err=-3
+localhost: [W328 00:24:38.673197707 socket.cpp:209] [c10d] The hostname of the client socket cannot be retrieved. err=-3
+localhost: [W328 00:24:38.788167248 socket.cpp:209] [c10d] The hostname of the client socket cannot be retrieved. err=-3
+localhost: [W328 00:24:38.802616955 socket.cpp:209] [c10d] The hostname of the client socket cannot be retrieved. err=-3
+localhost: [W328 00:24:46.656744312 socket.cpp:209] [c10d] The hostname of the client socket cannot be retrieved. err=-3
+localhost: [rank0]: Traceback (most recent call last):
+localhost: [rank0]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+localhost: [rank0]:     pretrain(train_valid_test_datasets_provider,
+localhost: [rank0]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 133, in pretrain
+localhost: [rank0]:     initialize_megatron(extra_args_provider=extra_args_provider,
+localhost: [rank0]:   File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 89, in initialize_megatron
+localhost: [rank0]:     finish_mpu_init()
+localhost: [rank0]:   File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 69, in finish_mpu_init
+localhost: [rank0]:     _initialize_distributed()
+localhost: [rank0]:   File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 254, in _initialize_distributed
+localhost: [rank0]:     mpu.initialize_model_parallel(args.tensor_model_parallel_size,
+localhost: [rank0]:   File "/home/sd/Megatron-DeepSpeed/megatron/core/parallel_state.py", line 212, in initialize_model_parallel
+localhost: [rank0]:     group = torch.distributed.new_group(ranks)
+localhost: [rank0]:   File "/home/sd/.local/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 95, in wrapper
+localhost: [rank0]:     func_return = func(*args, **kwargs)
+localhost: [rank0]:   File "/home/sd/.local/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 5276, in new_group
+localhost: [rank0]:     return _new_group_with_tag(
+localhost: [rank0]:   File "/home/sd/.local/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 5366, in _new_group_with_tag
+localhost: [rank0]:     pg, pg_store = _new_process_group_helper(
+localhost: [rank0]:   File "/home/sd/.local/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 2134, in _new_process_group_helper
+localhost: [rank0]:     eager_backend.eager_connect_single_device(device_id)
+localhost: [rank0]: torch.distributed.DistBackendError: NCCL error in: /pytorch/torch/csrc/distributed/c10d/NCCLUtils.cpp:230, unhandled cuda error (run with NCCL_DEBUG=INFO for details), NCCL version 2.27.5
+localhost: [rank0]: ncclUnhandledCudaError: Call to CUDA function failed.
+localhost: [rank0]: Last error:
+localhost: [rank0]: Failed to CUDA calloc async 4 bytes
+localhost: [rank0]:[W328 00:24:47.941721895 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+localhost: [rank1]: Traceback (most recent call last):
+localhost: [rank1]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+localhost: [rank1]:     pretrain(train_valid_test_datasets_provider,
+localhost: [rank1]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 133, in pretrain
+localhost: [rank1]:     initialize_megatron(extra_args_provider=extra_args_provider,
+localhost: [rank1]:   File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 89, in initialize_megatron
+localhost: [rank1]:     finish_mpu_init()
+localhost: [rank1]:   File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 69, in finish_mpu_init
+localhost: [rank1]:     _initialize_distributed()
+localhost: [rank1]:   File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 254, in _initialize_distributed
+localhost: [rank1]:     mpu.initialize_model_parallel(args.tensor_model_parallel_size,
+localhost: [rank1]:   File "/home/sd/Megatron-DeepSpeed/megatron/core/parallel_state.py", line 212, in initialize_model_parallel
+localhost: [rank1]:     group = torch.distributed.new_group(ranks)
+localhost: [rank1]:   File "/home/sd/.local/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 95, in wrapper
+localhost: [rank1]:     func_return = func(*args, **kwargs)
+localhost: [rank1]:   File "/home/sd/.local/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 5276, in new_group
+localhost: [rank1]:     return _new_group_with_tag(
+localhost: [rank1]:   File "/home/sd/.local/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 5366, in _new_group_with_tag
+localhost: [rank1]:     pg, pg_store = _new_process_group_helper(
+localhost: [rank1]:   File "/home/sd/.local/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 2134, in _new_process_group_helper
+localhost: [rank1]:     eager_backend.eager_connect_single_device(device_id)
+localhost: [rank1]: torch.distributed.DistBackendError: NCCL error in: /pytorch/torch/csrc/distributed/c10d/NCCLUtils.cpp:230, remote process exited or there was a network error, NCCL version 2.27.5
+localhost: [rank1]: ncclRemoteError: A call failed possibly due to a network error or a remote process exiting prematurely.
+localhost: [rank1]: Last error:
+localhost: [rank1]: socketProgress: Connection closed by remote peer v100x16-1.example.com<42766>
+localhost: [rank1]:[W328 00:24:48.300609161 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+localhost: [rank3]:[W328 00:24:49.658310708 TCPStore.cpp:125] [c10d] recvValue failed on SocketImpl(fd=102, addr=[::]:10239, remote=[fdff:ffff::]:53782): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+localhost: Exception raised from recvBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
+localhost: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7f96cf17cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+localhost: frame #1: <unknown function> + 0x5ffc5b1 (0x7f96b229c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #2: <unknown function> + 0x5ffd9ad (0x7f96b229d9ad in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #3: <unknown function> + 0x5ffe55a (0x7f96b229e55a in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x31e (0x7f96b229927e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7f9670e18868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+localhost: frame #6: <unknown function> + 0xdc253 (0x7f96c7cb0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+localhost: frame #7: <unknown function> + 0x94ac3 (0x7f96d06afac3 in /lib/x86_64-linux-gnu/libc.so.6)
+localhost: frame #8: <unknown function> + 0x126850 (0x7f96d0741850 in /lib/x86_64-linux-gnu/libc.so.6)
+localhost: 
+localhost: [rank1]:[W328 00:24:49.658271757 TCPStore.cpp:125] [c10d] recvValue failed on SocketImpl(fd=102, addr=[::]:50413, remote=[fdff:ffff::]:45194): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+localhost: Exception raised from recvBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
+localhost: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7f90f473fb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+localhost: frame #1: <unknown function> + 0x5ffc5b1 (0x7f9136a9c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #2: <unknown function> + 0x5ffd9ad (0x7f9136a9d9ad in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #3: <unknown function> + 0x5ffe55a (0x7f9136a9e55a in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x31e (0x7f9136a9927e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7f90f5618868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+localhost: frame #6: <unknown function> + 0xdc253 (0x7f914c4b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+localhost: frame #7: <unknown function> + 0x94ac3 (0x7f9154da2ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+localhost: frame #8: <unknown function> + 0x126850 (0x7f9154e34850 in /lib/x86_64-linux-gnu/libc.so.6)
+localhost: 
+localhost: [rank1]:[W328 00:24:49.661838754 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 1] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+localhost: [rank3]:[W328 00:24:49.661848920 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 3] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+localhost: [rank2]:[W328 00:24:49.658313073 TCPStore.cpp:125] [c10d] recvValue failed on SocketImpl(fd=102, addr=[::]:11453, remote=[fdff:ffff::]:27334): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+localhost: Exception raised from recvBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
+localhost: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7f02bb37cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+localhost: frame #1: <unknown function> + 0x5ffc5b1 (0x7f029e49c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #2: <unknown function> + 0x5ffd9ad (0x7f029e49d9ad in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #3: <unknown function> + 0x5ffe55a (0x7f029e49e55a in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x31e (0x7f029e49927e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7f025d018868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+localhost: frame #6: <unknown function> + 0xdc253 (0x7f02b3eb0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+localhost: frame #7: <unknown function> + 0x94ac3 (0x7f02bc8d6ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+localhost: frame #8: <unknown function> + 0x126850 (0x7f02bc968850 in /lib/x86_64-linux-gnu/libc.so.6)
+localhost: 
+localhost: [rank2]:[W328 00:24:49.661941104 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 2] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+192.168.205.202: [rank6]:[W328 00:24:49.310079114 TCPStore.cpp:125] [c10d] recvValue failed on SocketImpl(fd=102, addr=[::]:13823, remote=[fdff:ffff::]:14704): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+192.168.205.202: Exception raised from recvBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fbfda57cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fbfbd69c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffd9ad (0x7fbfbd69d9ad in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe55a (0x7fbfbd69e55a in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x31e (0x7fbfbd69927e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fbf7c218868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fbfd30b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fbfdbae2ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fbfdbb74850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank5]:[W328 00:24:49.310062202 TCPStore.cpp:125] [c10d] recvValue failed on SocketImpl(fd=102, addr=[::]:12287, remote=[fdff:ffff::]:4188): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+192.168.205.202: Exception raised from recvBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fd374f3fb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fd3b729c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffd9ad (0x7fd3b729d9ad in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe55a (0x7fd3b729e55a in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x31e (0x7fd3b729927e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fd375e18868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fd3cccb0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fd3d5650ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fd3d56e2850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank4]:[W328 00:24:49.309936164 TCPStore.cpp:125] [c10d] recvValue failed on SocketImpl(fd=102, addr=[::]:18751, remote=[fdff:ffff::]:4598): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+192.168.205.202: Exception raised from recvBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fc1ed77cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fc1d089c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffd9ad (0x7fc1d089d9ad in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe55a (0x7fc1d089e55a in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x31e (0x7fc1d089927e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fc18f418868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fc1e62b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fc1eece3ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fc1eed75850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank7]:[W328 00:24:49.310203102 TCPStore.cpp:125] [c10d] recvValue failed on SocketImpl(fd=102, addr=[::]:49535, remote=[fdff:ffff::]:23817): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+192.168.205.202: Exception raised from recvBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7f016657cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7f014969c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffd9ad (0x7f014969d9ad in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe55a (0x7f014969e55a in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x31e (0x7f014969927e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7f0108218868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7f015f0b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7f0167ae2ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7f0167b74850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank5]:[W328 00:24:49.313596086 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 5] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+192.168.205.202: [rank6]:[W328 00:24:49.313595943 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 6] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+192.168.205.202: [rank7]:[W328 00:24:49.313628671 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 7] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+192.168.205.202: [rank4]:[W328 00:24:49.313642443 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 4] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+localhost: [rank3]:[W328 00:24:50.662005972 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:10239, remote=[fdff:ffff::]:53782): Broken pipe
+localhost: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+localhost: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7f96cf17cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+localhost: frame #1: <unknown function> + 0x5ffc5b1 (0x7f96b229c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #2: <unknown function> + 0x5ffce42 (0x7f96b229ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #3: <unknown function> + 0x5ffe94e (0x7f96b229e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7f96b229926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7f9670e18868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+localhost: frame #6: <unknown function> + 0xdc253 (0x7f96c7cb0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+localhost: frame #7: <unknown function> + 0x94ac3 (0x7f96d06afac3 in /lib/x86_64-linux-gnu/libc.so.6)
+localhost: frame #8: <unknown function> + 0x126850 (0x7f96d0741850 in /lib/x86_64-linux-gnu/libc.so.6)
+localhost: 
+localhost: [rank3]:[W328 00:24:50.665514906 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 3] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+192.168.205.202: [rank5]:[W328 00:24:50.313775956 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:12287, remote=[fdff:ffff::]:4188): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fd374f3fb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fd3b729c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7fd3b729ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7fd3b729e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7fd3b729926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fd375e18868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fd3cccb0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fd3d5650ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fd3d56e2850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank6]:[W328 00:24:50.313805599 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:13823, remote=[fdff:ffff::]:14704): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fbfda57cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fbfbd69c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7fbfbd69ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7fbfbd69e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7fbfbd69926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fbf7c218868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fbfd30b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fbfdbae2ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fbfdbb74850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank5]:[W328 00:24:50.317185755 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 5] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+192.168.205.202: [rank6]:[W328 00:24:50.317186488 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 6] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+192.168.205.202: [rank7]:[W328 00:24:50.313842391 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:49535, remote=[fdff:ffff::]:23817): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7f016657cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7f014969c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7f014969ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7f014969e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7f014969926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7f0108218868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7f015f0b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7f0167ae2ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7f0167b74850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank7]:[W328 00:24:50.317214246 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 7] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+192.168.205.202: [rank4]:[W328 00:24:50.313767548 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:18751, remote=[fdff:ffff::]:4598): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fc1ed77cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fc1d089c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7fc1d089ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7fc1d089e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7fc1d089926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fc18f418868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fc1e62b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fc1eece3ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fc1eed75850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank4]:[W328 00:24:50.317317678 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 4] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+localhost: [2026-03-28 00:24:50,431] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 3719419
+localhost: [2026-03-28 00:24:50,432] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 3719420
+localhost: [2026-03-28 00:24:50,642] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 3719421
+localhost: [rank3]:[W328 00:24:51.665718833 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:10239, remote=[fdff:ffff::]:53782): Broken pipe
+localhost: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+localhost: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7f96cf17cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+localhost: frame #1: <unknown function> + 0x5ffc5b1 (0x7f96b229c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #2: <unknown function> + 0x5ffce42 (0x7f96b229ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #3: <unknown function> + 0x5ffe94e (0x7f96b229e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7f96b229926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+localhost: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7f9670e18868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+localhost: frame #6: <unknown function> + 0xdc253 (0x7f96c7cb0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+localhost: frame #7: <unknown function> + 0x94ac3 (0x7f96d06afac3 in /lib/x86_64-linux-gnu/libc.so.6)
+localhost: frame #8: <unknown function> + 0x126850 (0x7f96d0741850 in /lib/x86_64-linux-gnu/libc.so.6)
+localhost: 
+localhost: [rank3]:[W328 00:24:51.669214115 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 3] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+192.168.205.202: [rank6]:[W328 00:24:51.317366226 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:13823, remote=[fdff:ffff::]:14704): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fbfda57cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fbfbd69c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7fbfbd69ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7fbfbd69e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7fbfbd69926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fbf7c218868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fbfd30b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fbfdbae2ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fbfdbb74850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank7]:[W328 00:24:51.317390545 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:49535, remote=[fdff:ffff::]:23817): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7f016657cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7f014969c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7f014969ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7f014969e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7f014969926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7f0108218868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7f015f0b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7f0167ae2ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7f0167b74850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank5]:[W328 00:24:51.317366008 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:12287, remote=[fdff:ffff::]:4188): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fd374f3fb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fd3b729c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7fd3b729ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7fd3b729e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7fd3b729926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fd375e18868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fd3cccb0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fd3d5650ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fd3d56e2850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank7]:[W328 00:24:51.320819200 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 7] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+192.168.205.202: [rank6]:[W328 00:24:51.320820035 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 6] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+192.168.205.202: [rank5]:[W328 00:24:51.320822529 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 5] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+192.168.205.202: [rank4]:[W328 00:24:51.317416187 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:18751, remote=[fdff:ffff::]:4598): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fc1ed77cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fc1d089c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7fc1d089ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7fc1d089e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7fc1d089926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fc18f418868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fc1e62b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fc1eece3ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fc1eed75850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank4]:[W328 00:24:51.320933065 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 4] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+localhost: [2026-03-28 00:24:51,408] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 3719422
+192.168.205.202: [rank6]:[W328 00:24:52.320982450 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:13823, remote=[fdff:ffff::]:14704): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fbfda57cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fbfbd69c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7fbfbd69ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7fbfbd69e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7fbfbd69926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fbf7c218868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fbfd30b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fbfdbae2ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fbfdbb74850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank5]:[W328 00:24:52.321010761 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:12287, remote=[fdff:ffff::]:4188): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fd374f3fb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fd3b729c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7fd3b729ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7fd3b729e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7fd3b729926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fd375e18868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fd3cccb0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fd3d5650ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fd3d56e2850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank7]:[W328 00:24:52.320982000 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:49535, remote=[fdff:ffff::]:23817): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7f016657cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7f014969c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7f014969ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7f014969e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7f014969926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7f0108218868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7f015f0b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7f0167ae2ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7f0167b74850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank6]:[W328 00:24:52.324382538 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 6] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+192.168.205.202: [rank5]:[W328 00:24:52.324382731 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 5] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+192.168.205.202: [rank7]:[W328 00:24:52.324383819 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 7] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+192.168.205.202: [rank4]:[W328 00:24:52.321047619 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=102, addr=[::]:18751, remote=[fdff:ffff::]:4598): Broken pipe
+192.168.205.202: Exception raised from sendBytes at /pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
+192.168.205.202: frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x80 (0x7fc1ed77cb80 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libc10.so)
+192.168.205.202: frame #1: <unknown function> + 0x5ffc5b1 (0x7fc1d089c5b1 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #2: <unknown function> + 0x5ffce42 (0x7fc1d089ce42 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #3: <unknown function> + 0x5ffe94e (0x7fc1d089e94e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #4: c10d::TCPStore::check(std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&) + 0x30e (0x7fc1d089926e in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+192.168.205.202: frame #5: c10d::ProcessGroupNCCL::HeartbeatMonitor::runLoop() + 0x3c8 (0x7fc18f418868 in /home/sd/.local/lib/python3.10/site-packages/torch/lib/libtorch_cuda.so)
+192.168.205.202: frame #6: <unknown function> + 0xdc253 (0x7fc1e62b0253 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+192.168.205.202: frame #7: <unknown function> + 0x94ac3 (0x7fc1eece3ac3 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: frame #8: <unknown function> + 0x126850 (0x7fc1eed75850 in /lib/x86_64-linux-gnu/libc.so.6)
+192.168.205.202: 
+192.168.205.202: [rank4]:[W328 00:24:52.324625001 ProcessGroupNCCL.cpp:1771] [PG ID 0 PG GUID 0(default_pg) Rank 4] Failed to check the "should dump" flag on TCPStore, (maybe TCPStore server has shut down too early), with error: Broken pipe
+localhost: [2026-03-28 00:24:52,547] [ERROR] [launch.py:341:sigkill_handler] ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=3', '--tensor-model-parallel-size', '4', '--pipeline-model-parallel-size', '1', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--micro-batch-size', '1', '--global-batch-size', '8', '--seq-length', '2048', '--max-position-embeddings', '2048', '--train-iters', '20', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--lr', '1e-5', '--lr-decay-style', 'cosine', '--min-lr', '1e-6', '--weight-decay', '0.01', '--clip-grad', '1.0', '--lr-warmup-iters', '19', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--log-interval', '1', '--save-interval', '0', '--eval-interval', '100', '--eval-iters', '10', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing', '--zero-stage=1', '--deepspeed_config=/home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json', '--deepspeed', '--experiment-run-id', 'dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1', '--experiment-name', 'dual8_tp4pp1dp2_static990', '--experiment-root-dir', '/home/sd/Megatron-DeepSpeed/experiments', '--bf16'] exits with return code = 1
+192.168.205.202: [2026-03-28 00:24:53,124] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 484141
+192.168.205.202: [2026-03-28 00:24:53,124] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 484142
+192.168.205.202: [2026-03-28 00:24:53,125] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 484143
+192.168.205.202: [2026-03-28 00:24:53,125] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 484144
+192.168.205.202: [2026-03-28 00:24:53,125] [ERROR] [launch.py:341:sigkill_handler] ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=3', '--tensor-model-parallel-size', '4', '--pipeline-model-parallel-size', '1', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--micro-batch-size', '1', '--global-batch-size', '8', '--seq-length', '2048', '--max-position-embeddings', '2048', '--train-iters', '20', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--lr', '1e-5', '--lr-decay-style', 'cosine', '--min-lr', '1e-6', '--weight-decay', '0.01', '--clip-grad', '1.0', '--lr-warmup-iters', '19', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--log-interval', '1', '--save-interval', '0', '--eval-interval', '100', '--eval-iters', '10', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing', '--zero-stage=1', '--deepspeed_config=/home/sd/Megatron-DeepSpeed/.context/dsconfig_dual8_tp4pp1dp2_static990_20260328.json', '--deepspeed', '--experiment-run-id', 'dual8_tp4pp1dp2_static990_20260328_002404_DGX2-1', '--experiment-name', 'dual8_tp4pp1dp2_static990', '--experiment-root-dir', '/home/sd/Megatron-DeepSpeed/experiments', '--bf16'] exits with return code = -11
+pdsh@DGX2-1: localhost: ssh exited with exit code 1
+pdsh@DGX2-1: 192.168.205.202: ssh exited with exit code 245
