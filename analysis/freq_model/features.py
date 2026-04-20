@@ -41,6 +41,13 @@ class DerivedModelFeatures:
     cross_node_pp_bytes: float = 0.0
     cross_node_dp_bytes: float = 0.0
     cross_node_tp_bytes: float = 0.0
+    network_transport_label: str = ""
+    network_effective_bandwidth_gbps: float = 0.0
+    network_jitter_cv: float = 0.0
+    network_large_message_jitter_cv: float = 0.0
+    tensor_model_parallel_size: int = 1
+    pipeline_model_parallel_size: int = 1
+    data_parallel_size: int = 1
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -277,4 +284,7 @@ def derive_model_features(hardware: HardwareFeatures, workload: WorkloadFeatures
         cross_node_pp_bytes=cross_node_pp_bytes,
         cross_node_dp_bytes=cross_node_dp_bytes,
         cross_node_tp_bytes=cross_node_tp_bytes,
+        tensor_model_parallel_size=workload.tensor_model_parallel_size,
+        pipeline_model_parallel_size=workload.pipeline_model_parallel_size,
+        data_parallel_size=workload.data_parallel_size,
     )

@@ -11,6 +11,8 @@ ZEUS_LOG_PATTERN = re.compile(
     r"\[Zeus\] Steps (?P<step_start>\d+)-(?P<step_end>\d+): Energy=(?P<energy_wh>[0-9.]+) Wh \((?P<energy_j>[0-9.]+) J\), "
     r"Avg Power=(?P<avg_power_w>[0-9.]+) W, Time=(?P<time_s>[0-9.]+) s, Samples/Wh=(?P<samples_per_wh>[0-9.]+), Tokens/J=(?P<tokens_per_j>[0-9.]+)"
 )
+STATIC_FREQUENCY_PATTERN = re.compile(r"(?:^|[_-])static(?P<frequency_mhz>\d{3,4})(?:$|[_-])")
+
 
 
 @dataclass(frozen=True)
@@ -143,6 +145,30 @@ def build_workload_features(run_payload: Dict[str, Any]) -> WorkloadFeatures:
     )
 
 
+def _resolve_frequency_mode_and_mhz(run_payload: Dict[str, Any]) -> tuple[Optional[str], Optional[int]]:
+    freq_policy = run_payload.get("freq_policy") or {}
+    mode = freq_policy.get("mode")
+    static_freq = freq_policy.get("static_clock_mhz")
+    if static_freq not in (None, ""):
+        return mode, int(static_freq)
+
+    candidate_strings = [
+        run_payload.get("run_id"),
+        run_payload.get("experiment_name"),
+        (run_payload.get("identity") or {}).get("run_id"),
+        (run_payload.get("identity") or {}).get("experiment_name"),
+        (run_payload.get("command") or {}).get("command"),
+    ]
+    for candidate in candidate_strings:
+        if not candidate:
+            continue
+        match = STATIC_FREQUENCY_PATTERN.search(str(candidate))
+        if match is not None:
+            return "static", int(match.group("frequency_mhz"))
+
+    return mode, None
+
+
 def _build_observed_from_zeus_payload(
     iteration: int,
     frequency_mhz: Optional[int],
@@ -206,10 +232,7 @@ def _extract_latest_interval_observed(
     events: Iterable[Dict[str, Any]],
     include_baseline: bool,
 ) -> Optional[ObservedMetrics]:
-    freq_policy = run_payload.get("freq_policy") or {}
-    mode = freq_policy.get("mode")
-    static_freq = freq_policy.get("static_clock_mhz")
-    frequency_mhz = int(static_freq) if static_freq not in (None, "") else None
+    mode, frequency_mhz = _resolve_frequency_mode_and_mhz(run_payload)
     if mode != "static" and not include_baseline:
         return None
 
@@ -240,10 +263,7 @@ def _find_log_files(run_dir: Path) -> List[Path]:
 
 
 def _extract_from_logs(run_payload: Dict[str, Any], run_dir: Path, include_baseline: bool) -> Optional[ObservedMetrics]:
-    freq_policy = run_payload.get("freq_policy") or {}
-    mode = freq_policy.get("mode")
-    static_freq = freq_policy.get("static_clock_mhz")
-    frequency_mhz = int(static_freq) if static_freq not in (None, "") else None
+    mode, frequency_mhz = _resolve_frequency_mode_and_mhz(run_payload)
     if mode != "static" and not include_baseline:
         return None
 

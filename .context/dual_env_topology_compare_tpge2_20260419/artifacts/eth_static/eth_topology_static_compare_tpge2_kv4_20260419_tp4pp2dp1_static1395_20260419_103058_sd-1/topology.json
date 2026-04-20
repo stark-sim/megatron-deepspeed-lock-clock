@@ -1,0 +1,17 @@
+{
+  "launcher": "deepspeed",
+  "master_addr": "192.168.66.121",
+  "master_port": "30644",
+  "nnodes": 2,
+  "node_rank": 0,
+  "nproc_per_node": 4,
+  "pp": 2,
+  "tp": 4,
+  "visible_gpu_indices": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "world_size": 8
+}

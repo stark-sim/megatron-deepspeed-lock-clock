@@ -66,6 +66,8 @@ Each run writes to `experiments/<run_id>/`:
 
 Clock locking, unlocking, and NVML metadata collection now follow `CUDA_VISIBLE_DEVICES` by default instead of blindly operating on all physical GPUs.
 
+`scripts/run_experiment.sh` now also performs an `EXIT`-trap clock reset for `static`, `dynamic`, and `dryrun` modes, so visible GPUs are unlocked even if the in-process frequency manager misses its normal shutdown path.
+
 This matters when:
 
 - running on partial GPUs on a shared node

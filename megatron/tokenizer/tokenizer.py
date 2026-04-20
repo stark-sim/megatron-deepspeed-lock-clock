@@ -5,10 +5,39 @@
 
 from abc import ABC
 from abc import abstractmethod
+import json
+import os
 
 from transformers import AutoTokenizer
 from .bert_tokenization import FullTokenizer as FullBertTokenizer
 from .gpt2_tokenization import GPT2Tokenizer
+
+
+def _hf_config_vocab_size(tokenizer_name_or_path):
+    """Best-effort read of local HF config vocab size.
+
+    Some checkpoints (for example Qwen-family) ship embedding/lm_head rows that
+    are larger than tokenizer.vocab_size reports. When loading Megatron weights
+    converted from those checkpoints, we need the runtime padded vocab size to
+    align with the checkpoint rows rather than the smaller tokenizer report.
+    """
+    if not tokenizer_name_or_path or not os.path.isdir(tokenizer_name_or_path):
+        return None
+
+    config_path = os.path.join(tokenizer_name_or_path, "config.json")
+    if not os.path.isfile(config_path):
+        return None
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    vocab_size = config.get("vocab_size")
+    return vocab_size if isinstance(vocab_size, int) and vocab_size > 0 else None
+
+
 def build_tokenizer(args):
     """Initialize tokenizer."""
     if args.rank == 0:
@@ -570,9 +599,12 @@ class _HFTokenizer(AbstractTokenizer):
         self.tokenizer.model_max_length = max_seq_len
         self.encoder = self.tokenizer.get_vocab()
         self.decoder = {v: k for k, v in self.encoder.items()}
+        self._config_vocab_size = _hf_config_vocab_size(tokenizer_name_or_path)
 
     @property
     def vocab_size(self):
+        if self._config_vocab_size is not None:
+            return max(self.tokenizer.vocab_size, self._config_vocab_size)
         return self.tokenizer.vocab_size
 
     @property

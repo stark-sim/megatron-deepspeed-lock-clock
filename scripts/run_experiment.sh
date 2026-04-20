@@ -102,8 +102,14 @@ DATASET="${DATASET:-$(resolve_default_dataset)}"
 TOKENIZER_PATH="${TOKENIZER_PATH:-$(resolve_default_tokenizer)}"
 CHECKPOINT_ROOT="${CHECKPOINT_ROOT:-${BASE_PATH}/checkpoints/${EXPERIMENT_NAME}}"
 LOAD_CHECKPOINT="${LOAD_CHECKPOINT:-0}"
+LOAD_CHECKPOINT_PATH="${LOAD_CHECKPOINT_PATH:-}"
+FINETUNE="${FINETUNE:-0}"
+NO_LOAD_OPTIM="${NO_LOAD_OPTIM:-0}"
+NO_LOAD_RNG="${NO_LOAD_RNG:-0}"
+RESET_ITERATION="${RESET_ITERATION:-0}"
 VALIDATE_ONLY="${VALIDATE_ONLY:-0}"
 DISABLE_CHECKPOINT="${DISABLE_CHECKPOINT:-0}"
+DISABLE_SAVE_CHECKPOINT="${DISABLE_SAVE_CHECKPOINT:-0}"
 DATA_CACHE_PATH="${DATA_CACHE_PATH:-}"
 
 HIDDEN_SIZE="${HIDDEN_SIZE:-3584}"
@@ -114,6 +120,7 @@ NUM_KV_HEADS="${NUM_KV_HEADS:-4}"
 SEQ_LENGTH="${SEQ_LENGTH:-2048}"
 MICRO_BATCH_SIZE="${MICRO_BATCH_SIZE:-1}"
 GLOBAL_BATCH_SIZE="${GLOBAL_BATCH_SIZE:-16}"
+NUM_WORKERS="${NUM_WORKERS:-2}"
 TRAIN_STEPS="${TRAIN_STEPS:-500}"
 LR="${LR:-1e-5}"
 MIN_LR="${MIN_LR:-1e-6}"
@@ -154,13 +161,30 @@ setup_experiment_run "${BASE_PATH}" "${EXPERIMENT_NAME}"
 
 RUN_DS_CONFIG="${RUN_DIR}/ds_config.json"
 CHECKPOINT_PATH="${CHECKPOINT_PATH:-${CHECKPOINT_ROOT}/${RUN_ID}}"
+LOAD_PATH_FOR_RUN=""
 if [[ "$DISABLE_CHECKPOINT" == "1" ]]; then
     CHECKPOINT_PATH=""
     SAVE_INTERVAL=0
     LOAD_CHECKPOINT=0
+    DISABLE_SAVE_CHECKPOINT=1
     echo "[Checkpoint] DISABLE_CHECKPOINT=1; skipping checkpoint save/load"
 else
+    if [[ "$DISABLE_SAVE_CHECKPOINT" == "1" ]]; then
+        SAVE_INTERVAL=0
+        echo "[Checkpoint] DISABLE_SAVE_CHECKPOINT=1; skipping checkpoint save but preserving optional load"
+    fi
+fi
+
+if [[ "$DISABLE_CHECKPOINT" != "1" && "$DISABLE_SAVE_CHECKPOINT" != "1" ]]; then
     mkdir -p "${CHECKPOINT_PATH}"
+fi
+
+if [[ "$LOAD_CHECKPOINT" == "1" ]]; then
+    LOAD_PATH_FOR_RUN="${LOAD_CHECKPOINT_PATH:-${CHECKPOINT_PATH}}"
+    if [[ ! -d "${LOAD_PATH_FOR_RUN}" ]]; then
+        echo "[Error] LOAD_CHECKPOINT=1 but load path does not exist: ${LOAD_PATH_FOR_RUN}" >&2
+        exit 1
+    fi
 fi
 
 export EXPERIMENT_NAME RUN_ID RUN_DIR RUN_LOG_DIR EXPERIMENT_ROOT
@@ -169,6 +193,7 @@ export MEGATRON_EXPERIMENT_ROOT="${EXPERIMENT_ROOT}"
 export MEGATRON_EXPERIMENT_MODE="${EXPERIMENT_MODE}"
 export MEGATRON_REQUESTED_TP="${TP}"
 export MEGATRON_REQUESTED_PP="${PP}"
+export MEGATRON_LOAD_CHECKPOINT_PATH="${LOAD_PATH_FOR_RUN}"
 
 if [[ -z "$LOCAL_GPU_INDICES" || "$LOCAL_GPU_COUNT" -eq 0 ]]; then
     echo "[Error] No visible GPUs found via CUDA_VISIBLE_DEVICES or nvidia-smi" >&2
@@ -380,6 +405,12 @@ PY
         REMOTE_SELECTED_HOSTS+=("$host")
         host_gpu_indices="$(resolve_host_gpu_indices "$host")"
         REMOTE_PREFLIGHTS+=("$(run_remote_preflight "$host" "$BASE_PATH" "$TP" "$EXPERIMENT_MODE" "$STATIC_CLOCK_MHZ" "$host_gpu_indices" "$LAUNCHER" "$DATASET" "$TOKENIZER_PATH" "$CONDA_ENV")")
+        if [[ "$LOAD_CHECKPOINT" == "1" ]]; then
+            if ! ssh "$host" "test -d '${LOAD_PATH_FOR_RUN}'"; then
+                echo "[Error] Remote load checkpoint path missing on ${host}: ${LOAD_PATH_FOR_RUN}" >&2
+                exit 1
+            fi
+        fi
     done
 fi
 
@@ -389,6 +420,7 @@ for host in "${REMOTE_SELECTED_HOSTS[@]}"; do
     [[ -n "${TORCH_EXTENSIONS_DIR:-}" ]] && remote_dirs+=("$TORCH_EXTENSIONS_DIR")
     [[ -n "${TMPDIR:-}" ]] && remote_dirs+=("$TMPDIR")
     [[ -n "${PYTHONPYCACHEPREFIX:-}" ]] && remote_dirs+=("$PYTHONPYCACHEPREFIX")
+    [[ -n "${TRITON_CACHE_DIR:-}" ]] && remote_dirs+=("$TRITON_CACHE_DIR")
     remote_mkdir_cmd="mkdir -p"
     for remote_dir in "${remote_dirs[@]}"; do
         remote_mkdir_cmd+=" '$remote_dir'"
@@ -402,6 +434,7 @@ local_dirs=()
 [[ -n "${TORCH_EXTENSIONS_DIR:-}" ]] && local_dirs+=("$TORCH_EXTENSIONS_DIR")
 [[ -n "${TMPDIR:-}" ]] && local_dirs+=("$TMPDIR")
 [[ -n "${PYTHONPYCACHEPREFIX:-}" ]] && local_dirs+=("$PYTHONPYCACHEPREFIX")
+[[ -n "${TRITON_CACHE_DIR:-}" ]] && local_dirs+=("$TRITON_CACHE_DIR")
 if (( ${#local_dirs[@]} > 0 )); then
     mkdir -p "${local_dirs[@]}"
 fi
@@ -431,6 +464,7 @@ DEEPSPEED_MANAGED_ENV_VARS=(
     MEGATRON_EXPERIMENT_MODE
     MEGATRON_REQUESTED_TP
     MEGATRON_REQUESTED_PP
+    MEGATRON_LOAD_CHECKPOINT_PATH
     MEGATRON_HOSTFILE_PATH
     MEGATRON_HOSTFILE_JSON
     MEGATRON_TOPOLOGY_JSON
@@ -455,7 +489,9 @@ DEEPSPEED_MANAGED_ENV_VARS=(
     TORCH_EXTENSIONS_DIR
     TMPDIR
     PYTHONPYCACHEPREFIX
+    TRITON_CACHE_DIR
     PYTHONDONTWRITEBYTECODE
+    TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD
     DATA_CACHE_PATH
     MAX_JOBS
 )
@@ -587,6 +623,7 @@ TRAIN_CMD=(
     --num-key-value-heads "$NUM_KV_HEADS"
     --micro-batch-size "$MICRO_BATCH_SIZE"
     --global-batch-size "$GLOBAL_BATCH_SIZE"
+    --num-workers "$NUM_WORKERS"
     --seq-length "$SEQ_LENGTH"
     --max-position-embeddings "$SEQ_LENGTH"
     --train-iters "$TRAIN_STEPS"
@@ -635,7 +672,7 @@ TRAIN_CMD=(
     --experiment-root-dir "${EXPERIMENT_ROOT}"
 )
 
-if [[ "$DISABLE_CHECKPOINT" != "1" ]]; then
+if [[ "$DISABLE_CHECKPOINT" != "1" && "$DISABLE_SAVE_CHECKPOINT" != "1" ]]; then
     TRAIN_CMD+=(--save "$CHECKPOINT_PATH")
 fi
 
@@ -649,7 +686,23 @@ else
 fi
 
 if [[ "$LOAD_CHECKPOINT" == "1" ]]; then
-    TRAIN_CMD+=(--load "$CHECKPOINT_PATH")
+    TRAIN_CMD+=(--load "$LOAD_PATH_FOR_RUN")
+fi
+
+if [[ "$FINETUNE" == "1" ]]; then
+    TRAIN_CMD+=(--finetune)
+fi
+
+if [[ "$NO_LOAD_OPTIM" == "1" ]]; then
+    TRAIN_CMD+=(--no-load-optim)
+fi
+
+if [[ "$NO_LOAD_RNG" == "1" ]]; then
+    TRAIN_CMD+=(--no-load-rng)
+fi
+
+if [[ "$RESET_ITERATION" == "1" ]]; then
+    TRAIN_CMD+=(--reset-iteration)
 fi
 
 if [[ "$EXPERIMENT_MODE" == "dynamic" ]]; then

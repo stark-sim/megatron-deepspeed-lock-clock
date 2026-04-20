@@ -1,0 +1,27 @@
+{
+  "entries": [
+    {
+      "hostname": "sd-1",
+      "slots": 4
+    },
+    {
+      "hostname": "sd-2",
+      "slots": 4
+    }
+  ],
+  "path": "/tmp/hostfile_eth_dual4_common_qwen3b_tp1pp2dp4_20260419_static1200_20260419_084533_sd-1",
+  "preflight_required": true,
+  "raw_text": "sd-1 slots=4\nsd-2 slots=4\n",
+  "selected_hosts": [
+    {
+      "hostname": "sd-1",
+      "slots": 4
+    },
+    {
+      "hostname": "sd-2",
+      "slots": 4
+    }
+  ],
+  "selection_reason": "first 2 host(s) from hostfile order",
+  "sha1": "e6350edaea30964d9e171c29c7fa619295f4542b"
+}

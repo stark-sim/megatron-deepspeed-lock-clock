@@ -1,26 +1,68 @@
-__pycache__
-
-# Distribution / packaging
-build/
-dist/
-*.egg-info/
-
-# binaries
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
 *.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# tmp files
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
 *.swp
-
-# AML workspace config file
-config.json
-
-.coverage_*
+*.swo
 *~
-slurm*
-logs
 
-# Data folder
-bookcorpus_data/
+# Jupyter
+.ipynb_checkpoints
 
-data/index-cache
+# Project specific
+experiments/
+checkpoints/
+*.log
+.DS_Store
+
+# Data files
 data/
+*.bin
+*.idx
+
+# Temporary files
+*.tmp
+tmp/
+temp/
+
+# Megatron specific
+*.pt
+latest_checkpointed_iteration.txt
+iteration*
+stdout.txt
+stderr.txt
+
+# Megatron-DeepSpeed specific
+.ds_config*
+*.deepspeed
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/

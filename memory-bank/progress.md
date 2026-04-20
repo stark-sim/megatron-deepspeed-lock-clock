@@ -1,0 +1,864 @@
+- [x] [2026-04-01] Mitigated the full `20-step` memory failure for `2x4` source collection by enabling `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` through `/home/sd/Megatron-DeepSpeed/.deepspeed_env`. The rerun `dual8_tp4pp1dp2_static990_20260401_222055_DGX2-1` has already reached `iteration 3/20`, which clears the previous OOM point.
+- [x] [2026-04-02] **编写 `scripts/preflight_check.sh` 预检脚本**：实现双节点 GPU 空闲、系统负载、残留进程、网络连通性的自动化检查，支持 JSON/verbose 输出。
+- [x] [2026-04-02] **`2x4` 异常数据深度诊断完成**：确认根因为采集脚本实际使用 `CUDA_VISIBLE_DEVICES=0,1,2,3`（而非预期的 8-11），与外部进程产生资源竞争；功率反常（高频功率更低）直接支持该结论。诊断报告见 `.context/anomaly_analysis_20260402/detailed_diagnosis.md`。
+- [x] [2026-04-02] **修复多节点 GPU 索引绑定问题**：
+  - `scripts/run_experiment.sh` 新增 `DS_INCLUDE` 环境变量支持，可在 DeepSpeed 启动时传入 `--include` 强制指定 GPU。
+  - 新建 `.context/dual8_tp4pp1dp2_collect_20260402.sh`，使用 `--include localhost:8,9,10,11@192.168.205.202:8,9,10,11` 确保训练进程绑定到正确 GPU，并将 ds_config 放在共享路径避免多节点文件缺失。
+- [x] [2026-04-02] **`2x4` 控制变量重采启动**：
+  - **990 MHz**：✅ 成功完成，20 步 step time 稳定在 ~70.3s，平均功率 ~483W，数据干净。
+  - **1080 MHz**：⚠️ 采集到 step 14 时发现 step 13 起 step time 从 ~70s 突然跳涨至 ~117s。根因定位为同机用户 `lb` 的 `nsys stats` 离线分析进程导致系统负载（loadavg > 10）飙升。已停止该 run。
+  - **1155 MHz**：暂未开始。已部署自动 watcher `.context/watch_and_recollect_20260402.sh`，会轮询等待 `nsys stats` 结束且 loadavg < 6.0 后自动开始 1080+1155 MHz 重采。
+- [x] [2026-04-02] **`2x4` Source 三频采集全部完成，但数据质量存疑**：
+  - `990 MHz`：1756.2s / 849323.5J / 483.6W / 0.386 tokens/J
+  - `1080 MHz`：2363.4s / 1047246.3J / 443.1W / 0.313 tokens/J ⚠️ 比 990MHz 慢 34.6%
+  - `1155 MHz`：2234.9s / 1011665.8J / 452.7W / 0.324 tokens/J ⚠️ 比 990MHz 慢 27.3%
+  - **异常分析**：高频运行时间反而更长，可能原因：系统负载/过热保护/网络波动
+  - 本地路径：`.context/dual8_tp4pp1dp2_collection_20260401/`
+- [x] [2026-04-02] **`2x4 -> 2x8` Transfer 数据就绪**：`scripts/check_transfer_dataset_readiness.py` 确认 ready=true
+- [x] [2026-04-02] **异常数据整理完成**：
+  - 分析报告：`.context/anomaly_analysis_20260402/step_time_comparison.md`
+  - 详细数据：`.context/anomaly_analysis_20260402/step_time_analysis.json`
+  - 关键发现：1080 MHz Step 1 比 990 MHz 慢 65.9%，Step 3 慢 133.4%
+- [x] [2026-04-02] **Predictor 健康检查完成**：
+  - 输出路径：`.context/health_check_20260402/`
+  - 发现：predictor 推荐 502 MHz（最低频），与异常实测数据不一致
+  - MAPE: total_time=14.76%, total_energy=4.37%
+- [x] [2026-04-02] **实验控制变量协议 v1.0 制定**：`.context/experiment_control_protocol.md`
+  - 启动前检查：GPU 空闲状态、系统负载、网络质量、时钟锁定验证
+  - 实验中监控：GPU 温度、实际频率、step time 稳定性
+  - 实验后验证：频率-性能趋势检查、异常检测、重复性验证
+  - 实施计划：Phase 1 (立即) / Phase 2 (短期) / Phase 3 (长期)
+- [x] [2026-04-01] **解决 OOM 瓶颈**：确认 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` 可有效解决 20-step 阶段的 OOM 问题
+- [x] [2026-03-31] Completed a clean `2x4` smoke on the user-approved `GPU 8,9,10,11` slice of both hosts: `dual8_tp4pp1dp2_smoke990_20260331_163556_DGX2-1` finished 2 iterations successfully with validation, confirming the `8-11` path is runnable for `TP=4, PP=1, DP=2, ZeRO-1`.
+- [x] [2026-03-31] Switched from smoke to source-data acquisition immediately after the successful `8-11` smoke: launched `screen` session `dual8_tp4pp1dp2_collect_20260331` running `/home/sd/Megatron-DeepSpeed/.context/dual8_tp4pp1dp2_collect_20260328.sh` for `990/1080/1155 MHz`.
+# Progress
+- [x] [2026-04-20] **补齐面向新机器 bring-up 的 Python 环境复现脚本与预热校验脚本**：
+  - 新增 `scripts/setup_python_env.sh`
+    - 支持 `STACK_PROFILE=sd-eth` 与 `STACK_PROFILE=dgx-v100`
+    - 统一创建 Python `3.10` 的 `conda` 环境
+    - 安装 `torch / deepspeed / transformers / sentencepiece / einops / pynvml / zeus-ml`
+    - 显式预编译 `DeepSpeed CPUAdam/FusedAdam`
+    - 支持从 `NVIDIA/apex` 源码安装 `APEX_CPP_EXT=1` 与 `APEX_CUDA_EXT=1`
+  - 新增 `scripts/activate_runtime_env.sh`
+    - 统一导出 `TORCH_EXTENSIONS_DIR`、`TMPDIR`、`PYTHONPYCACHEPREFIX`、`TRITON_CACHE_DIR`
+    - 默认落到 `/dev/shm/<tag>/...`，避免 clean shell 下 JIT/cache 写入用户目录导致 `CPUAdamBuilder().load()` 失败
+  - 新增 `scripts/verify_python_env.py`
+    - 检查 `torch / deepspeed / transformers / apex / zeus / pynvml`
+    - `--warmup` 模式下直接触发 `apex.FusedAdam`、`MixedFusedRMSNorm`、`DeepSpeedCPUAdam`、`deepspeed.ops.adam.FusedAdam` 和 `pretrain_gpt.py` 导入链路
+  - README 已补充新机器复现步骤，后续其他机器上的 first-run bring-up 应以这套脚本为主
+- [x] [2026-04-20] **完成 Ethernet 真实 `Qwen2.5-7B-Instruct` `TP=2 / PP=2 / DP=2` 的 `1005 / 1200 / 1500 / 1650 MHz` 正式补测，并将五个 static 点工件全部回拉到本地**：
+  - baseline（已存在）：
+    - `229.492s / 73478.543J / 320.179W / 2.2298 tokens/J`
+  - 新增 `1005 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1005_formal20_finetune_nw0_nosave_fixenv_20260420_r2_20260419_174710_sd-1`
+    - `267.575s / 57177.500J / 213.688W / 2.8655 tokens/J`
+    - 相对 baseline：`runtime +16.59% / avg_power -33.26% / energy -22.18% / tokens_per_j +28.51%`
+  - 新增 `1200 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1200_formal20_finetune_nw0_nosave_fixenv_20260420_r2_20260419_175317_sd-1`
+    - `261.969s / 57168.610J / 218.226W / 2.8659 tokens/J`
+    - 相对 baseline：`runtime +14.15% / avg_power -31.84% / energy -22.20% / tokens_per_j +28.53%`
+  - 新增 `1500 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1500_formal20_finetune_nw0_nosave_fixenv_20260420_r4_20260420_002554_sd-1`
+    - `248.866s / 55554.388J / 223.230W / 2.9492 tokens/J`
+    - 相对 baseline：`runtime +8.44% / avg_power -30.28% / energy -24.39% / tokens_per_j +32.26%`
+  - 新增 `1650 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1650_formal20_finetune_nw0_nosave_fixenv_20260420_r4_20260420_003214_sd-1`
+    - `238.310s / 54380.384J / 228.192W / 3.0129 tokens/J`
+    - 相对 baseline：`runtime +3.84% / avg_power -28.73% / energy -25.99% / tokens_per_j +35.12%`
+  - 当前同拓扑五点比较：
+    - `1200 MHz` 基本支配 `1005 MHz`：总能耗几乎相同，但总时长减少约 `5.61s`
+    - `1500 MHz` 已同时优于 `1395 MHz` 的运行时间与总能耗
+    - `1650 MHz` 是当前 Ethernet 真实模型曲线里时间代价最小且总能耗最低的点
+  - 本地工件目录：
+    - `.context/eth_real_qwen25_7b_baseline_static_20260419/artifacts/`
+  - 口径注意：
+    - 模型/checkpoint 是真实 `Qwen2.5-7B-Instruct`
+    - 但 `qwen_data_text_document.{bin,idx}` 仍偏小，因此这条线更适合表述为“真实模型 + 当前项目数据前缀”的功耗/时间证据，而不是“大规模真实语料训练”
+- [x] [2026-04-20] **继续完成 Ethernet 真实 `Qwen2.5-7B-Instruct` `TP=2 / PP=2 / DP=2` 的 `1800 / 1950 MHz` 正式补测，并确认高频段不会立刻破坏训练稳定性**：
+  - 新增 `1800 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1800_formal20_finetune_nw0_nosave_fixenv_20260420_r5_20260420_010053_sd-1`
+    - `239.220s / 55380.942J / 231.506W / 2.9584 tokens/J`
+    - 相对 baseline：`runtime +4.24% / avg_power -27.69% / energy -24.63% / tokens_per_j +32.68%`
+  - 新增 `1950 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static1950_formal20_finetune_nw0_nosave_fixenv_20260420_r5_20260420_010704_sd-1`
+    - `237.601s / 55839.752J / 235.015W / 2.9341 tokens/J`
+    - 相对 baseline：`runtime +3.53% / avg_power -26.60% / energy -24.01% / tokens_per_j +31.59%`
+  - 当前同拓扑七点比较：
+    - `1950 MHz` 已把运行时间压到当前最低，但只比 `1650 MHz` 快约 `0.71s`
+    - `1650 MHz` 仍保持更低总能耗（`54380J` vs `55840J`）与更高 `tokens/J`（`3.0129` vs `2.9341`）
+    - 因此当前 Ethernet 真实模型线的更稳主代表点仍应优先保留 `1650 MHz`
+  - 稳定性结论：
+    - `1800` 与 `1950` 两组 `20 step` 都完成且 `skipped=0`
+    - 这说明 `1500+ MHz` 在该 Ethernet 真实模型 workload 上不是“一上去就炸”的不稳定区间
+- [x] [2026-04-20] **继续把 Ethernet 真实模型曲线上探到 `2100 / 2250 MHz`，并确认高频端的“稳定但不再更省电”趋势**：
+  - 新增 `2100 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static2100_formal20_finetune_nw0_nosave_fixenv_20260420_r6_20260420_011555_sd-1`
+    - `239.100s / 56694.104J / 237.115W / 2.8899 tokens/J`
+    - 相对 baseline：`runtime +4.19% / avg_power -25.94% / energy -22.84% / tokens_per_j +29.61%`
+  - 新增 `2250 MHz`：
+    - run id: `eth_real_qwen25_7b_tp2pp2dp2_static2250_formal20_finetune_nw0_nosave_fixenv_20260420_r6_20260420_012206_sd-1`
+    - `238.292s / 57151.293J / 239.837W / 2.8668 tokens/J`
+    - 相对 baseline：`runtime +3.83% / avg_power -25.09% / energy -22.22% / tokens_per_j +28.57%`
+  - 高频端结论：
+    - `2100` 与 `2250` 也都完成 `20 step` 且 `skipped=0`
+    - `2250` 的 runtime 已几乎与 `1650` 持平（仅约 `0.02s` 差异），但总能耗比 `1650` 高约 `2771J`
+    - 这进一步确认了：高频端仍然稳定，但 sweet spot 并没有继续向上移动，`1650` 仍是当前最佳主代表点
+- [x] [2026-04-20] **确认 V100 线不必再把“代理下载 Qwen7B”当成唯一主线，`DGX2-2` 已持有完整真实权重，可直接走双机内部同步**：
+  - 当前状态：
+    - `sd@v100x16-1` 与 `sd@v100x16-2` 现都空闲，16 张 V100 无外部进程占用
+    - `sd@v100x16-2` 暴露的 `/home/sd/models/Qwen2.5-7B` 实际是软链接：`/home/sd/models/Qwen2.5-7B -> /home/sd/cache/modelscope/Qwen/Qwen2.5-7B-Instruct -> /home/sd/cache/modelscope/Qwen/Qwen2___5-7B-Instruct`
+    - 沿该路径可见完整 `model-00001..00004-of-00004.safetensors`，目录体积约 `15G`
+  - 对 `sd@v100x16-1` 现有副本的复核：
+    - `/home/sd/models/Qwen2.5-7B-Instruct/model-00001-of-00004.safetensors = 1705896960`
+    - `/home/sd/models/Qwen2.5-7B-Instruct/model-00004-of-00004.safetensors = 887808000`
+    - 同名文件在 `DGX2-2` 源端分别为 `3945441440` 与 `3556377672`
+    - 这说明 `DGX2-1` 上现有 Instruct 目录不是“只缺两片”的完整副本，而是已经截断的坏副本
+  - 已采取动作：
+    - 启动 `v100x16-2 -> v100x16-1` 的直接权重同步
+    - 目标目录：`/home/sd/models/Qwen2.5-7B-Instruct-full`
+    - 截至最新检查，目标目录已增长到约 `11G`
+    - 进一步核对后确认：`00001 / 00003 / 00004` 基本完整，但 `model-00002-of-00004.safetensors` 仅约 `317M`
+    - 现场已无任何活跃 `scp/rsync/tar` 进程，因此当前慢点不是“仍在低速拷贝”，而是此前同步已中断并留下半截 shard
+  - 含义：
+    - 后续 V100 线主 blocker 已从“修好代理自下载”切换为“恢复/重启内部同步 -> 同步最新 converter/launcher -> 做真实 7B smoke”
+- [x] [2026-04-19] **完成 V100 双机 latest-code 重跑前预检，确认当前 IB 线仍未达到“直接开跑真实 Qwen7B”状态**：
+  - `sd@v100x16-1 (DGX2-1)`:
+    - 16 张 V100 当前全部空闲
+    - `/home/sd/Megatron-DeepSpeed` 的 live tree 仍是历史基线 `6629a33` 附近的 dirty worktree，和本地当前 `169e5dc` 不一致
+    - `qwen_data_text_document.{bin,idx}` 存在但仅 `968B / 242B`，当前更像占位文件而不是正式训练集
+    - `checkpoints/` 下尚无 `qwen25_7b_instruct_hf2megads_tp2pp2_real_main`
+  - `sd@v100x16-2 (DGX2-2)`:
+    - 16 张 V100 全被外部 `VLLM::Worker_TP0..15` 占满
+    - `/home/sd/Megatron-DeepSpeed` 仍是无 `.git` 的 repo snapshot
+    - `qwen_data_text_document.{bin,idx}` 同样只有几百字节
+    - `checkpoints/` 下同样没有真实 Qwen7B Megatron checkpoint
+  - 结论：
+    - 当前不能把 V100 线视为“latest code + real model workload ready”
+    - 下一步准备顺序应为：等待 `DGX2-2` 空闲 -> 同步本地最新代码到两机 -> 补齐真实 checkpoint 与真实数据集 -> 先做 `VALIDATE_ONLY`/smoke，再跑 baseline/static
+- [x] [2026-04-19] **确认 `v100x16-1` 已有可用的 `Qwen2.5-7B` base 权重，且架构与 `Qwen2.5-7B-Instruct` 一致**：
+  - 位置：`/home/sd/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B/snapshots/d149729398750b98c0af14eb82c78cfe92750796/`
+  - 关键结构：`28L / hidden 3584 / ffn 18944 / heads 28 / kv_heads 4`
+  - 含义：
+    - 如果只需“真实 7B 架构+真实权重”来验证最新框架的性能路径，它可作为临时 fallback
+    - 但若要严格沿用户当前主线，仍应使用 `Qwen2.5-7B-Instruct`
+- [x] [2026-04-19] **尝试为 `v100x16-1` 准备 `Qwen2.5-7B-Instruct` HF snapshot，但当前跨环境传输过慢，未在本 turn 内完成**：
+  - 来源：`user@sd-1:/home/user/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28`
+  - 尝试方式：
+    - remote-to-remote `scp -r` 整个 HF cache 目录
+    - `ssh user@sd-1 'tar ... a09a...' | ssh sd@v100x16-1 'tar -xf -'`
+  - 结果：
+    - `DGX2-1` 上已创建 snapshot 目录 `.../models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28`
+    - 中止前目录体积约 `73M`
+    - 根因更像带宽/链路慢，而不是权限或路径错误
+- [x] [2026-04-20] **按用户要求切换为 “V100 本机自行下载 Qwen2.5-7B-Instruct”，并完成网络链路诊断**：
+  - 用户偏好：
+    - 不再允许 `sd-1 -> v100` 传输模型本体，避免额外流量消耗
+  - `DGX2-1` 现状：
+    - `huggingface_hub` 与 `transformers` 已安装
+    - 无本地 HF token 文件，但 `Qwen2.5-7B-Instruct` 作为公开模型不应因此受阻
+    - `~/.bashrc` 中存在代理配置：`http_proxy=http://192.168.205.201:7890`，并提供 `all_proxy=socks5h://192.168.205.201:7890`
+  - 实测结果：
+    - 直连 `huggingface.co:443` 超时
+    - 经 `http_proxy` 访问时，代理返回 `HTTP/1.1 200 Connection established`，但 TLS 握手报 `unexpected eof while reading`
+    - `hf-mirror.com` 直连同样超时
+    - 为测试 SOCKS 路径，已把本地 `PySocks` 的 `socks.py` / `sockshandler.py` 小文件复制到 `DGX2-1` 的 `.context/pysocks_vendor/`
+    - 之后 Python 进程可与 `192.168.205.201:7890` 建立 `ESTAB` 连接，但 `curl --socks5-hostname 192.168.205.201:7890 https://huggingface.co` 仍超时
+  - 结论：
+    - 当前 V100 self-download 的 blocker 已缩小为外网/代理连通性，而不是 HF 权限、包依赖、或下载命令本身
+- [x] [2026-04-20] **完成 `DGX2-1` 本地真实 7B 资产完整性审计，并确认当前仍不足以启动 HF->Megatron 转换**：
+  - 已同步新版 `tools/hf2megads_weight_converter.py` 到 `sd@v100x16-1`，其中包含：
+    - 优先信任 `model.embed_tokens.weight.shape[0]`
+    - 必要时上调 `padded_vocab_size`
+  - 已按 `sd-1` 成功口径在 `DGX2-1` 启动过一次本地转换尝试：
+    - run log: `/home/sd/Megatron-DeepSpeed/.context/qwen25_7b_instruct_local_hf2megads_tp2pp2_dgx1_20260420_003409.log`
+    - 第一轮失败原因为 `tokenizer-model=/home/sd/models/Qwen2.5-7B-Instruct` 在当前 Transformers/Qwen2 tokenizer 路径下触发 `vocab_file=None`
+    - 随后确认 `/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat/` 是可用 fallback tokenizer
+  - 更关键的资产事实：
+    - `/home/sd/models/Qwen2.5-7B-Instruct` 只有 `model-00001-of-00004.safetensors` 与 `model-00004-of-00004.safetensors`
+    - `model.safetensors.index.json` 明确需要 `00001..00004` 四个 shard
+    - 定点搜索 `DGX2-1` 全机后，没有找到缺失的 `model-00002-of-00004.safetensors` / `model-00003-of-00004.safetensors`
+    - `/home/sd/.cache/huggingface/hub/models--Qwen--Qwen2.5-7B/snapshots/d149.../` 也只有 `config.json`，没有权重 shard
+  - 结论：
+    - 当前 `DGX2-1` 上既没有完整的 `Qwen2.5-7B-Instruct`，也没有完整的 `Qwen2.5-7B`
+    - V100 线目前还不能基于本机现有资产完成真实 7B HF->Megatron 转换
+- [x] [2026-04-19] **完成 Ethernet 双机真实 `Qwen2.5-7B-Instruct` 首组同拓扑 baseline/static 正式对照，并把工件回拉到本地**：
+  - 工作负载：
+    - `sd-1 + sd-2`
+    - `2 nodes x 4 GPUs`, 每机 `GPU 0,1,2,3`
+    - `TP=2 / PP=2 / DP=2`
+    - `28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4`
+    - `micro_batch_size=1 / global_batch_size=4 / seq_length=2048 / train-iters=20`
+    - `bf16 / ZeRO-1 + CPU optimizer/offload / num_workers=0`
+    - `dataset=qwen_data_text_document`
+    - `tokenizer=Qwen2.5-7B-Instruct snapshot a09a35458c702b33eeacc393d103063234e8bc28`
+    - `--load /home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_real_main --finetune`
+  - 运行结果：
+    - baseline `eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+      - `status=completed`, `final_iteration=20`
+      - `229.49s / 73478.54J / 320.18W / 2.230 tokens/J`
+    - static `1395 MHz` `eth_real_qwen25_7b_tp2pp2dp2_static1395_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+      - `status=completed`, `final_iteration=20`
+      - `254.42s / 56385.52J / 221.63W / 2.906 tokens/J`
+  - 相对 baseline：
+    - runtime `+10.86%`
+    - avg_power `-30.78%`
+    - energy `-23.26%`
+    - tokens_per_j `+30.31%`
+  - 本地工件：
+    - `.context/eth_real_qwen25_7b_baseline_static_20260419/artifacts/`
+  - 中文摘要：
+    - `汇报总结_20260415/11_真实模型基线与定频补充.md`
+- [x] [2026-04-19] **按用户要求清理真实 Qwen7B Ethernet 线的训练输出 checkpoint，并把 `sd-2` 空间从“几乎打满”恢复到可继续实验**：
+  - 删除目录（保留真实预训练转换 checkpoint `qwen25_7b_instruct_hf2megads_tp2pp2_real_main` 不动）：
+    - `sd-1`: `.../eth_real_qwen25_7b_tp2pp2dp2_20260419/{baseline_formal20_finetune_nw0,baseline_smoke5_finetune_nw0}_20260419_sd-1`
+    - `sd-2`: 同名两目录
+  - 删除前容量：
+    - `sd-1`: `baseline_formal20 ≈ 50G`, `baseline_smoke5 ≈ 50G`
+    - `sd-2`: `baseline_formal20 ≈ 31G`, `baseline_smoke5 ≈ 50G`
+    - `sd-2 /` 仅余 `43M`
+  - 删除后容量：
+    - `sd-1 /home/user`: `5.3T` 总量中约 `1.1T` 可用
+    - `sd-2 /home/user`: `1.8T` 总量中约 `109G` 可用
+  - 直接触发原因：
+    - `eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_20260419_sd-1` 的训练主体已完成 `20/20`
+    - 但在 final checkpoint save 时，`sd-2` 报 `OSError: [Errno 28] No space left on device`
+    - 这进一步确认后续真实 checkpoint benchmarking 不应继续保存训练输出 checkpoint
+- [x] [2026-04-19] **`scripts/run_experiment.sh` 已支持“保留 `--load`，禁用 `--save`”的新语义**：
+  - 新增环境变量：`DISABLE_SAVE_CHECKPOINT=1`
+  - 行为：
+    - 保留 `LOAD_CHECKPOINT_PATH` / `--load` / `--finetune`
+    - 跳过 `--save`
+    - 将 `SAVE_INTERVAL` 压为 `0`
+  - 目的：
+    - 允许真实预训练 checkpoint benchmarking 不再因为 final save 占满 `sd-2` 根分区而失败
+- [x] [2026-04-19] **no-save clean-shell rerun 的 CPUAdam JIT blocker 已解决，并被真实 baseline/static 对照实跑验证**：
+  - 根因：
+    - 新 shell 没继承此前成功 run 的 `/dev/shm` 构建缓存环境，`CPUAdamBuilder().load()` 回退到 `/home/user/.cache/torch_extensions/py310_cu128`
+  - 修复方式：
+    - clean shell 显式恢复 `TORCH_EXTENSIONS_DIR=/dev/shm/...`、`TMPDIR=/dev/shm/...`、`PYTHONPYCACHEPREFIX=/dev/shm/...`、`TRITON_CACHE_DIR=/dev/shm/...`
+    - 同时保留 `PYTHONDONTWRITEBYTECODE=1`、`TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1`、`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`、`TORCH_NCCL_BLOCKING_WAIT=1`
+    - `scripts/run_experiment.sh` 现在也会把 `TRITON_CACHE_DIR` 透传进远端 `.deepspeed_env`
+  - 验证结果：
+    - `eth_real_qwen25_7b_tp2pp2dp2_baseline_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+    - `eth_real_qwen25_7b_tp2pp2dp2_static1395_formal20_finetune_nw0_nosave_fixenv_20260419_sd-1`
+    - 两者都完成 `20/20`，未再触发 `/home/user/.cache/torch_extensions/py310_cu128` 权限错误
+- [x] [2026-04-19] **完成 `Qwen2.5-7B-Instruct` 在 `sd-1/sd-2` 上的顺序 HF->Megatron 转换验证**：
+  - 目标模型与权重：
+    - HF snapshot `Qwen2.5-7B-Instruct/a09a35458c702b33eeacc393d103063234e8bc28`
+    - 真实 `28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4`
+  - 转换拓扑：
+    - 两台 Ethernet 节点各自本地 `4 GPUs`
+    - `TP=2 / PP=2 / DP=1`
+    - 运行时：`/home/user/miniconda3/envs/tp4bit/bin/{python,deepspeed}`
+  - 关键修复：
+    - `tools/hf2megads_weight_converter.py` 不再信任 `tokenizer.vocab_size` 作为 Qwen 词表行数
+    - 若 HF checkpoint 含 `model.embed_tokens.weight`，直接以其行数作为 `token_vocab`
+    - 在构建 DS 模型前读取 HF `config.json.vocab_size`，必要时上调 `args.padded_vocab_size`
+  - 成功产物：
+    - `sd-1`: `/home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_fixvocab2_20260419_114318`
+    - `sd-2`: `/home/user/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_sd2_20260419_114724`
+    - 两边日志都以 `save checkpoint completed` 结束
+    - 两边目录都约 `15G`，`global_step0` 顶层条目数都为 `67`，`latest=global_step0`
+  - 一致性检查：
+    - `layer_01-model_00-model_states.pt` 与 `layer_16-model_01-model_states.pt` 在双机上的 `sha256` 完全一致
+    - `mp_rank_00_model_states.pt` 哈希不同，当前判断更像保存路径/元数据差异，而不是核心层权重分片不一致
+  - 结论：
+    - 现有 `hf2megads` 已足以支撑真实 Qwen2.5-7B-Instruct 权重主线，不必立刻切换到 `Megatron-Bridge`
+    - 下一步 blocker 已变为“真实 checkpoint 的多节点 `--load` smoke”，而不是“能否转换”
+- [x] [2026-04-19] **完成“四组主结果是否为真实 `Qwen2.5-7B-Instruct`”的 provenance 审计**：
+  - 当前四组正式 `baseline/static` 对照来自 `.context/dual_env_topology_compare_tpge2_20260419/artifacts/{eth_static,ib_static}/`
+  - 核对 `run.json.config.model` 与 `command.argv` 后确认，其 workload 为 `36L / hidden 2048 / ffn 11008 / heads 16 / kv_heads 4`
+  - 数据集使用真实 mmap prefix `qwen_data_text_document`，tokenizer 使用 `Qwen2.5-7B-Instruct` 路径或本地平铺 tokenizer
+  - 命令中没有 `--load` / checkpoint 参数，因此这些结果不是“真实 Qwen2.5-7B-Instruct 权重”实验
+  - PPT headline 数据来自历史 V100 双机案例 `TP=1 / PP=4 / DP=4` 与 `TP=2 / PP=2 / DP=4`；它们更接近 `28L / hidden 3584 / ffn 18944 / heads 28 / kv_heads 4` 的 7B-like 结构，但 baseline provenance 仍以 `memory-bank/observability.md` preserved summary 为主
+  - 当前结论：后续若要以“真实 7B workload”作为主证据，需要在 latest code 上补跑 7B-like 配置；若要求“真实预训练权重”，则需要单独设计 checkpoint 加载路径
+- [x] [2026-04-19] **完成用户修正口径下的“双环境、同拓扑 baseline/static 正式对照”，并本地沉淀中文总结**：
+  - 主对照口径：
+    - 只比较同一拓扑下 `baseline` 与 `static fixed clock`
+    - 不再把不同拓扑之间的差异当作主结论
+  - 共同 workload：
+    - `2 nodes x 4 GPUs`
+    - `36L / hidden 2048 / ffn 11008 / heads 16 / kv_heads 4`
+    - `micro=1 / global=4 / seq=2048 / train-iters=20`
+    - `ZeRO-1 + CPU optimizer/offload`
+    - dataset `qwen_data_text_document`
+  - 环境与拓扑：
+    - Ethernet：`sd-1/sd-2`，GPU `0,1,2,3`
+    - IB：`v100x16-1/v100x16-2`，GPU `8,9,10,11`
+    - topology `TP=2 / PP=2 / DP=2`
+    - topology `TP=4 / PP=2 / DP=1`
+  - 本地原始工件：
+    - `.context/dual_env_topology_compare_tpge2_20260419/artifacts/eth_static/`
+    - `.context/dual_env_topology_compare_tpge2_20260419/artifacts/ib_static/`
+  - 中文汇总：
+    - `汇报总结_20260415/10_同拓扑下基线与定频对比.md`
+  - 关键结果范围：
+    - Ethernet `TP=2 / PP=2 / DP=2`：能耗 `-22.5% ~ -26.0%`，时间 `+6.3% ~ +16.7%`
+    - Ethernet `TP=4 / PP=2 / DP=1`：能耗 `-28.0% ~ -28.5%`，时间 `+3.9% ~ +7.2%`
+    - IB `TP=2 / PP=2 / DP=2`：能耗 `-25.1% ~ -27.8%`，时间 `+21.6% ~ +34.7%`
+    - IB `TP=4 / PP=2 / DP=1`：能耗 `-29.2% ~ -31.4%`，时间 `+17.5% ~ +29.3%`
+  - 当前更适合拿来做汇报代表点的是：
+    - Ethernet `TP=4 / PP=2 / DP=1 @ 1395 MHz`
+    - IB `TP=4 / PP=2 / DP=1 @ 1080 MHz` 或 `1155 MHz`
+- [x] [2026-04-19] **完成 `TP>=2` 的双环境 topology-only 对比，并把工件全部回拉到本地**：
+  - 共同 workload：`2 nodes x 4 GPUs`，`36L / hidden 2048 / ffn 11008 / heads 16 / kv_heads 4 / micro=1 / global=4 / seq=2048 / train-iters=20 / ZeRO-1 + CPU optimizer/offload`
+  - 数据集：`qwen_data_text_document`
+  - 对比拓扑：
+    - `TP=2 / PP=2 / DP=2`
+    - `TP=4 / PP=2 / DP=1`
+  - 环境：
+    - Ethernet：`sd-1/sd-2`，GPU `0,1,2,3`
+    - IB：`v100x16-1/v100x16-2`，GPU `8,9,10,11`
+  - 本地工件路径：`.context/dual_env_topology_compare_tpge2_20260419/artifacts/{eth,ib}/`
+  - 本地摘要：`.context/dual_env_topology_compare_tpge2_20260419/results_summary_kv4.md`
+  - Zeus 结果：
+    - Ethernet `tp2pp2dp2`: `129.39s / 40490.20J / 312.94W`
+    - Ethernet `tp4pp2dp1`: `158.06s / 48914.50J / 309.47W`
+    - IB `tp2pp2dp2`: `155.21s / 105340.95J / 678.72W`
+    - IB `tp4pp2dp1`: `127.52s / 97714.23J / 766.27W`
+  - 相对 `tp2pp2dp2`：
+    - Ethernet `tp4pp2dp1`: `time +22.16%`, `energy +20.81%`, `avg_power -1.11%`
+    - IB `tp4pp2dp1`: `time -17.84%`, `energy -7.24%`, `avg_power +12.90%`
+- [x] [2026-04-19] **补上 launcher 的 GQA/TP 前置合法性检查，避免非法拓扑晚爆炸**：
+  - `scripts/run_experiment.sh` 现在会在启动前直接校验：
+    - `NUM_HEADS % TP == 0`
+    - `NUM_KV_HEADS % TP == 0`
+  - 触发背景：最初的 `kv_heads=2` 拓扑对比脚本在 `TP=4 / PP=2 / DP=1` 下直到 `ParallelAttention` 构图阶段才报 `AssertionError: 2 is not divisible by 4`
+  - 结果：当前这类非法 GQA/TP 组合会在 launcher/preflight 阶段更早、更明确地失败，减少远端长日志排查成本
+- [x] [2026-04-19] **完成 Ethernet / IB 双环境同负载 `2x4` 正式 sweep，并把工件全部保存在本地**：
+  - 共同 workload：`2 nodes x 4 GPUs`，`TP=1 / PP=2 / DP=4 / 36L / hidden 2048 / ffn 11008 / heads 16 / kv_heads 2 / micro=1 / global=4 / seq=2048 / train-iters=20 / ZeRO-1 + CPU optimizer/offload`
+  - Ethernet 运行节点：`sd-1/sd-2`，GPU `0,1,2,3`；IB 运行节点：`v100x16-1/v100x16-2`，GPU `8,9,10,11`
+  - 本地工件路径：`.context/dual_env_common_workload_20260419/artifacts/{eth,ib}/`
+  - Ethernet Zeus 汇总：
+    - baseline: `168.22s / 51438.76J / 305.79W`
+    - static1005: `198.73s / 40212.95J / 202.35W` (`time +18.14%`, `energy -21.82%`, `avg_power -33.83%`)
+    - static1200: `184.72s / 38400.35J / 207.89W` (`time +9.81%`, `energy -25.35%`, `avg_power -32.02%`)
+    - static1395: `181.38s / 38436.71J / 211.91W` (`time +7.82%`, `energy -25.28%`, `avg_power -30.70%`)
+  - IB Zeus 汇总：
+    - baseline: `182.48s / 114005.41J / 624.75W`
+    - static990: `244.73s / 88633.16J / 362.17W` (`time +34.11%`, `energy -22.26%`, `avg_power -42.03%`)
+    - static1080: `229.77s / 86021.34J / 374.38W` (`time +25.91%`, `energy -24.55%`, `avg_power -40.07%`)
+    - static1155: `212.35s / 84274.51J / 396.86W` (`time +16.37%`, `energy -26.08%`, `avg_power -36.48%`)
+  - 这批结果可作为“同 workload、不同网络/硬件环境”的最新 baseline/static 对照基础，但其 runtime 惩罚明显大于此前某些 headline 案例，后续汇报应按 workload-matched 证据如实表述。
+- [x] [2026-04-19] **完成 workload 级实验数据图表总览，并显式区分“当前可支撑”与“必须补跑”的实验**：
+  - 新增 `汇报总结_20260415/脚本/生成实验数据图表总览.py`，直接从本地 `run.json` 和 formal replay report 生成图表与 Markdown 总览
+  - 新增 `汇报总结_20260415/09_实验数据图表总览.md`，按 workload 元数据、source/target 曲线和 replay 精度组织当前主证据
+  - 新增 `汇报总结_20260415/图表/{ib_formal_curves,eth_formal_curves,formal_replay_mape}.png`
+  - 当前文档已明确：2026-04 的 IB formal rerun 与 Ethernet formal replay 可以作为 workload 级主图；历史 `TP=1,PP=4,DP=4` / `TP=2,PP=2,DP=4` headline 案例因 baseline 工件缺失或元数据过旧，暂只保留为待补实验
+- [x] [2026-04-16] **将学术化 PPT 进一步强化为图表版**：
+  - `汇报总结_20260415/generate_ppt.py` 已将案例 A/B 页面改为相对 baseline 的多序列柱状图，并保留右侧精简 delta 表和 baseline 锚点
+  - 受控结论页新增 `runtime delta vs avg power delta` trade-off 象限图，直接展示 7 个 static 点整体落在“功率显著下降、时间基本不变”的区域
+  - IB replay 页面已改为 `Observed vs Predicted` 时间/功率图；Ethernet replay 页面已改为 `Observed vs Predicted` 时间图 + 逐频点 APE 图
+  - 重新生成后的 `汇报总结_20260415/GPU能效优化_20%+功耗节省方案.pptx` 仍为 13 页，但关键结果页已不再以表格为主
+- [x] [2026-04-16] **将汇报 PPT 重构为更具学术风格的证据链版本**：
+  - 重写 `汇报总结_20260415/generate_ppt.py`，把 deck 主线改为：研究问题 -> 公平对照口径 -> Baseline vs Static 证据 -> Predictor formal replay -> 结论与边界
+  - 新 deck 不再以缺少支撑的“20%+ headline”作为前置页面，而是显式加入 Baseline 对照表，直接展示 `ΔTime / ΔPower / ΔEnergy`
+  - 新增设计文档：`docs/plans/2026-04-16-academic-ppt-redesign.md`
+  - 同步更新 `汇报总结_20260415/02_PPT提纲.md`、`03_PPT页面文案.md` 与 `08_完整PPT与汇报材料.md`
+  - 当前 PPT 的关键表达边界也已同步写入内容：受控节能证据来自 Baseline/static + Zeus，对 predictor 的正式 claim 主要来自本地 formal replay，而 Ethernet 与 IB 因 topology 不同不直接做一维排名
+- [x] [2026-04-15] **完成汇报材料单目录重组，并统一改为中文版本**：
+  - 新增根目录：`汇报总结_20260415/`
+  - 将此前分散在 `.context/`、`docs/plans/` 和顶层 `scripts/` 的汇报相关内容收拢到一个目录下
+  - 当前集中材料包括：实验口径、PPT 提纲、页面文案、演示流程、证据清单、讲稿和实现说明
+  - 当前集中脚本包括：`汇报总结_20260415/脚本/运行1p5b演示.sh`、`汇报总结_20260415/脚本/批量运行1p5b对比.sh`、`汇报总结_20260415/脚本/对比Zeus结果.py`
+  - 批量 demo 输出目录默认也已收口到 `汇报总结_20260415/结果/`
+- [x] [2026-04-15] **完成 baseline/static 演示版 PPT 与 1.5B demo workflow 首版落地**：
+  - 新增设计文档：`docs/plans/2026-04-15-baseline-static-demo-design.md`
+  - 新增演示材料目录：`.context/ppt_baseline_static_demo_1p5b_20260415/`
+  - 新增 `ppt_outline.md`，按 `problem -> fairness -> launch workflow -> compare -> predictor positioning` 组织页面结构
+  - 新增 `demo_flow.md`，固定展示路径为 `VALIDATE_ONLY=1 -> baseline -> static -> compare`
+  - 新增 `scripts/run_qwen1p5b_demo.sh`，把 canonical launcher 包装成 `Qwen2.5-style 1.5B` 的短步数 demo preset
+  - 新增 `scripts/run_qwen1p5b_demo_sweep.sh`，可顺序执行 baseline + 多个 static 频点并生成 manifest
+  - 新增 `scripts/compare_zeus_runs.py`，直接读取 `run.json.power_metrics.zeus` 输出 Markdown 对比表，方便贴进 PPT 或报告
+- [x] [2026-04-15] **完成 baseline-vs-fixed-frequency 总结汇报材料首版搭建**：
+  - 新增目录：`.context/briefing_baseline_vs_fixedfreq_20260415/`
+  - 新增 `README.md`，统一定义当前汇报主线：baseline 代表 Megatron-DeepSpeed 原始默认运行，static 代表相同 workload/topology 下只改变锁频策略的对照实验
+  - 新增 `baseline_static_experiment_recipe.md`，沉淀 baseline/static 的公平对比口径、统一 launcher 语义，以及 Zeus 指标字段建议
+  - 新增 `briefing_outline.md` 与 `speaker_notes.md`，可直接复用到阶段汇报、论文报告或答辩表述
+  - 新增 `evidence_inventory.md`，显式区分 `artifact-backed local` 与 `memory-bank preserved` 两类证据，避免后续写作误把历史摘要当作“当前本地完整工件”
+  - 当前建议 headline：`合适的固定频点可带来约 20% 量级的平均功率下降，部分拓扑可达 25% 到 35%+，同时 runtime 基本不变`
+- [x] [2026-04-12] **完成论文实验工件本地留存审计**：
+  - 新增 `.context/paper/local_artifact_audit_20260412.md`
+  - 逐项确认当前论文依赖的 benchmark JSON、formal source/target curves、以及 IB/Ethernet formal transfer replay 工件都存在于本地
+  - 已用 SHA256 对比 `sd@v100x16-1` 上的 6 个正式 IB run，确认关键文件与本地一致
+  - 新发现：`sd-1` 上 Ethernet target bundle 已明显残缺，只剩根目录、`ds_config.json` 与 `logs/`
+  - 新发现：`sd-2` 上已搜索不到 `eth_qwen3b_1x4_source_static*` / `*source_curve*20260409*` 目录
+  - 结论：当前论文所需数据已经保存在本地，而且本地 `.context/eth_2x4_curve_eval_20260409/...` 目录实际上是 Ethernet formal artifacts 的保全副本
+- [x] [2026-04-11] **论文正式结果图已生成并接入构建流程**：
+  - 新增 `.context/paper/generate_figures.py`，直接从 formal benchmark / transfer JSON 工件生成 paper-safe 图像
+  - 当前输出：
+    - `.context/paper/figures/benchmark_transport_curve.pdf`
+    - `.context/paper/figures/ib_diagnostics.pdf`
+  - `.context/paper/sections/results.tex` 已改为在正文中引用这两张图，并移除了对应的低信息密度静态表
+  - `.context/paper/Makefile` 现支持 `make figures`，且 `make` / `make quick` 会自动刷新图片后再编译 PDF
+  - 验证结果：加入正式图后 `make` 仍成功，`main.pdf` 保持 `6 pages`
+- [x] [2026-04-11] **论文正文排版告警已进一步收敛**：
+  - 重新执行 `.context/paper/Makefile` 后，确认 `main.pdf` 持续可生成
+  - 已轻量改写 `.context/paper/sections/results.tex` 与 `.context/paper/sections/conclusion.tex` 两处松散段落
+  - 当前 `rg -n "Underfull|Overfull" .context/paper/main.log` 只剩 `main.bbl` 内一条参考文献 underfull，正文章节已无 `Underfull/Overfull` 告警
+- [x] [2026-04-11] **本地论文编译环境已恢复可用**：
+  - 已确认 `pdflatex` 来自 `/Library/TeX/texbin/pdflatex`
+  - 已通过 `tlmgr --usermode` 安装缺失 LaTeX 包：`ieeetran`, `algorithms`, `multirow`, `subfigure`, `courier`
+  - 已更新 `.context/paper/Makefile`，让构建显式使用 `/Library/TeX/texbin/{pdflatex,bibtex}` 并把 TeX 缓存写到 `.context/paper/.texlive-cache/`
+  - 验证结果：
+    - `make quick` 成功
+    - `make` 成功
+    - 输出 PDF：`.context/paper/main.pdf`
+- [x] [2026-04-11] **完成论文主报告与当前 formal artifacts 对齐**：
+  - 已更新 `.context/paper/sections/abstract.tex`
+  - 已更新 `.context/paper/sections/introduction.tex`
+  - 已更新 `.context/paper/sections/background.tex`
+  - 已更新 `.context/paper/sections/methodology.tex`
+  - 已更新 `.context/paper/sections/experiments.tex`
+  - 已更新 `.context/paper/sections/results.tex`
+  - 已更新 `.context/paper/sections/conclusion.tex`
+  - 已更新 `.context/paper/README.md`
+  - 当前正文已移除把历史 `1.8%`、单节点 `111.48 Gbps`、以及二元 threshold 方法写成“当前正式结论”的表述；正式 headline 已统一为 fresh IB `11.48% / 3.28% / 7.86%` 与 Ethernet `5.16% / 12.38% / 10.42%`
+- [x] [2026-04-11] **完成 fresh IB formal artifacts 的远端 sanity check，当前结果不是本地解析幻觉**：
+  - 远端主核验点：`sd@v100x16-1`
+    - source: `ib_dual8_tp4pp1dp2_formal_990_20260410_20260410_161719_DGX2-1`
+    - target: `ib_dual16_tp4pp1dp4_formal_1080_20260411_110907_DGX2-1`
+    - target: `ib_dual16_tp4pp1dp4_formal_1155_20260411_111702_DGX2-1`
+  - 三个目录均确认：
+    - `run.json.status=completed`
+    - `final_iteration=20`
+    - source `visible_gpu_indices=[8,9,10,11]`, `world_size=8`
+    - target `visible_gpu_indices=[8..15]`, `world_size=16`
+    - `events.jsonl` 含真实 Zeus interval / finalized 事件
+    - 日志含带 `v100x16-2:` 前缀的 `iteration 1..20/20` 行
+  - `hostfile_snapshot.json` 明确记录双机：
+    - source `v100x16-1 slots=4`, `v100x16-2 slots=4`
+    - target `v100x16-1 slots=8`, `v100x16-2 slots=8`
+  - `sd@v100x16-2` 侧补查显示同名 target 目录可见，但只保留 `ds_config.json`；当前推断是正式 artifact 由 launch node `DGX2-1` 聚合写盘，`DGX2-2` 不应被当作 artifact 缺失的反证
+- [x] [2026-04-11] **完成 predictor 全量单测回归，当前模型层处于健康状态**：
+  - 命令：`python3 -m pytest --noconftest -q tests/unit_tests/test_freq_model.py`
+  - 结果：`38 passed in 103.89s`
+  - 过程中发现旧断言 `test_cross_node_penalty_slows_and_depowers_multinode_prediction` 假设“多节点一定 depower”，与当前 per-node power 语义不再一致；已修正为“在 `gpus_per_node` 不变时，多节点功率应保持近似同量级”
+  - 当前结论：围绕 throughput / cross-node penalty / cluster-capacity scaling / per-node power scaling 的 predictor 主路径，在本地回归上无红灯
+- [x] [2026-04-11] **完成 per-node GPU-count power scaling，并验证 fresh IB `2x4 -> 2x8` replay 的功率/能耗误差显著收敛**：
+  - 代码改动：
+    - `analysis/freq_model/model.py`: 新增 `_local_gpu_count_power_scale()`，让 `predict_power_w()` 显式按 `target.gpus_per_node / reference_gpus_per_node` 缩放
+    - `analysis/freq_model/calibrate.py`: 持久化 `reference_gpus_per_node`
+    - `tests/unit_tests/test_freq_model.py`: 新增 `test_local_gpu_count_power_scale_tracks_per_node_growth`
+  - targeted tests:
+    - `python3 -m pytest --noconftest -q tests/unit_tests/test_freq_model.py -k 'cluster_capacity_scale_tracks_gpu_growth_and_pipeline_efficiency or local_gpu_count_power_scale_tracks_per_node_growth or cross_node_penalty_exposure_increases_with_frequency or network_quality_observation_and_penalty_scaling'`
+      - `4 passed`
+    - `python3 -m pytest --noconftest -q tests/unit_tests/test_freq_model.py -k 'load_calibrate_and_overlay_modes or predict_script_network_benchmark_annotation or local_gpu_count_power_scale_tracks_per_node_growth'`
+      - `3 passed`
+  - 新 replay 产物：`.context/transfer_eval_ib_2x4_to_2x8_rerun_topology_fixed_live_ib_powerfix_20260411/`
+  - 相对上一版 live-IB replay（`.context/transfer_eval_ib_2x4_to_2x8_rerun_topology_fixed_live_ib_20260411/`）：
+    - `total_time_mape`: `11.48% -> 11.48%`（不变）
+    - `avg_power_mape`: `51.64% -> 3.28%`
+    - `total_energy_mape`: `46.07% -> 7.86%`
+  - 当前逐频点功率 / 能耗 APE：
+    - `990 MHz`: power `5.11%`, energy `2.98%`
+    - `1080 MHz`: power `2.24%`, energy `9.22%`
+    - `1155 MHz`: power `2.48%`, energy `11.37%`
+  - 结论：对 `avg_power_w` 而言，当前 artifact 语义更接近“每节点总功率”，因此当 `gpus_per_node` 从 `4 -> 8` 时需要显式 power scaling；修复后 fresh IB formal rerun 的主要剩余误差重新集中在 runtime，而不是 power/energy
+- [x] [2026-04-11] **完成 transport-consistent `2x4 -> 2x8` IB formal replay，并确认 continuous benchmark scaling 没有破坏 IB transfer**：
+  - 先将 source 工件整理为 `.context/ib_formal_rerun_20260410/source_curated/`，只保留 completed 的 `990 / 1080 / 1155_retry` 三个 `2x4` IB source 点，显式排除 `status=incomplete` 的旧 `1155`
+  - stock `scripts/evaluate_transfer_prediction.py` 无法直接用于这组 canonical transfer，因为它要求 source/target 的 non-topology workload 完全一致，而当前 pair 是 `2x4 / DP=2 / GBS=8` → `2x8 / DP=4 / GBS=16`
+  - 因此改用 topology-fixed replay 方式复用同一套分析模块，并记录显式 `source_override` / `target_override`；输出目录：`.context/transfer_eval_ib_2x4_to_2x8_rerun_topology_fixed_live_ib_20260411/`
+  - live dual-node IB benchmark (`.context/ib_formal_replay_20260410/comm_bench_2x4_20260410_ibhist.json`) 下的 formal replay 结果：
+    - `alpha_dp=2.220525e-11 s/byte`
+    - `total_time_mape=11.48%`
+    - `step_time_mape=11.48%`
+    - `avg_power_mape=51.64%`
+    - `total_energy_mape=46.07%`
+  - 逐频点时间 APE：
+    - `990 MHz`: `8.53%`
+    - `1080 MHz`: `11.73%`
+    - `1155 MHz`: `14.19%`
+  - 对照项：
+    - legacy no-network replay 仍更差：`time_mape=13.81%`
+    - earlier mixed-provenance raw-artifact live-IB replay 为 `19.01%`，说明新 transport-consistent rerun 明显改善
+    - 历史 `111.48 Gbps` benchmark 只把时间 MAPE 从 `11.48%` 微调到 `11.43%`，说明当前剩余误差不再由 benchmark provenance 主导
+  - 结论：continuous benchmark-scaled `alpha/beta` 没有把 IB path 打回 slow-network，但这批 fresh formal rerun 仍未恢复 paper-era `<10%` 级别；下一阶段应优先分析 power/energy 系统性低估与论文中的表述边界
+- [x] [2026-04-10] **补回 `2x8` IB formal target 的 `990 MHz` 成功点并回拉本地**：
+  - 首次 formal `990` (`ib_dual16_tp4pp1dp4_formal_990_20260410_192729_DGX2-1`) 在 `training ...` 后立即由 `rank0` 命中 `torch.AcceleratorError: CUDA error: out of memory`，`run.json.status=incomplete`
+  - 本地已给 `megatron/training.py` 增加 `DISABLE_ZEUS_MONITORING` 开关并同步到两台 DGX2；随后用 detached 单频 retry driver `.context/ib_dual16_diag_nozeus_990_driver_20260410.sh` 发起 `ib_dual16_tp4pp1dp4_diag_nozeus_990_20260410_202433_DGX2-1`
+  - retry run 成功完成 `20` 步，`run.json.status=completed`，关键结果：
+    - `time_s=401.18670558929443`
+    - `energy_j=477080.10800009966`
+    - `avg_power_w=1189.172276532262`
+    - `topology.resolved.visible_gpu_indices=[8,9,10,11,12,13,14,15]`
+    - `topology.resolved.nproc_per_node=8`
+  - 已将该 run 回拉到本地：`.context/ib_formal_rerun_20260410/target_partial/ib_dual16_tp4pp1dp4_diag_nozeus_990_20260410_202433_DGX2-1/`
+  - 当前剩余 `1080/1155 MHz` 还未补齐，因为 `DGX2-1` 在 `990` 完成后被外部 `VLLM::Worker_TP8..15` 重新占回 `GPU 8-15`
+
+- [x] [2026-04-10] **恢复并完成 `2x8` IB target smoke（`GPU 8-15` on both DGX2 nodes）**：
+  - 首次 `2x8` smoke `ib_dual16_tp4pp1dp4_smoke_1080_20260410_171438_DGX2-1` 并不是训练本体 bug，而是 `DGX2-2` 缺少 workload 哈希 `d1158a21c6d1be91201644dbce18ab32` 对应的 mmap index-cache 文件，导致远端 `GPTDataset` 初始化时报 `FileNotFoundError`
+  - 已把 `d1158a21c6d1be91201644dbce18ab32_{doc,sample,shuffle}_idx.npy` 从 `DGX2-1` 同步到 `DGX2-2`
+  - 清理失败 run 残留后，使用 detached driver `.context/ib_dual16_smoke_1080_driver_20260410.sh` 成功重跑 `ib_dual16_tp4pp1dp4_smoke_1080_20260410_192035_DGX2-1`
+  - 新 smoke `run.json.status=completed`，关键元数据：
+    - `hostfile.entries=[v100x16-1,v100x16-2]`
+    - `topology.resolved.visible_gpu_indices=[8,9,10,11,12,13,14,15]`
+    - `topology.resolved.nproc_per_node=8`
+    - `preflight.ok=true`
+  - Zeus 区间汇总：`38.452s / 46709.31J / 1214.74W`
+  - run 结束后，两边 `GPU 8-15` 均回到 `0 MiB / 0%`
+
+- [x] [2026-04-10] **启动 detached `2x8` IB formal target sweep**：
+  - 新增 `.context/ib_dual16_formal_sweep_driver_20260410.sh`
+  - 固定配置：`TP=4 / PP=1 / DP=4 / ZeRO-1 / GBS=16 / MICRO=1 / TRAIN_STEPS=20 / GPUs 8-15 on both nodes`
+  - 频点顺序：`990 / 1080 / 1155 MHz`
+  - 采用独立 `MASTER_PORT=30031/30032/30033` 串行运行，避免长时间本地交互会话中断后把远端 worker 留挂
+
+- [x] [2026-04-10] **完成新的双机 `2x4` IB smoke，确认 metadata / hostfile / preflight 已在正式 launcher 路径上对齐到 `GPU 8-11`**：
+  - 首次重试 `ib_2x4_smoke_rerun_20260410_retry_20260410_154329_DGX2-1` 暴露 `.deepspeed_env` overlay bug：原逻辑会把备份文件和新增 `MEGATRON_*` 变量之间插入空行，导致 `deepspeed.runner` 在解析 `.deepspeed_env` 时触发 `ValueError: not enough values to unpack`
+  - 已修复 `scripts/run_experiment.sh`：overlay 时只保留合法 `KEY=VALUE` 行，并同步到 `sd@v100x16-{1,2}`
+  - 修复后重新运行 `ib_2x4_smoke_rerun_20260410_retry_20260410_155057_DGX2-1` 成功完成 `2` 个 step，关键结果：`step1=19.650s`, `step2=19.455s`, Zeus `39.1s / 23609.5J / 603.3W`
+  - 回拉工件确认 `run.json.status=completed`，且：
+    - `run.json.hostfile.entries=[v100x16-1,v100x16-2]`
+    - `run.json.topology.resolved.visible_gpu_indices=[8,9,10,11]`
+    - `run.json.topology.resolved.nproc_per_node=4`
+    - `run.json.preflight.ok=true`
+    - `run.json.preflight.node_results[*].gpu_indices=[8,9,10,11]`
+  - 两台机器在 run 结束后 `GPU 8-11` 都回到 `0 MiB / 0%`
+
+- [x] [2026-04-10] **修复 hostfile 本机别名误判，避免把 `v100x16-1` 当成远端再次预检/锁频**：
+  - 新 smoke 虽然成功，但 `preflight.json` 仍出现重复的 `DGX2-1` 节点，原因是 hostfile 中的 `v100x16-1` 解析到 `100.64.0.90`，而本地主机名 `DGX2-1` / `dgx2-1` 只回到 `127.0.1.1`
+  - 已在 `scripts/experiment_utils.sh:is_local_host_alias()` 中加入 `hostname -I` 接口地址集合，让本机识别按真实本地 IP 判断，而不只靠主机名
+  - 通过 `VALIDATE_ONLY=1` 运行 `ib_2x4_validate_aliasfix2_20260410_20260410_160700_DGX2-1` 复核后，`preflight.json.node_results` 已恢复为正确的 `2` 个节点：`DGX2-1` 和 `DGX2-2`
+
+- [x] [2026-04-10] **确认上一轮 IB smoke 仍不能作为 metadata patch 已验证的正式证据，并完成单机 clean-launcher 复核**：
+  - 回拉 `/home/sd/Megatron-DeepSpeed/experiments/ib_2x4_smoke_rerun_20260410_20260410_132952_DGX2-1/{run.json,hostfile_snapshot.json,topology.json,preflight.json}` 后确认：`run.json.hostfile={}`、`run.json.topology.resolved={}`，`topology.json` 仍是 `visible_gpu_indices=0-15 / nproc_per_node=16`，`preflight.json` 的本地节点也仍记录 `gpu_indices=0-15`
+  - 这说明那一轮成功 smoke 只能证明训练链路可跑通，不能证明新版 `LOCAL_GPU_INDICES + .deepspeed_env` 元数据补丁已经实际生效
+  - 随后在空闲的 `DGX2-2` 上发起单机 `deepspeed` smoke `ib_single_node_metadata_verify_20260410_20260410_134052_DGX2-2`，显式传入 `CUDA_VISIBLE_DEVICES=8,9,10,11`、`LOCAL_GPU_INDICES=8,9,10,11`
+  - 新 run 的 `run.json` 已正确记录 `topology.requested(tp=4, pp=1)`、`topology.resolved.visible_gpu_indices=[8,9,10,11]`，并把 `preflight.node_results[0].gpu_indices=[8,9,10,11]` 一并写入，证明 clean launcher 下 metadata 透传已经正常
+  - 该单机 run 在模型构建阶段因 `DeepSpeed runtime/utils.py -> psutil.virtual_memory()` 报 `AttributeError` 而中断，但 run dir 与 metadata 工件已成功生成；`DGX2-2` 的 `GPU 8-11` 之后已回到 `0 MiB / 0%`
+
+- [x] [2026-04-10] **定位当前双机 rerun 的唯一外部阻塞为 `DGX2-1` 全卡占用**：
+  - `scripts/preflight_check.sh --gpu-indices 8,9,10,11` 在 `DGX2-1` 报本地 load 高、目标切片利用率异常
+  - 进一步用 `nvidia-smi` / `pmon` 取证后确认，`lb` 的 `vllm serve /share-data/models/Llama-3.1-70B-Instruct --tp 16` 正在 `DGX2-1` 上占用全部 16 张卡，`VLLM::Worker_TP0..15` 每卡约 `9436 MiB`
+  - 结论：当前无法获得干净的 `2 nodes x 4 GPUs (8-11)` IB rerun；要继续 formal validation，必须先释放 `DGX2-1`
+
+- [x] [2026-04-10] **完成 live DGX2 IB benchmark + provenance audit，并用 fresh benchmark 重放 current-code topology-fixed transfer**：
+  - 为避免误用远端旧代码，先将本地新版 `.context/torch_nccl_comm_bench.py` 同步到 `sd@v100x16-1` 和 `sd@v100x16-2`；远端旧副本会直接拒绝 `--warmup-iters/--iters`
+  - 对齐 recovered 2026-04-03 正式 run 的启动事实后，确认历史主节点地址应为 `MASTER_ADDR=192.168.205.201` (`DGX2-1` / `enp6s0`)，此前 `.202` 路径与正式 run 不一致
+  - fresh live benchmark 最终在 `2 nodes x 4 GPUs`、`GPU 8-11`、`GLOO/NCCL_SOCKET_IFNAME=enp6s0`、`NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_6,mlx5_7,mlx5_8,mlx5_9`、`NCCL_IB_DISABLE=0` 下成功落盘到 `.context/ib_formal_replay_20260410/comm_bench_2x4_20260410_ibhist.json`
+  - live dual-node `busbw` 曲线：`1MB=6.39 Gbps`, `4MB=9.84 Gbps`, `16MB=11.54 Gbps`, `64MB=18.76 Gbps`
+  - 随后在相同 recovered raw artifact 上执行 topology-fixed replay，输出 `.context/ib_formal_replay_20260410/transfer_eval_current_code_topology_fixed_live_ib.json` 和 `.md`
+  - fresh-benchmark replay 结果：`total_time_mape=19.01%`, `step_time_mape=19.01%`, `avg_power_mape=52.36%`, `total_energy_mape=43.28%`, `alpha_dp=2.22e-11 s/byte`
+  - 对比 paper-era single-node benchmark replay（`18.98%`, `alpha_dp≈2.00e-12`），时间精度几乎不变，说明当前 raw-artifact IB replay 的剩余误差并不是由 `111.48 Gbps` benchmark 单独支配
+  - 审计结论：旧 `<10%` / `≈1.8%` 论证链混合了 separate single-node IB benchmark 与 recovered DGX2 training artifact；在没有 transport-consistent rerun 或直接证明 raw training artifact 走 IB 之前，不能再把该数字当作 formal claim
+
+- [x] [2026-04-09] **完成 IB reconstructed sanity replay，continuous `alpha/beta` 未明显破坏 fast-network 行为**：
+  - 当前 workspace 缺 paper-era 原始 `2x8` IB target artifact，因此不能直接做 formal raw-artifact replay
+  - 采用 `.context/paper/experimental_data.md` 中的 IB 三频观测值，配合本地 `2x4` source / `2x8` target topology 定义，生成 reconstructed sanity replay，结果记录于 `.context/ib_synthetic_transfer_regression_20260409.md`
+  - synthetic legacy replay：`time_mape≈12.37%`, `power_mape≈3.02%`, `energy_mape≈8.99%`
+  - synthetic current replay：`time_mape≈11.23%`, `power_mape≈3.28%`, `energy_mape≈7.60%`
+  - 当前 IB synthetic `alpha_dp≈2.00e-12 s/byte`，保持 near-zero fast-network 量级
+  - 结论：continuous benchmark scaling 没有把 IB path 明显打坏，但这还不是足以替代论文正式数字 (`≈1.8%`) 的证据，后续仍需恢复或重跑 formal IB target 工件
+
+- [x] [2026-04-09] **加入 cluster-capacity transfer scaling，Ethernet `1x4 -> 2x4` 时间曲线显著改善**：
+  - `analysis/freq_model/model.py` 新增 cluster-capacity scaling，用 `(target_total_gpus / reference_total_gpus) * (target_pipeline_parallel_efficiency / reference_pipeline_parallel_efficiency)` 修正 base compute/memory anchor 的 transfer
+  - `analysis/freq_model/calibrate.py` 现会持久化 `reference_total_gpu_count` 与 `reference_pipeline_parallel_efficiency`
+  - 同时明确 power path 不使用这层 cluster scale 的 compute-limit normalization，以保持每节点功耗预测更合理
+  - focused tests 再次通过：`4 passed, 33 deselected`
+  - 重新回放 Ethernet formal 后，指标从旧 checkpoint 的 `time 40.17% / power 20.99% / energy 10.58%` 收敛到 `time 5.16% / power 12.38% / energy 10.42%`
+  - 当前结论：Ethernet `2x4` 时间预测已达到与此前 IB checkpoint 同量级的可用精度，下一步应验证该 scaling 是否能泛化到其他 world-size / transport 迁移
+
+- [x] [2026-04-09] **按用户要求将网络 benchmark 从“二元分支/直接罚时”收口为“连续调参”**：
+  - `analysis/freq_model/cross_node.py` 已移除 `>50 Gbps` 的 high-speed/slow-network 二元切换
+  - 新实现保留原始 `alpha_pp/alpha_dp/alpha_tp` 与 `beta_pp_*` 结构，再按 benchmark 的带宽/抖动结果连续缩放参数
+  - `analysis/freq_model/network.py` / `calibrate.py` 已补充 benchmark 曲线提取与持久化，便于后续诊断和扩展
+  - focused tests 通过：核心 cross-node/network case `3 passed`，wiring case `2 passed`
+  - 新 Ethernet `2x4` formal replay 工件：`.context/transfer_eval_eth_qwen3b_1x4_source_curve_20260409_curated_to_eth_qwen3b_2x4_target_curve_20260408_sd-1/`
+  - 指标变化：`total_time_mape 40.17% -> 39.19%`，`step_time_mape 40.17% -> 39.19%`，`total_energy_mape 10.58% -> 8.43%`，`avg_power_mape 20.99% -> 21.98%`
+  - 结论：连续 benchmark 调参可以削弱 Ethernet slow-network 的时间/能耗保守性，但当前仍不足以把时间误差压到论文主结论级别
+
+- [x] [2026-04-09] **完成 Ethernet `2x4` formal source→target predictor evaluation**：
+  - target 三频工件已从 `/dev/shm/megatron_eth_eval_20260408/eth_qwen3b_2x4_target_curve_20260408_sd-1` 拉回本地
+  - source 三频正式样本已整理为 `.context/eth_2x4_curve_eval_20260409/eth_qwen3b_1x4_source_curve_20260409_curated/`
+  - `1395 MHz` source 首轮补跑失败于 `torch.distributed.DistNetworkError: EADDRINUSE (29549)`；已清理仅属于该 run 的残留进程，并用 `29551` + `topology_29551.json` rerun 成功
+  - 本地 formal 回放命令：`python3 scripts/evaluate_transfer_prediction.py --source-root .context/eth_2x4_curve_eval_20260409/eth_qwen3b_1x4_source_curve_20260409_curated --target-root .context/eth_2x4_curve_eval_20260409/eth_qwen3b_2x4_target_curve_20260408_sd-1 --network-benchmark-json .context/comm_bench_2x4_eth0_20260406_175803.json`
+  - formal 指标：`total_time_mape=40.17%`, `step_time_mape=40.17%`, `avg_power_mape=20.99%`, `total_energy_mape=10.58%`
+  - 结论：Ethernet slow-network 路径下的时间曲线预测明显劣于此前 IB `<10%` checkpoint，但能耗曲线已接近论文可对比使用的精度
+
+- [x] [2026-04-08] **完成首个 `sd-1/sd-2` `2x4` Ethernet 全卡标准 smoke**：
+  - 固定使用 `GPU 0,1,2,3` on both hosts，`TP=1 / PP=2 / DP=4 / ZeRO-1 + CPU offload / GBS=4 / train-iters=2`
+  - 首次重跑暴露远端部分同步问题：`experiment_tracker.py` 依赖的 `megatron/gpu_freq_manager.py` 仍是旧版，报 `collect_nvml_device_snapshot` import error；补同步该文件后重试成功
+  - 关键结果：`step1=16.150s`, `step2=8.303s`, `skipped=0`, `max reserved≈10966 MB (rank0) / 10086 MB (rank4)`
+  - 标准工件恢复：`run.json`, `events.jsonl`, `command.sh`, `notes.md`, `manual_2x4.log` 已落盘到 `/home/user/Megatron-DeepSpeed/experiments/eth_qwen3b_2x4_fullgpu_smoke_20260408_sd-1`
+  - Zeus 区间汇总：`steps1-2 => 24.477s / 6891.9J / 281.6W / 2.377 tokens/J`
+  - 当前遗留：`run.json` 中 `hostfile/topology` 仍为空，说明 manual launcher 还没导出对应元数据环境变量
+
+- [x] [2026-04-07] **完成首个 `sd-1/sd-2` 2x2 Ethernet 目标 smoke**：
+  - 目标命令固定使用 `GPU 2,3` on both hosts，`PP=2 / DP=2 / ZeRO-1 + CPU offload`
+  - 运行条件：`NCCL_SOCKET_IFNAME=eth0`, `NCCL_IB_DISABLE=1`, `TORCH_EXTENSIONS_DIR=/tmp/torch_extensions_user`, `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
+  - `manual_cpuoffload_r5.log` 成功完成 `2` 个 step，清除了此前的 `Makefile python3`、远端 `ds_config` 缺失、`ninja` 路径、`pin_memory=true`、`index-cache` 缺失等阻塞
+  - 关键结果：`step1=37.418s`, `step2=10.976s`, `skipped=0`, `max reserved≈11126 MB (rank0) / 12786 MB (rank2)`
+  - 结论：当前 10GbE / socket 路径下，`2x2` Ethernet 目标拓扑已可稳定起跑
+
+- [x] [2026-04-07] **完成 workload 对齐后的单节点 source smoke**：
+  - 新目录：`/home/user/Megatron-DeepSpeed/experiments/eth_qwen3b_source_gb4_manual_20260407_sd-2`
+  - 固定使用 `sd-2` 的 `GPU 2,3`，保持 `PP=2 / TP=1 / ZeRO-1 + CPU offload`，把 `global_batch_size` 从旧 source smoke 的 `2` 对齐到 `4`
+  - 关键结果：`step1=34.361s`, `step2=8.296s`, `skipped=0`
+  - 目的：为“只跨拓扑、不跨 workload”的 Ethernet 时间预测提供 source anchor
+
+- [x] [2026-04-07] **完成 Ethernet provisional time-only replay**：
+  - 输入：对齐后的 source `step2=8.296s`，target `step2=10.976s`，网络基准 `.context/comm_bench_2x4_eth0_20260406_175803.json`
+  - 本地 replay 结果：target `step_time_predicted=14.683s`, `observed=10.976s`, `APE≈33.8%`
+  - 当前 slow-network 参数落在传统分支：`alpha_dp≈8.41e-10 s/byte`, `transport=eth0|ib_disable=1`, `effective_bandwidth≈0.2026`
+  - 结论：Ethernet slow-network 路径下的时间预测明显难于此前 IB 的 `<10%`，但该结果暂时仅可视为 provisional，因为远端工件尚未恢复到标准 `run.json/events.jsonl + Zeus` 形态
+
+- [x] [2026-04-05] **完成 `sd-1` / `sd-2` Ethernet 预检第一轮**：
+  - 两台机器都已恢复直接 SSH，可稳定访问 `user@sd-1` 和 `user@sd-2`
+  - 基础硬件确认：两边均为 `4 x RTX 4080 SUPER 16GB`，主机内存约 `100 GB`
+  - 运行时确认：默认 `/usr/bin/python3` (`3.12.3`) 无 `torch`；`tp4bit` Conda 环境可导入 `torch 2.10.0+cu128`、`deepspeed 0.14.0`、`einops 0.8.2`
+  - 网络现状：当前 SSH 会话走 `eth0`/socket 路径，`/dev/infiniband` 缺失，`rdma link show` 为空，应按 Ethernet-only 处理
+  - Repo 状态：两边 repo 都在 `/home/user/Megatron-DeepSpeed` 的 `main` 分支，但提交不同（`sd-1=f275844`, `sd-2=fbdc239`），且都缺少 `.context/torch_nccl_comm_bench.py` / `run_comm_bench.sh`
+  - 结论：下一步应先同步本地新代码，再运行 Ethernet 通信基准
+
+- [x] [2026-04-07] **完成 `sd-1` / `sd-2` 本地新代码同步**：
+  - 补回本地缺失的 `.context/torch_nccl_comm_bench.py`
+  - 将 predictor/benchmark 相关文件同步到两台机器：`analysis/freq_model/*` 关键模块、`scripts/predict_freq_sweet_spot.py`、`scripts/run_experiment.sh`、`scripts/preflight_check.sh`、`scripts/check_transfer_dataset_readiness.py`、`.context/run_comm_bench.sh`、`.context/test_cross_node_model.py`
+  - 远端验证：`sd-1` 上 `.context/test_cross_node_model.py` 通过，`sd-1/sd-2` 上 benchmark 脚本均通过 `python -m py_compile` / `bash -n`
+  - 遗留问题：tar 同步带入了少量 `scripts/._*` AppleDouble 文件，后续清理即可
+
+- [x] [2026-04-07] **完成首个 `sd-1/sd-2` Ethernet benchmark 工件**：
+  - 首次完整 recipe `1/4/16/64/256 MB × 20` 会在 `256 MB` 阶段超时退出 (`exit 124`)，但 `64 MB` 之前各档都已稳定输出
+  - 将 `.context/run_comm_bench.sh` 扩展为支持 `SIZES_MB`、`BENCH_WARMUP_ITERS`、`BENCH_ITERS` 覆盖
+  - 成功配置：`SIZES_MB="1 4 16 64"`, `BENCH_WARMUP_ITERS=3`, `BENCH_ITERS=8`
+  - 结果 JSON：`.context/comm_bench_2x4_eth0_20260406_175803.json`
+  - Predictor summarizer 输出：`transport=eth0|ib_disable=1`, `effective_bandwidth≈0.2026`, `small_jitter≈0.0153`, `large_jitter≈0.0072`
+  - 结论：该链路明确属于 slow-network 分支，后续 cross-node penalty 应沿标准/慢速网络路径解释
+
+- [x] [2026-04-03] **完成 `2x4 -> 2x8` Transfer 验证**：
+  - **源数据 (2x4)**: 990/1080/1155 MHz，IB 下干净采集
+  - **目标数据 (2x8)**: 990/1080/1155 MHz，IB 下干净采集
+  - **验证结果**:
+    - 源校准 MAPE: time=0.54%, energy=0.60% (极佳)
+    - Transfer 时间 MAPE: **98.50%** (严重失败)
+    - Transfer 能量 MAPE: **1.25%** (很好)
+  - **关键发现**:
+    - Predictor 严重高估 2x8 运行时间（预测 764s vs 实际 396s @ 990MHz）
+    - 实际 2x8 与 2x4 step time 几乎相同（IB 通信开销极低）
+    - 能量预测准确，说明功率模型正确
+  - **根因**: Cross-node 通信惩罚过度，不适用于 IB 高速网络环境
+  - **Artifacts**: `/home/sd/Megatron-DeepSpeed/.context/transfer_2x4_to_2x8_20260403/`
+
+- [x] [2026-04-03] **实现动态网络基准集成修复 Transfer 失败**：
+  - **问题**: Predictor 的 cross-node 惩罚系数基于 tailscale 慢速网络校准（~0.2 Gbps），IB 环境实际带宽 111 Gbps，惩罚被高估 ~1700 倍
+  - **解决**: 修改 `analysis/freq_model/cross_node.py`，支持通过 `network_bench_result` 参数动态检测网络速度
+    - 高速网络 (>50 Gbps): 使用接近零的惩罚系数（alpha_dp ~5e-13 s/byte）
+    - 慢速网络 (<50 Gbps): 使用传统惩罚系数（alpha_dp ~8e-10 s/byte）
+  - **实现细节**:
+    - `fit_cross_node_penalty_model()` 新增 `network_bench_result` 参数
+    - `calibrate_frequency_model()` 传递网络基准结果到 cross-node 模型
+    - 创建通信基准脚本 `torch_nccl_comm_bench.py` 测量实际带宽
+  - **验证**: 单元测试 `.context/test_cross_node_model.py` 通过，确认 IB 环境惩罚系数降低 1700x
+  - **Artifacts**: `.context/IB_NETWORK_FIX_SUMMARY.md`, `.context/torch_nccl_comm_bench.py`, `.context/run_comm_bench.sh`
+
+- [x] [2026-04-03] **论文框架搭建完成**：
+  - 创建 `.context/paper/` 目录结构
+  - 完成 LaTeX 模板配置 (`main.tex`, `preamble.tex`)
+  - 完成各章节框架: Abstract, Introduction, Methodology, Experiments, Results, Conclusion
+  - 创建 `experimental_data.md` 整理关键实验数据
+  - 创建 `figures/` 目录存放图表
+  - 论文主题: "Dynamic Network-Aware Cross-Node Performance Prediction for Distributed Deep Learning"
+
+- [x] [2026-04-03] **多拓扑扩展路线图制定**：
+  - **Tier-1 (网络层)**: 不同网络配置 (IB 100Gbps, RoCE 25/50Gbps, Ethernet 1/10Gbps, Tailscale VPN)
+  - **Tier-2 (拓扑层)**: 不同并行策略 (TP/PP/DP 组合), 不同节点规模 (2x4, 2x8, 2x16, 4x8)
+  - **Tier-3 (硬件层)**: 不同 GPU 代际 (V100, A100, H100), 不同互联拓扑 (NVLink, PCIe)
+  - **实施策略**: 从网络层开始，逐步向下扩展
+  - **验证计划**: 每个新环境都需要完整的 source→target transfer 验证
+
+- [x] [2026-04-03] **`2x8` (dual16) 三频 source 采集全部完成**：
+  - 990 MHz：`dual16_tp4pp1dp4_static990_20260403_102608_DGX2-1`，20 步 ~19.7s/步
+  - 1080 MHz：`dual16_tp4pp1dp4_static1080_20260403_103520_DGX2-1`，20 步 ~18.2s/步
+  - 1155 MHz：`dual16_tp4pp1dp4_static1155_20260403_104355_DGX2-1`，20 步 ~17.2s/步
+  - 数据质量：step time 完全单调递减，无任何 spike，IB 通信瓶颈已彻底消除。
+
+- [x] [2026-04-03] **`2x4` 三频 source 数据在 IB 环境下全部重采完成**：
+  - 990 MHz（4 月 2 日）：此前 ~70s/步（tailscale 瓶颈），真实值应在 IB 下重测。
+  - 1080 MHz（4 月 3 日 01:59）：`dual8_tp4pp1dp2_static1080_20260403_015926_DGX2-1`，20 步稳定 ~18.7-19.9s/步，无异常 spike。
+  - 1155 MHz（4 月 3 日 02:07）：`dual8_tp4pp1dp2_static1155_20260403_020750_DGX2-1`，20 步稳定 ~17.6-18.3s/步，无异常 spike。
+- [x] [2026-04-03] **发现并修复根本 NCCL 通信瓶颈**：
+  - 根因：环境变量 `NCCL_IB_DISABLE=1` + `NCCL_SOCKET_IFNAME=tailscale0` 强迫 NCCL 走 VPN，导致 all-reduce 带宽极低、tailscale CPU 占用 400%+，系统 loadavg 虚高，step time 被拖慢约 4 倍。
+  - 修复：启用 IB (`mlx5_0..mlx5_9`)，移除 socket 强制绑定，step time 从 ~70s 骤降至 ~19s。
+  - 影响范围：所有此前通过 tailscale0 采集的 `2x4/2x8/2x16` 数据均受污染，不可用于 predictor 校准。
+
+- [x] [2026-03-28] Diagnosed `2x4` source run failure cause on rerun `dual8_tp4pp1dp2_20260328_r2`: early error is `torch.distributed.DistBackendError` at model-parallel group creation (`NCCL ... Failed to CUDA calloc async 4 bytes`), followed by watchdog timeouts.
+- [x] [2026-03-28] Added remote auto-retry guard for `2x4` collection under GPU contention: watcher script `/home/sd/Megatron-DeepSpeed/.context/watch_and_launch_dual8_tp4pp1dp2_20260328.sh` is running in `screen` session `dual8_tp4pp1dp2_watch_20260328` and will launch once GPUs `0-3` are below the configured memory threshold.
+- [x] [2026-03-28] Connected to remote hosts and launched source-side `2x4` collection job for strict transfer validation: `screen` session `dual8_tp4pp1dp2_20260328`, script `/home/sd/Megatron-DeepSpeed/.context/dual8_tp4pp1dp2_collect_20260328.sh`, log `/home/sd/Megatron-DeepSpeed/.context/dual8_tp4pp1dp2_20260328.log`.
+- [x] [2026-03-28] Added `scripts/check_transfer_dataset_readiness.py` to gate `2x4 -> 2x8` transfer replay by explicit topology signatures `(node_count,gpus_per_node,tp,pp,dp)` parsed from `run.json`.
+- [x] [2026-03-28] Ran readiness check on current workspace snapshot: `scripts/check_transfer_dataset_readiness.py --source-root .context --target-root .context --source-topology 2,4,4,1,2 --target-topology 2,8,4,1,4` returned `source_matches=0`, `target_matches=0`, `ready=false` (exit `2`).
+- [x] [2026-03-27] Replayed held-out dual8 transfer with the new exposure-calibration stage and wrote artifacts to `.context/dual8_generalization_20260327_exposure_calibration/comparison.json` and `summary.md`. Result is unchanged versus the previous multi-topology-prior checkpoint (`time MAPE≈68.274%`, `energy MAPE≈50.948%`, default `1110 MHz`), and fitted exposure knobs stay at defaults.
+- [x] [2026-03-27] Wired explicit cross-node exposure knobs into calibration flow: after cross-node coefficients are injected, `calibrate_frequency_model()` now runs `_fit_cross_node_exposure_scaling()` to search `cross_node_{pp,dp,tp}_exposure_sensitivity`, `cross_node_dp_group_scale_gain`, and `cross_node_pp_bubble_exposure_gain` against the same MAPE-based objective; multinode-only by design.
+- [x] [2026-03-27] Added calibration regression test `test_fit_cross_node_exposure_scaling_checks_all_candidates` to ensure the new exposure-parameter grid is fully traversed and can select a non-default optimum.
+- [x] [2026-03-27] Implemented explicit TP/PP/DP communication-time decomposition in `analysis/freq_model/model.py` for cross-node penalties. `estimate_cross_node_time_penalty_s()` now uses separate `pp_exposure_factor` / `dp_exposure_factor` / `tp_exposure_factor` (frequency-aware and topology-aware) instead of a shared exposure scalar.
+- [x] [2026-03-27] Added explicit cross-node communication-shape knobs in `CalibrationParams`: `cross_node_{pp,dp,tp}_exposure_sensitivity`, `cross_node_dp_group_scale_gain`, and `cross_node_pp_bubble_exposure_gain`, keeping network benchmark quality (`bandwidth/jitter`) as a multiplicative driver on the decomposed penalty.
+- [x] [2026-03-27] Added regression coverage `test_cross_node_penalty_exposure_increases_with_frequency` in `tests/unit_tests/test_freq_model.py` and re-ran the focused suite: `pytest -q tests/unit_tests/test_freq_model.py --noconftest` → `34 passed`.
+- [x] [2026-03-26] Fixed a regression in `analysis/freq_model/calibrate.py`: `_fit_topology_base_scaling()` now compares each candidate inside the innermost loop, and a focused regression test was added so the shape-sensitivity search cannot silently ignore most of its grid.
+- [x] [2026-03-26] Introduced a dispersion-scaled multi-topology base prior in `analysis/freq_model/model.py`. When calibration is pooled across multiple topologies, the predictor now applies topology-conditioned priors directly to base throughput, communication, power, and low-frequency shape even if fitted residual sensitivities remain zero.
+- [x] [2026-03-26] Re-ran held-out `tp4pp1dp4` leave-one-topology-out with the new multi-topology base prior. Artifact: `.context/dual8_generalization_20260326/leave_one_tp4pp1dp4_multi_topology_prior_20260326/comparison.json` plus `summary.md`. Relative to the previous pooled-reference result, time MAPE improves from about `85.752%` to `68.274%`, energy MAPE from about `70.756%` to `50.948%`, and the default recommendation moves from `600 MHz` to `1110 MHz`.
+- [x] [2026-03-26] Revalidated the full freq-model suite after the multi-topology prior update: `python3 -m pytest --noconftest -q tests/unit_tests/test_freq_model.py` now passes with `33 passed in 123.42s`.
+- [ ] [2026-03-27] Validation plan update: use `2x4 -> 2x8` transfer for communication-model verification (not `2x8 -> 2x16`).
+- [x] [2026-03-26] Re-ran the full freq-model unit suite after the latest topology-shape patch: `python3 -m pytest --noconftest -q tests/unit_tests/test_freq_model.py` now passes with `31 passed in 100.02s`.
+- [x] [2026-03-26] Re-ran leave-one-topology-out on held-out `tp4pp1dp4` after enabling topology base + shape scaling. Artifact: `.context/dual8_generalization_20260326/leave_one_tp4pp1dp4_topology_shape_scaling_20260326/comparison.json` with companion `summary.md`. Result: still exactly `85.752%` time MAPE / `70.756%` energy MAPE, recommended `[600, 607, 615]`, and all fitted topology sensitivities remain zero.
+- [x] [2026-03-26] Added a quick topology-pressure diagnostic for the pooled `8+8 -> tp4pp1dp4` transfer: after dispersion normalization the effective topology distance is only about `0.17`, so even sensitivity `=1.0` would cap the current multiplier layer near `0.914x` throughput, `1.086x` communication, and `0.958x` low-frequency shape scaling. This shows the remaining failure is now in anchor/base elasticity, not in correction metadata or weak regularization.
+- [x] [2026-03-26] Implemented pooled multi-topology calibration metadata in `analysis/freq_model/calibrate.py` / `analysis/freq_model/model.py`: multi-topology calibration now uses aggregated reference features, stores topology dispersion/count flags in `CalibrationParams`, and increases correction-magnitude regularization when fitting across heterogeneous topologies. Two focused unit tests were added, and the full freq-model suite now passes with `28 passed`.
+- [x] [2026-03-26] Evaluated the new pooled calibration path with leave-one-topology-out on `tp4pp1dp4`, using the other three `8+8` topologies as the pooled source. Artifact: `.context/dual8_generalization_20260326/leave_one_tp4pp1dp4_after_fix/comparison.json`. Result: virtually no accuracy improvement, which narrows the remaining issue to the shared base model rather than correction-transfer metadata.
+- [x] [2026-03-26] Added a minimal topology/network-aware transfer-correction damping layer in `analysis/freq_model/model.py`, plus two focused unit tests covering mismatch damping and same-topology preservation. The full freq-model unit suite now passes with `26 passed`.
+- [x] [2026-03-26] Ran a focused before/after comparison on two representative `8+8` transfer directions, saved at `.context/dual8_generalization_20260326/focused_transfer_compare_after_fix/comparison_two_pairs.json`. Result: negligible change, which suggests current `8+8` generalization error is dominated by pooled curve-shape / topology-scaling issues rather than low-frequency correction transfer alone.
+- [x] [2026-03-26] Completed the offline `2x8 -> 2x16` transfer replay under `.context/dual16_to_dual32_transfer_20260326/`. Using `dual16_tp4pp1dp4` (`990/1080/1155 MHz`) as the source and `dual32_tp4pp1dp8` (`990/1020/1050/1080/1125/1155/1200 MHz`) as the target, both no-network and with-network modes land at about `73.7%` time MAPE and `14.0%` energy MAPE, with an unrealistic default around `480 MHz`.
+- [x] [2026-03-26] Replayed the completed `2x8` control (`TP=4, PP=1, DP=4`) through the current predictor both with and without `--network-benchmark-json`. The replay artifacts live under `.context/dual16_tp4pp1dp4_prediction_compare_20260326/`; both modes produce identical results because the measured `tailscale0|ib_disable=1` benchmark is already very close to the model's current reference transport. Accuracy on the three sampled points is about `13.0%` time MAPE / `6.8%` energy MAPE, but the model still mis-ranks the local `990/1080/1155 MHz` curve and extrapolates an unrealistic `472 MHz` default.
+- [x] [2026-03-26] Hardened `analysis/freq_model/workload.py` so predictor replays do not silently skip completed static runs when `run.json` misses `freq_policy`. The loader now falls back to inferring `static<freq>` from `run_id` / `experiment_name`, and focused unit coverage was added for this case.
+
+- [x] [2026-03-26] Implemented the first predictor-side network-quality hook. `CalibrationParams` now stores reference transport/bandwidth/jitter, `DerivedModelFeatures` can carry observed network quality, `scripts/predict_freq_sweet_spot.py` accepts `--network-benchmark-json`, and the focused freq-model suite passes with `23 passed`.
+- [x] [2026-03-26] Completed the controlled `2 nodes x 8 GPUs` comparison batch (`TP=4, PP=1, DP=4`) at `990/1080/1155 MHz`. Final Zeus summaries: `990 -> 2118.0 s / 588.2 W / 1.246 MJ`, `1080 -> 2955.3 s / 565.3 W / 1.671 MJ`, `1155 -> 2466.9 s / 605.9 W / 1.495 MJ`. The discrete ordering matches the `2x16` control (`990 < 1155 < 1080` by both time and energy), which argues against the 32-GPU anomaly being only a rank-layout bug.
+- [x] [2026-03-26] Completed the same-transport dual-node communication benchmark for the real training path (`tailscale0`, `NCCL_IB_DISABLE=1`) on `2 nodes x 8 GPUs`. The saved artifact shows `busbw ≈ 0.207-0.212 GB/s`; message-size jitter is modest for `64-256 MB` (`cv ≈ 0.008-0.012`) but materially worse around `16 MB` (`cv ≈ 0.136`). This provides a concrete network-quality signal to feed into the predictor.
+- [x] [2026-03-26] Running the controlled `2 nodes x 8 GPUs` comparison batch in remote `screen` session `dual16_tp4pp1dp4_20260325`: `TP=4, PP=1, DP=4`, `GBS=16`, `train-iters=20`, frequencies `990/1080/1155 MHz`. This is the direct world-size-control experiment against the noisier `2x16` results.
+- [x] [2026-03-26] Queued a same-environment communication-quality probe for the dual-node `8+8` setup. The watcher session `dual16_post_comm_watch_20260325` will launch `/home/sd/Megatron-DeepSpeed/.context/comm_bench_torchrun_dual8.sh` after the training batch completes, so the resulting bandwidth/latency/jitter can be folded into the predictor analysis.
+- [x] [2026-03-25] Regenerated the current-code 32-GPU `TP=4, PP=1, DP=8` transfer prediction from the measured `source_tp2pp4dp2` calibration set and compared it against the completed `1050/1125/1200 MHz` runs. The predictor still fails badly on this topology: about `76.6%` time MAPE, `127.7%` power MAPE, and `47.2%` energy MAPE. It still recommends `[690, 697, 705]`, so the remaining gap is model generalization, not just lack of a fresh artifact.
+- [x] [2026-03-25] Running a 32-GPU refinement sweep in remote `screen` session `dual32_refine_20260325` using `.local`: `990/1020/1050(repeat)/1080/1155 MHz` for `TP=4, PP=1, DP=8`, `train-iters=20`. The first `990 MHz` run has already passed Megatron initialization and completed `iteration 1/20` (`~139.0 s`, `loss≈12.65`, no immediate cache/init regression); wait for completed Zeus summaries before deciding the next predictor adjustment.
+- [x] [2026-03-25] Revalidated the 32-GPU `TP=4, PP=1, DP=8` `.local` bring-up path on `sd@v100x16-{1,2}` with a `1050 MHz` 2-step smoke run. The key blocker was not Apex: the first rerun failed because `DGX2-2` lacked `index-cache/87922b4c8bcca7cc5c0cfc95a72dd19d_*`. After syncing that cache hash from `DGX2-1`, the rerun completed full setup and reached a real training step (`iteration 1/2`, `~89.3 s`, no skipped/nan iterations).
+## Completed Features
+- [x] [2026-03-23] **跨节点模型验证完成**：使用真实测量的单节点 TP2PP2DP4 数据（420.4s/417.5s/415.1s）替换估算值后，三个拓扑的时间预测 APE 均降至 10% 以内（TP2PP4DP2=1.8%, TP2PP2DP4=8.4%, TP1PP4DP4=2.1%），功率 APE 均低于 3%，模型成功通过真实数据验证。
+- [x] [2026-03-23] **实测单节点 TP2PP2DP4 20 步时间**：在 v100x16-1 上完成 1072/1080/1087 MHz 三个频点的测量，获得真实单节点基线数据，替换之前的估算值。
+- [x] [2026-03-23] **修复跨节点模型单元 bug**...
+- [x] [2026-03-22] **关键修复：`_global_rank()` 公式**（`features.py`）：由错误的 `((pipe*dp)+data)*tp+model` 修正为 Megatron 标准 `model+tp*(pipe+pp*data)`。修复后拓扑特征全部正确：pp_cross_node_edge_fraction=0，dp_cross_node_group_fraction 准确，功率 APE 从 4.2%→1.2%。
+- [x] [2026-03-22] Replayed the current shared cross-node fit against both validated real dual-node topologies using the updated predictor path and wrote `.context/dual-node-validation-20260322/multi_topology_global_refit_20260322.json` plus `.md`. Current replay after the calibration fix: `TP=2,PP=4,DP=2` is about `3.13%` time APE / `1.35%` power APE / `4.10%` energy APE, while `TP=2,PP=2,DP=4` is about `2.14%` / `3.19%` / `5.15%`.
+- [x] [2026-03-22] Fixed the shared-fit integration root cause in `analysis/freq_model/calibrate.py`: final predictor params now include `cross_node_beta_pp_edge_s` and `cross_node_power_base_drop`. Added regression coverage in `tests/unit_tests/test_freq_model.py`, and the focused suite passes with `3 passed`.
+- [x] [2026-03-21] Produced a multi-topology accuracy scoreboard under `.context/dual-node-validation-20260321/multi_topology_accuracy_summary_20260321.md` plus `.json`, covering current generalized dual-node validation, legacy overhead replay, historical measured-band checkpoints, and remaining evidence gaps.
+- [x] [2026-03-21] Replaced the overfit dual-legacy time residual with a simpler generalized PP wait-pressure term so the model trades a small amount of main-topology accuracy for much better cross-topology robustness. The current generalized checkpoint keeps dual-node `TP=2, PP=4, DP=2` at about `2.03%` time APE / `0.51%` power APE and improves the two legacy topology overhead replays to about `3.84%` average APE.
+- [x] [2026-03-21] Added a calibrated low-frequency cross-node power multiplier for the measured dual-node reference topology. The predictor now preserves the improved topology-sensitive time fit and cuts the 7-point dual-node `avg_power_ape_vs_cluster_est` from about `5.22%` to about `0.43%`, with replay saved to `.context/dual-node-validation-20260321/current_replay_topology_residual_fit_powerfix.json`.
+- [x] [2026-03-21] Implemented a topology-sensitive PP cross-node residual term anchored at the measured `TP=2, PP=4, DP=2` dual-node reference. The cross-node model now combines PP byte volume with extra per-step penalty from replica pressure and pipeline bubble deltas, preserving the main 7-point dual replay (`avg_time_ape≈1.37%`) while bringing the two legacy dual-node points to essentially zero overhead replay error.
+- [x] [2026-03-21] Revalidated the weighted cross-node fit against the older coarse dual-node `TP=1, PP=4, DP=4` and `TP=2, PP=2, DP=4` legacy points. The saved artifact `.context/dual-node-validation-20260321/legacy_topology_revalidation.json` shows the new fit improves the main measured dual curve but does **not** improve those legacy topologies: legacy overhead APE rises from about `10.2%` to about `86.5%`, which isolates the next modeling gap to a missing topology-sensitive PP cross-node latency term.
+- [x] [2026-03-21] Refit the span-aware cross-node penalty around the real dual-node `TP=2, PP=4, DP=2` static validation set by adding matched `1185/1200/1215 MHz` single-vs-dual calibration points and down-weighting the older coarse points. The code now fits per-step overhead with confidence weights, keeps `DP/TP` cross-node terms at zero for this layout, and local validation suggests the saved 7-point dual curve would drop from about `14.7%` to about `1.4%` time APE.
+- [x] [2026-03-17] Added a topology-distance-weighted low-band throughput regularizer plus explicit `reference_topology_features_present` gating, validated it with `pytest -q --noconftest tests/unit_tests/test_freq_model.py` (`19 passed`), and regenerated both local and remote TP=1 transfer bundles. The new canonical artifacts are `/home/sd/Megatron-DeepSpeed/.context/canonical-transfer-tp1pp4dp4-20260317-topodist/` and `/home/sd/Megatron-DeepSpeed/.context/canonical-transfer-tp1pp2dp8-20260317-topodist/`, both recommending `[1185, 1192, 1200]` with default `1185 MHz`.
+- [x] [2026-03-17] Evaluated a broader source-gap trust regularizer locally (inside large source observation gaps as well as below the observed minimum). Result: useful as a diagnostic, but not yet accepted as the next remote model revision because it still leaves `TP=1, PP=4, DP=4` over-favoring the old low-frequency cluster (`~930 MHz`).
+- [x] [2026-03-17] Added a source-observed-band low-frequency extrapolation fallback to the curve model and updated calibration to persist the observed source frequency band; this fixes the previously underconstrained deep-low-frequency tail on `TP=1, PP=2, DP=8`, moving its regenerated default from `757 MHz` back to `[900, 907, 915]` without disturbing the measured diagnostic trio fit.
+- [x] [2026-03-17] Synced the current low-TP anchor fix into the live `sd@v100x16-1` working tree and regenerated `/home/sd/Megatron-DeepSpeed/.context/canonical-transfer-tp1pp2dp8-20260317-anchorfix/prediction.json`; the existing diagnostic trio now re-scores at about `2.07% time / 1.68% avg_power_w / 0.44% energy` MAPE, confirming the remote code path matches the local replay in the tested band.
+- [x] [2026-03-17] Implemented a low-TP / `TP=1` transfer-anchor adjustment in `analysis/freq_model/model.py` and replayed it locally against the saved V100 TP=1 transfer bundles under `.context/transfer-debug-20260316/`; curve MAPE dropped to about `1.25% time / 1.05% avg_power_w / 0.34% energy` on `TP=1, PP=4, DP=4` and `2.07% / 1.68% / 0.44%` on `TP=1, PP=2, DP=8`.
+- [x] [2026-03-17] Finished the `TP=1, PP=2, DP=8` static transfer-validation trio (`1177/1185/1192 MHz`) and wrote the measured-vs-predicted summary under `.context/real-v100-tp1pp2dp8-static-20260316/`; this topology is a clear curve-accuracy miss (`time MAPE≈11.73%`, `avg_power_w MAPE≈5.74%`, `energy MAPE≈5.33%`).
+- [x] [2026-03-16] Completed the `TP=1, PP=2, DP=8` unfixed baseline only after a minimal allocator retry (`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`); the successful retry finished at `1137.3 s / 3935271.5 J / 3460.1 W / 0.416 tokens/J` and produced the canonical zero-shot artifact `.context/canonical-transfer-tp1pp2dp8-20260316/` with neighborhood `[1177, 1185, 1192]`.
+- [x] [2026-03-16] Finished the `TP=1, PP=4, DP=4` static transfer-validation trio (`1252/1260/1267 MHz`) and wrote the measured-vs-predicted summary under `.context/real-v100-tp1pp4dp4-static-20260316/`; although the candidate set contained the measured best-energy point `1260 MHz`, the more important result is that `total_time` / power curve accuracy is still not good enough (`time MAPE≈7.17%`, `avg_power_w MAPE≈5.30%`).
+- [x] [2026-03-16] Completed the `TP=1, PP=4, DP=4` 50-step unfixed baseline on `sd@v100x16-1` with Zeus summary `1316.7 s / 4174627.4 J / 3170.6 W / 0.392 tokens/J` and generated the first zero-shot transfer artifact under `.context/canonical-transfer-tp1pp4dp4-20260316/`; the current recommended neighborhood is `[1252, 1260, 1267]` with default `1252 MHz`.
+- [x] [2026-03-16] Launched the first `TP=1, PP=4, DP=4` static transfer-validation sequence in detached screen session `tp1pp4dp4_static_seq_20260316`, covering `1252/1260/1267 MHz` around the canonical zero-shot recommendation.
+- [x] [2026-03-16] Re-established the live experiment state from workspace `yangon`, confirmed that the remote canonical artifacts are still only on `sd@v100x16-1`, and verified that the active remote repo is a dirty working tree on top of commit `6629a33` rather than a clean synced branch.
+- [x] [2026-03-16] Picked `TP=1, PP=4, DP=4` as the next proxy-distinct 16-GPU generalization target, passed a detached launcher preflight on `sd@v100x16-1`, and started the 50-step unfixed baseline run in screen session `tp1pp4dp4_base50_20260316` (`/home/sd/Megatron-DeepSpeed/experiments/v100_tp1pp4dp4_baseline50_20260316_185249_DGX2-1`).
+- [x] [2026-03-16] Generated and synced a canonical V100 validation checkpoint for the current predictor: `.context/canonical-transfer-tp2pp2dp4-20260316/` keeps `TP=2, PP=2, DP=4` in the correct `1080 MHz` neighborhood (`1072/1080/1087`), while `.context/canonical-transfer-tp2pp1dp8-20260316/` raises `TP=2, PP=1, DP=8` from the original `975 MHz` miss to a higher `1005/1012/1020` neighborhood, though not yet to the measured `1050 MHz` optimum.
+- [x] [2026-03-16] Added transfer-time low-frequency amplitude rescaling based on exposed pipeline waiting, and validated it on `sd@v100x16-1`: `TP=2, PP=2, DP=4` improved to `1072 MHz` (`[1065, 1072, 1080]`), while `TP=2, PP=1, DP=8` improved to `1005 MHz` (`[997, 1005, 1012]`).
+- [x] [2026-03-16] Restored the low-frequency correction baseline in the explanatory split and rechecked transfer on `sd@v100x16-1`; defaults improved from `1035 -> 1057 MHz` (`TP=2, PP=2, DP=4`) and `907 -> 960 MHz` (`TP=2, PP=1, DP=8`), though the model still sits below the earlier `1080 MHz` success case and below the measured `1050 MHz` control for `TP=2, PP=1, DP=8`.
+- [x] [2026-03-16] Ran the explanatory-split transfer recheck on `sd@v100x16-1` and synced the outputs locally under `.context/remote-recheck-tp2pp2dp4-20260316-v100/` and `.context/remote-recheck-tp2pp1dp8-20260316-v100/`; the current split still over-favors lower frequencies (`1080 -> 1035 MHz` on `TP=2, PP=2, DP=4`, `975 -> 907 MHz` on `TP=2, PP=1, DP=8`).
+- [x] [2026-03-15] Documented an explanatory topology-adjustment design in `docs/plans/2026-03-15-topology-explanatory-adjustment-design.md`, tying future predictor changes to official `DDP`/`ZeRO`/`PP`/`TP` performance mechanics instead of adding another topology-specific fit layer.
+- [x] [2026-03-15] Finished the `TP=2, PP=1, DP=8` 50-step static transfer-validation sweep (`967/975/982/1050 MHz`) and generated `.context/real-v100-tp2pp1dp8-static-20260315/measured_vs_predicted.tsv`; the transferred `975 MHz` default missed, and the `1050 MHz` control was best on both total energy and total time.
+- [x] [2026-03-15] Completed the `TP=2, PP=1, DP=8` 50-step unfixed baseline on `sd@v100x16-1` and generated `.context/real-v100-tp2pp1dp8-transfer-20260315-with-baseline/`; the first transferred default for this topology is `975 MHz` with neighborhood `[967, 975, 982]`.
+- [x] [2026-03-15] Finished the `TP=2, PP=2, DP=4` 50-step static transfer-validation sweep (`1072/1080/1087/1125 MHz`) and generated `.context/real-v100-tp2pp2dp4-static-20260315/measured_vs_predicted.tsv`; the transferred `1080 MHz` default matched the measured minimum-energy point, while `1125 MHz` remained the fastest tested control.
+- [x] [2026-03-15] Completed the `TP=2, PP=2, DP=4` 50-step unfixed baseline on `sd@v100x16-1` (`1030.6 s / 3686.1 W / 3798903.8 J`) and generated a fresh transfer-prediction bundle under `.context/real-v100-tp2pp2dp4-transfer-20260315-with-baseline/`; the current transferred default is `1080 MHz` with neighborhood `[1072, 1080, 1087]`.
+- [x] [2026-03-15] Added a two-layer clock-reset failsafe for dynamic frequency experiments: the launcher now resets visible GPU clocks on `EXIT` in `dynamic`/`dryrun`/`static` modes, and the Python frequency manager now performs `atexit` cleanup.
+- [x] Added a two-band continuous-curve correction layer (low-frequency + smooth mid/high-frequency) and calibrated it directly on sampled-point `total_time` / `total_energy`; the latest rerun improves sampled-point MAPE to about `1.20%` for total time and `0.90%` for total energy, with fresh outputs under `.context/real-v100-tp2pp4dp2-rerun-20260315-corrected/`.
+- [x] Re-ran the full `TP=2, PP=4, DP=2` offline prediction with the updated PP-bubble proxy and confirmed the current model still fits observed `total_time` / `total_energy` well on sampled points (`MAPE≈1.73%` / `1.20%`), but its continuous default recommendation remains too low (`1020 MHz`).
+- [x] Refined the PP-bubble topology proxy so bubble exposure increases `PP` communication pressure as microbatches become scarce; focused freq-model tests now pass with `python -m pytest --noconftest -q tests/unit_tests/test_freq_model.py` (`12 passed`).
+- [x] Tightened offline predictor guards: workload consistency now covers `micro_batch_size` plus attention-shape metadata (`num_attention_heads`, `num_key_value_heads`, `swiglu`), and baseline-relative runs now fail fast when `baseline_root` does not match the static sample workload (`11 passed` on focused freq-model tests).
+- [x] Patched workload-consistency validation so mixed `micro_batch_size` runs are rejected before offline prediction, and added a focused regression test for that failure mode (`python -m pytest --noconftest -q tests/unit_tests/test_freq_model.py` now passes with `9 passed`).
+- [x] Full 11-point `TP=2, PP=4, DP=2` Pareto-first accuracy rerun completed; sampled-point prediction error is low (`runtime_ratio_mape≈1.77%`, `energy_ratio_mape≈1.05%`), but the unsampled continuous default still drifts toward `1027 MHz`, so curve-shape/extrapolation remains the main modeling issue.
+- [x] Pareto-first prediction reporting completed: CLI/report output now foregrounds the full frontier and an analytic observed-vs-predicted accuracy table for total-time / total-energy ratios, while keeping the default recommendation as a secondary summary.
+- [x] Updated the frequency recommendation objective to `total_energy` first and `total_time` second, while preserving the previous balanced sweet spot as a secondary comparator in prediction outputs and reports.
+- [x] Completed the remote refinement sweep `1185/1192/1207/1215 MHz` for `TP=2, PP=4, DP=2`; `1185 MHz` is the current best measured discrete point (`tokens/J=0.601645`, runtime ratio `1.0720`, energy ratio `0.7186`).
+- [x] Feasibility triage for topology-transfer validation: proved `TP=8, DP=2` is invalid for the current Qwen2.5-7B head layout and established `TP=2, PP=4, DP=2` as a runnable, model-visible fallback on 16 V100s.
+- [x] Completed the fallback `TP=2, PP=4, DP=2` unfixed baseline run and generated the first zero-shot baseline-relative transfer prediction (`~915 MHz`, recommendation neighborhood `900-930 MHz`).
+- [x] Completed the first `TP=2, PP=4, DP=2` static transfer-validation sweep (`900/915/930/1200 MHz`) and showed that the best tested point is `1200 MHz`, not the zero-shot recommended `900-930 MHz` neighborhood.
+- [x] Revised the transfer predictor to make `PP` communication cost comparable to `TP` and added a pipeline bubble efficiency factor; local smoke checks now keep the old-topology sweet spot near `1252 MHz` while moving the new-topology zero-shot sweet spot from `~915 MHz` back to `~1252 MHz`.
+- [x] Baseline-relative predictor refactor completed: the recommendation bundle now reports Pareto frontier, balanced sweet spot, and baseline-relative runtime/energy ratios without a hard slowdown guardrail.
+- [x] Hardware-first calibration improved with throughput-scale centering and a throughput-saturation prior, reducing real merged-V100 prediction drift and moving the analytic sweet spot into the measured `1200-1305 MHz` neighborhood.
+- [x] Added targeted freq-model regression tests for `PP` bubble efficiency, throughput-saturation clamping, and Zeus-log fallback loading; local focused run now passes with `python -m pytest --noconftest -q tests/unit_tests/test_freq_model.py` (`8 passed`).
+- [x] Focused validation completed via `py_compile`, direct module smoke, and a real local CLI rerun against `.context/real-v100-power-static-20260312-merged` plus `.context/real-v100-baseline-rerun-20260312`.
+- [x] Initial offline frequency-modeling scaffold with calibration, discrete recommendation, CLI output, and targeted tests.
+- [x] Synthetic smoke validation of the prediction CLI and output artifacts.
+- [x] First real-V100 offline prediction run against five static sweep artifacts.
+- [x] Serial validation sweep of predicted low-frequency candidates `1020/1027/1035 MHz` on real V100 hardware.
+- [x] Unified experiment launcher and experiment tracking workflow.
+- [x] Remote NVML static clock lock/reset support for V100 runs.
+- [x] Zeus power metrics integrated into experiment outputs.
+- [x] Short-run-compatible warmup and eval configuration handling.
+- [x] `screen`-based remote launch workflow with recorded session IDs.
+- [x] `DISABLE_CHECKPOINT=1` mode for energy-only sweep runs.
+- [x] Remote cleanup of large, obsolete checkpoint directories.
+- [x] Runtime-guarded sweet-spot recommendation scoring plus CLI/report output for fixed-workload total energy/time estimates.
+- [x] Local sync of the `1020/1027/1035 MHz` validation artifacts plus a measured-vs-modeled guardrail comparison table for the merged 8-point V100 sweep.
+- [x] Observed-frequency interpolation overlay that aligns the merged 8-point guardrail recommendations with measured V100 sweet-spot transitions.
+- [x] Baseline-relative energy/runtime tradeoff table versus `power_baseline_20260311_20b`, including the current Pareto frontier across the merged 8-point sweep.
+- [x] Fresh unfixed-baseline rerun completed and a refreshed tradeoff table was written against `v100_power_baseline_rerun_20260312_151032_DGX2-1`.
+- [x] Dual Pareto skyline chart artifacts (paper view + analysis view) generated from the refreshed baseline-relative tradeoff table.
+
+## In Progress
+- [x] [2026-03-21] Completed the first real dual-node static validation point for `TP=2, PP=4, DP=2` at `1185 MHz` on `sd@v100x16-{1,2}` with GPUs `0-7` per node. After fixing multi-node launch plumbing (`shared ds_config`, dual-node clock lock, explicit `master_port`), steps `1-20` finished at `~22.66-22.86 s/iter`; rank-0 Zeus summary is `456.8 s`, `533166.9 J`, `1167.1 W`, `1.229 tokens/J`.
+- [x] Fit the first analytic cross-node coefficients and integrate them into the predictor: `analysis/freq_model/cross_node.py` now calibrates `alpha_pp / alpha_dp / alpha_tp`, `analysis/freq_model/features.py` derives cross-node TP/PP/DP proxy bytes from topology + node count, and `analysis/freq_model/model.py` applies the additive time penalty and power de-rating for `node_count > 1`.\n- [ ] Validate the new cross-node correction on real dual-node static-frequency runs and decide whether the remaining residual on `TP=2,PP=2,DP=4` requires a better TP proxy or better single-node 20-step anchors.\n- [x] Complete at least one clean cross-node small-scale validation in a different hardware environment: `dual8_tp2pp4dp1_base1_r1_free4_zero1_20260319` finished 1 iteration successfully on `sd@v100x16-{1,2}` after syncing the required `index-cache` hash files to node2.
+- [x] [2026-03-20] **Goal shift confirmed**: project goal is NO LONGER finding frequency sweet spots. Goal is accurate prediction of full frequency-power-time curve for any distributed topology including multi-node. Sweet-spot selection is downstream only.
+- [x] [2026-03-20] Ran dual-node 20-step baseline for `TP=2,PP=4,DP=2` (8+8 GPUs, GPUs 0-7 each node, tailscale0, old `.local` env). First 20 steps extracted from 50-step run: **492.5 s, ~3175 W** (est. both nodes). Single-node same topology: 419.5 s, 3613 W. Cross-node overhead: **+17.4% time, −12% per-GPU power**.
+- [x] [2026-03-20] Ran dual-node 20-step baseline for `TP=1,PP=4,DP=4` (8+8 GPUs). Zeus node0: **565.8 s, 1492.3 W, 844387 J**. Single-node est. 20-step: ~526.7 s. Cross-node overhead: **+7.4%**.
+- [x] [2026-03-20] Ran dual-node 20-step baseline for `TP=2,PP=2,DP=4` (8+8 GPUs). Zeus node0: **431.2 s, 1744.8 W, 752264 J**. Single-node est. 20-step: ~412.2 s. Cross-node overhead: **+4.6%**.
+- [x] [2026-03-20] Cross-node penalty data collected for 3 topology pairs. Overhead varies by topology (4.6%–17.4%), driven by number of cross-node PP activation sends (num_microbatches) and DP AllReduce volume (model_size/TP). Mathematical model defined in `techContext.md`; α_PP and α_DP coefficients not yet fitted; model not yet integrated into predictor.
+- [ ] Complete a clean cross-node validation on the free `8-15` GPU slice of `sd@v100x16-{1,2}` using the old `.local` env; the current best candidates are `TP=2, PP=4, DP=2, ZeRO-1` (closest to the known-good single-node layout) and, once `DGX2-2` is idle, the original 32-GPU `TP=4, PP=1, DP=8` target.
+- [ ] Run the next transfer validation on `TP=2, PP=8, DP=1`, using the same full-curve `total_time` / `avg_power_w` criteria instead of judging the model by whether one recommended point looks good.
+- [ ] Reframe the current transfer-validation loop around curve accuracy (`total_time`, `avg_power_w`, and derived `total_energy`) instead of judging success mainly by whether the recommended frequency neighborhood contains the measured best point.
+- [ ] Continue the transfer-time explanatory rescaling loop on `sd@v100x16-1`: recover the previously successful `TP=2, PP=2, DP=4` default fully into the `1080 MHz` neighborhood while pushing `TP=2, PP=1, DP=8` closer to the measured `1050 MHz` control.
+- [ ] Continue the explanatory stabilization loop on `sd@v100x16-1`: recover the `TP=2, PP=2, DP=4` transfer closer to `1080 MHz` without reintroducing the old over-low recommendation on `TP=2, PP=1, DP=8`.
+- [ ] Re-balance the explanatory split before the next transfer run: `pipeline_exposed_fraction` is now conceptually correct, but the current exposed-communication / low-frequency gating still pushes both target topologies too low, including the previously successful `TP=2, PP=2, DP=4`.
+- [ ] [2026-04-07] Feed `.context/comm_bench_2x4_eth0_20260406_175803.json` into predictor-side replay / annotation, then compare Ethernet-vs-IB transfer behavior under the new dynamic network hook.
+- [ ] [2026-04-09] Distill the new Ethernet formal checkpoint into paper-ready discussion: explain why `time MAPE≈40%` remains acceptable as a cross-environment practice result while `energy MAPE≈10.6%` is the more reusable comparison signal.
+- [ ] [2026-04-08] Backfill `MEGATRON_HOSTFILE_JSON` / `MEGATRON_TOPOLOGY_JSON` into the manual CPU-offload launch path (or teach `scripts/run_experiment.sh` the working DS offload config) so `run.json` captures non-empty topology/hostfile metadata on Ethernet.
+- [x] [2026-04-10] Once `DGX2-1` is free, rerun the short dual-node IB smoke with `LOCAL_GPU_INDICES=8,9,10,11` and verify `run.json.hostfile`, `run.json.topology.resolved`, and local preflight all match the intended `8-11` slice before starting formal `990/1080/1155` collection.
+- [ ] [2026-04-10] Start the formal transport-consistent IB rerun on the now-validated launcher path: source `2x4` at `990/1080/1155`, then target `2x8` at `990/1080/1155`, all with the same verified `NCCL_*` configuration and `GPU 8-11` / corresponding target slices.
+- [ ] [2026-04-10] Investigate the DGX2 `.local` runtime anomaly where `deepspeed.runtime.utils.see_memory_usage()` sees a `psutil` module without `virtual_memory`; confirm whether this is a host-local packaging issue, module shadowing, or a transient path leak.
+- [ ] [2026-04-07] Consolidate the current project into a cross-environment comparison package: use IB as the high-accuracy reference path, use Ethernet as the slow-network practice case, and organize the final narrative around environment differences rather than forcing Ethernet to meet the IB accuracy threshold.
+- [ ] Run the first true transfer recheck after the explanatory topology split, using the existing cross-topology workflow rather than target-only sparse re-fitting, and verify that `TP=2, PP=2, DP=4` stays stable while `TP=2, PP=1, DP=8` no longer inherits excess low-frequency bias.
+- [ ] Run the next generalization pass on a new feasible topology beyond `TP=2, PP=4, DP=2`, keeping the current corrected predictor fixed long enough to measure true transfer error in baseline-relative runtime/energy tradeoffs.
+- [x] [2026-03-17] Used the completed `TP=1` diagnostics to refine the transfer model's baseline-relative `total_time` / power anchors for low-TP topologies; the current local replay now fixes the earlier cancellation-driven miss on both `TP=1, PP=4, DP=4` and `TP=1, PP=2, DP=8`.
+- [x] [2026-03-17] Synced/reapplied the current low-TP transfer-anchor change to the live remote working tree on `sd@v100x16-1` and confirmed it survives the real remote prediction workflow for the existing `TP=1, PP=2, DP=8` diagnostic trio.
+- [x] [2026-03-18] Generated the first 32-GPU dual-node zero-shot topology matrix on `sd@v100x16-1` under `/home/sd/Megatron-DeepSpeed/.context/dual-node-topology-predictions-20260318/` using the current `TP=2, PP=4, DP=2` source calibration; energy-first defaults currently rank `TP=4, PP=1, DP=8` lowest, with progressively higher recommended clocks as `PP` deepens or `TP` drops.
+- [ ] Finish the real dual-node `TP=4, PP=1, DP=8` bring-up on `sd@v100x16-{1,2}`: code parity and tokenizer flat-dir are now handled, but the next bring-up must first return to the established `.local` Python 3.10 user-site environment (`~/.local/bin` / `~/.local/lib/python3.10/site-packages`) instead of `tp4bit`. The earlier `amp_C` ABI mismatch came from that non-canonical path and should not be treated as the project's default blocker until `.local` reproduction fails too.
+- [ ] Tackle the remaining broad low-frequency curve-shape bias inside the source-observed band: even after the deep-tail fix and a local large-gap regularization experiment, `TP=1, PP=4, DP=4` still over-favors the low observed cluster (`~930-997 MHz`), so the next model step should refine the mid/low-frequency throughput-power tradeoff itself rather than only the extrapolated tail.
+- [ ] Refine the hardware-first transfer model so it captures `PP=4`/multi-stage topology overhead well enough to avoid overly optimistic low-frequency recommendations on NvLink-equipped single-node runs.
+- [ ] Validate the bubble-aware zero-shot recommendation (`~1245/1252/1260 MHz`) on `TP=2, PP=4, DP=2`, since the current measured sweep only covered `900/915/930/1200 MHz`.
+- [ ] Validate whether the accepted continuous sweet spot around `1250 MHz` still transfers well after changing topology to `TP=8, DP=2`.
+- [ ] Improve prediction accuracy and calibration robustness using real V100 sweep artifacts, especially for sub-`1200 MHz` extrapolation.
+- [ ] Complete the V100 static-frequency sweep with additional candidate points.
+- [ ] Refactor the predictor toward a hardware-first analytic prior with light sample calibration over the full frequency band.
+- [ ] Optionally harden experiment finalization/reporting after no-checkpoint runs.
+
+## Known Issues
+- [2026-03-20] Cross-node overhead is topology-dependent and is now modeled in the predictor with explicit TP/PP/DP proxy terms. The current NNLS fit prefers `alpha_pp≈8.30e-09`, `alpha_dp=0`, `alpha_tp≈8.84e-11`, but `TP=2,PP=2,DP=4` still has ~17.6% overhead replay error, so real dual-node frequency validation is still required before trusting transfer.
+- [2026-03-20] Single-node 20-step estimates for TP1PP4DP4 and TP2PP2DP4 are extrapolated from 50-step Zeus totals (÷50×20), not directly measured. Warmup effects could cause small bias; consider running actual 20-step single-node baselines to confirm.
+- [2026-03-19] `DGX2-2` is not currently fully free for 32-GPU validation: another user process tree (`/home/wzk/miniconda3/envs/dd/bin/python3.10`) occupies GPUs `0-7`, so only GPUs `8-15` are available for conflict-free bring-up right now.
+- [2026-03-19] On the free 8+8 GPU split, `TP=4, PP=1, DP=4, ZeRO-0` fails reproducibly with CUDA OOM during DeepSpeed FP16 optimizer initialization (`apex.optimizers.fused_adam` state allocation).
+- [2026-03-19] On the free 8+8 GPU split, `TP=4, PP=2, DP=2, ZeRO-1` still OOMs on `DGX2-2` (first observed at rank `11`) before completing startup, so memory headroom remains the main practical blocker even after reducing PP-local model state.
+- The live remote repo on `sd@v100x16-1` is not a clean checkout: git reports base commit `6629a33`, but the actual predictor/launcher state comes from a dirty working tree with untracked `.context/`, `analysis/`, and experiment artifacts. Reproducibility requires either syncing that state back or reconstituting it on a clean branch before broader comparisons.
+- `TP=8, DP=2` cannot be run on the current Qwen2.5-7B configuration because `28` attention heads and `4` KV heads are incompatible with `tensor-model-parallel-size=8` in this Megatron setup.
+- Under the current stable topology proxy, several 16-GPU decompositions collapse to the same communication feature (`TP=4,DP=4`, `TP=8,DP=2`, `TP=4,PP=2,DP=2`), so topology-transfer validation should avoid those pairings unless the analytic communication model is refined.
+- 当前 `~1250 MHz` 更像连续理论甜点；由于实际 NVML 支持频点是离散的，后续解读时应区分“理论甜点”与“可锁定最佳离散频点”。
+- The pure hardware-first model is now much more stable, but its supported-frequency Pareto frontier is still broader than the measured discrete frontier because it predicts a smooth plateau from about `1250 MHz` downward; more real points are still needed to tighten that frontier confidently.
+- The first prediction model can overestimate throughput materially on synthetic calibration data even when power fit is tight.
+- The first real V100 prediction extrapolated the sweet spot down to about `1025 MHz`; follow-up runs at `1020/1027/1035 MHz` now confirm that the low-frequency neighborhood outperforms the old `1200 MHz` point, but the model still needs recalibration for absolute-scale accuracy.
+- After adding the low-frequency artifacts, measured guardrail-optimal choices are `1305 MHz` at `<=1.08x`, `1200 MHz` at `<=1.20x`, and about `1035-1020 MHz` only once the runtime budget reaches roughly `1.25-1.30x`; the observed-frequency overlay now tracks these transitions closely, though it can prefer interpolated in-between clocks (for example near `1185 MHz`) instead of exact sampled points.
+- Some completed runs still rely on log/event parsing because `run.json` finalize did not fully complete.
+- Local repo-wide `pytest` still imports `tests/conftest.py`, which requires `deepspeed`; focused offline analysis tests should currently be run with `--noconftest` unless that dependency is restored locally.
+- Distributed teardown can emit TCPStore/NCCL warnings even when training completed successfully.
+- Final checkpoint writing was previously the dominant disk-space failure mode for sweep jobs.
+
+## Milestones
+
+| Milestone | Status | Target Date |
+|-----------|--------|-------------|
+| Remote short-run power workflow validated | Done | 2026-03-11 |
+| Initial V100 sweep baseline/static comparison | Done | 2026-03-11 |
+| No-checkpoint sweep mode validated | Done | 2026-03-11 |
+| Remaining V100 sweep points collected | In Progress | 2026-03-12 |
+| Sweet-spot recommendation documented | Pending | 2026-03-12 |
+
+- [2026-03-13] Synced the completed `1245/1252/1260 MHz` `TP=2, PP=4, DP=2` static runs into `.context/real-v100-tp2pp4dp2-static-20260312/` and generated `.context/real-v100-tp2pp4dp2-static-20260312/measured_vs_predicted_v2_pp_bubble_full.tsv` plus `final_analysis_v2_pp_bubble.md`.
+- [x] Waited for remote refinement sweep `power_tp2pp4dp2_static_refine_20260313_1238c` (`1185 / 1192 / 1207 / 1215 MHz`) to finish, synced the artifacts, and compared them against the previous `1200 MHz` best point.
+
+- [2026-03-15] Completed remote 50-step reality check for the corrected `TP=2, PP=4, DP=2` predictor at `1117/1125 MHz` on `sd@v100x16-1`. Absolute error on full-run runtime stayed near `~1.1-1.2%`, power error near `~1.6-2.2%`, and total-energy error near `~2.9-3.3%`; importantly, the model matched the local runtime tradeoff between the two discrete points but still predicted the `1117 -> 1125 MHz` energy change too optimistically.
+
+- [2026-03-15] Finished the full remote `1117/1125/1132 MHz` 50-step validation sequence for the corrected predictor. The three-point real-vs-predicted check shows good absolute fit for `total_time` and decent fit for `total_power`, while `total_energy` remains systematically optimistic by about `2.4-3.3%` in the current recommended band.
+- [x] [2026-03-22] Finished real dual-node `TP=2, PP=2, DP=4` validation on `sd@v100x16-{1,2}` at `1072/1080/1087 MHz` and compared it against the current generalized predictor. Local summary artifacts: `.context/dual-node-validation-20260322/tp2pp2dp4_current_dual_real_vs_pred_20260322.json` and `.md`.
+- [x] [2026-03-31] Filled the newly exposed `DGX2-2` dataset cache gaps for `2x4` smoke: synced `2d90a4735ef9318461afc6d329b51277_{doc,sample,shuffle}_idx.npy` and `e1ad5b6b7b1f8b8a660d6fe8355c7bdd_{doc,sample,shuffle}_idx.npy` from `DGX2-1` to `DGX2-2`.
+- [x] [2026-03-31] Confirmed `2x4` smoke now passes dataset-build stage but still fails in NCCL group setup due to real device memory pressure: `dual8_tp4pp1dp2_smoke990_20260331_153159_DGX2-1` aborts at `torch.distributed.new_group()` with `NCCL ... Failed to CUDA calloc async 16 bytes`.
+- [x] [2026-03-31] Identified the host-level cause of the recurring `2x4` smoke OOM: `DGX2-1` is currently fully occupied by external `vLLM::Worker_TP0..15` processes (~`31.5 GiB/GPU` across all 16 GPUs), while `DGX2-2` still carries stale `/usr/bin/python3` ranks on `GPU1-3` from the failed run. Current relaunch logic must therefore gate on both nodes being truly free, not only `DGX2-1 GPU0-3`.
+- [x] [2026-03-31] Repointed the remote `2x4` smoke/collect/watch path away from `GPU 0-3` to the user-approved high slice. Current implementation uses `GPU 8,9,10,11` on both `DGX2-1` and `DGX2-2` for the 4-GPU-per-node jobs, and the watcher now inspects that same slice.

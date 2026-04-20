@@ -1,0 +1,27 @@
+{
+  "entries": [
+    {
+      "hostname": "v100x16-1",
+      "slots": 8
+    },
+    {
+      "hostname": "v100x16-2",
+      "slots": 8
+    }
+  ],
+  "path": "/tmp/hostfile_ib_dual16_tp4pp1dp4_diag_nozeus_990_20260410_202433_DGX2-1",
+  "preflight_required": true,
+  "raw_text": "v100x16-1 slots=8\nv100x16-2 slots=8\n",
+  "selected_hosts": [
+    {
+      "hostname": "v100x16-1",
+      "slots": 8
+    },
+    {
+      "hostname": "v100x16-2",
+      "slots": 8
+    }
+  ],
+  "selection_reason": "first 2 host(s) from hostfile order",
+  "sha1": "aacd7b4c6bb0832c517fb7fe78ddff54a36748a0"
+}
