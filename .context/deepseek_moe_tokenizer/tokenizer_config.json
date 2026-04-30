@@ -1,0 +1,8 @@
+{
+  "bos_token": "<｜begin▁of▁sentence｜>",
+  "eos_token": "<｜end▁of▁sentence｜>",
+  "model_max_length": 4096,
+  "tokenizer_class": "LlamaTokenizerFast",
+  "trust_remote_code": true,
+  "unk_token": "<｜begin▁of▁sentence｜>"
+}

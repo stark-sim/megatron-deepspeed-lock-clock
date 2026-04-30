@@ -862,3 +862,17 @@
 - [x] [2026-03-31] Confirmed `2x4` smoke now passes dataset-build stage but still fails in NCCL group setup due to real device memory pressure: `dual8_tp4pp1dp2_smoke990_20260331_153159_DGX2-1` aborts at `torch.distributed.new_group()` with `NCCL ... Failed to CUDA calloc async 16 bytes`.
 - [x] [2026-03-31] Identified the host-level cause of the recurring `2x4` smoke OOM: `DGX2-1` is currently fully occupied by external `vLLM::Worker_TP0..15` processes (~`31.5 GiB/GPU` across all 16 GPUs), while `DGX2-2` still carries stale `/usr/bin/python3` ranks on `GPU1-3` from the failed run. Current relaunch logic must therefore gate on both nodes being truly free, not only `DGX2-1 GPU0-3`.
 - [x] [2026-03-31] Repointed the remote `2x4` smoke/collect/watch path away from `GPU 0-3` to the user-approved high slice. Current implementation uses `GPU 8,9,10,11` on both `DGX2-1` and `DGX2-2` for the 4-GPU-per-node jobs, and the watcher now inspects that same slice.
+
+- [x] [2026-04-28] **完成 V100 单机 16 卡 TP=1/PP=2/DP=8 baseline vs static 1260 MHz 对比（LLaMA-7B + Qwen-7B）**：
+  - 拓扑：DGX2-1, 16× V100-SXM3-32GB, TP=1 / PP=2 / DP=8, ZeRO-1 + CPU Adam offload
+  - `power_monitor.py` 已恢复无 scale 原始版本，baseline/static 统计口径一致
+  - compare 脚本已规范化，可调参数 `TRAIN_STEPS`/`FREQS`/`EXPERIMENT_PREFIX` 在 compare 层传递
+  - LLaMA-7B 三次平均：baseline 659.0s/1,824,888J → static 620.5s/1,314,427J（**时间 -5.8%，能耗 -28.0%**）
+  - Qwen-7B 两次平均：baseline 724.6s/1,945,838J → static 717.6s/1,444,301J（**时间 -1.0%，能耗 -25.8%**）
+  - 脚本入口：
+    - `scripts/run_v100_llama7b_tp1pp2dp8_16card_compare.sh`
+    - `scripts/run_v100_qwen7b_tp1pp2dp8_16card_compare.sh`
+  - 运行方式：`TRAIN_STEPS=20 bash scripts/run_v100_llama7b_tp1pp2dp8_16card_compare.sh`
+  - 实验工件：
+    - LLaMA: `v100_llama7b_16card_baseline20_20260428_062708_DGX2-1`, `v100_llama7b_16card_static1260_20_20260428_064020_DGX2-1`
+    - Qwen: `v100_qwen7b_16card_baseline20_20260428_055425_DGX2-1`, `v100_qwen7b_16card_static1260_20_20260428_060830_DGX2-1`

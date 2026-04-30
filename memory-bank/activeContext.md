@@ -164,3 +164,28 @@
 4. 清理远端同步产生的 `._*` AppleDouble 噪声文件，保持工作树可读
 5. 将 launcher 默认 size/iters 策略按 Ethernet 路径保守化，避免 `256 MB` 档超时
 6. 实现 predictor 的自动网络检测工作流 (benchmark → calibrate → predict)
+
+[2026-04-28] **V100 单机 16 卡 TP=1/PP=2/DP=8 baseline vs static 1260 MHz 对比实验已完成（我跑 + 用户复现），power_monitor scale 已彻底清除**：
+  - **拓扑**：DGX2-1, 16× V100-SXM3-32GB, TP=1 / PP=2 / DP=8, ZeRO-1 + CPU Adam offload
+  - **关键配置**：
+    - `run_v100_llama7b_tp1pp2dp8_16card_compare.sh`
+    - `run_v100_qwen7b_tp1pp2dp8_16card_compare.sh`
+    - 可调参数均在 compare 层：`TRAIN_STEPS`, `FREQS`, `EXPERIMENT_PREFIX`
+    - launcher 层已固定 `CXX=/usr/bin/g++` 避免 conda cross-compiler 问题
+    - `power_monitor.py` 已恢复无 scale 原始版本，baseline/static `run.json` 数据项完全一致
+  - **LLaMA-7B 结果（三次平均）**：
+    - Baseline: 659.0s / 1,824,888J / 2770W
+    - Static 1260: 620.5s / 1,314,427J / 2117W
+    - **时间 -5.8%，能耗 -28.0%**
+  - **Qwen-7B 结果（两次平均）**：
+    - Baseline: 724.6s / 1,945,838J / 2698W
+    - Static 1260: 717.6s / 1,444,301J / 2013W
+    - **时间 -1.0%，能耗 -25.8%**
+  - **关键发现**：
+    - 16 卡无 TP（TP=1）下，计算密集度高，降频对时间惩罚极小甚至为负（thermal throttling 抵消）
+    - LLaMA 比 Qwen 的时间收益更显著（-5.8% vs -1.0%），可能与 LLaMA 更大的 vocab（32000 vs 152064）导致 embedding 层计算占比不同有关
+    - 能耗节省稳定在 26~28%，跨模型泛化性好
+  - **实验工件**：
+    - LLaMA: `v100_llama7b_16card_baseline20_20260428_062708_DGX2-1`, `v100_llama7b_16card_static1260_20_20260428_064020_DGX2-1`
+    - Qwen: `v100_qwen7b_16card_baseline20_20260428_055425_DGX2-1`, `v100_qwen7b_16card_static1260_20_20260428_060830_DGX2-1`
+  - **下一步**：该配置可作为 V100 单机节能主证据；如需更完整曲线，可在 16 卡上补测 1350/1455 MHz

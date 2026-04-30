@@ -565,3 +565,47 @@
 - [2026-03-31] `dual8_tp4pp1dp2_smoke990_20260331_153159_DGX2-1` first gets past missing-index-cache errors after syncing `2d90..._*` and `e1ad..._*` to `DGX2-2`, then fails earlier than training with `torch.distributed.DistBackendError` inside `torch.distributed.new_group()`. The first concrete NCCL lines are `include/alloc.h:228 NCCL WARN Cuda failure 2 'out of memory'` and `Failed to CUDA calloc async 16 bytes` on ranks `0-3` of `DGX2-1`.
 - [2026-03-31] Live occupancy snapshot during the failing `2x4` smoke: `DGX2-1` is fully consumed by external `VLLM::Worker_TP0..15` processes (about `31472 MiB` on every GPU), and `DGX2-2` still has `/usr/bin/python3` leftovers on `GPU1-3` plus another `python` process on `GPU0` (~`4.1 GiB`). This explains why tiny NCCL allocations fail immediately and why the current one-sided watcher is insufficient.
 - [2026-03-31] The active watcher `watch_and_launch_dual8_tp4pp1dp2_20260331.sh` no longer monitors `GPU0-3`; it now gates launch on `GPU8-11` on both hosts and logs `target_gpus=8,9,10,11` in each polling snapshot. Initial armed state shows `DGX2-1 GPU8-11` free while `DGX2-2 GPU8-11` are free but the host still fails the residual-process check because stale `/usr/bin/python3` ranks remain alive.
+
+## [2026-04-28] V100 单机 16 卡 TP=1/PP=2/DP=8 baseline vs static 1260 MHz
+
+### 实验配置
+- **硬件**: DGX2-1, 16× V100-SXM3-32GB
+- **拓扑**: TP=1, PP=2, DP=8
+- **训练**: 20 iterations, bf16, ZeRO-1, CPU Adam, recompute-granularity full
+- **Zeus 口径**: 原始 Zeus 值，无任何 scale（`power_monitor.py` 已恢复原始版本）
+
+### LLaMA-7B (32L / hidden=4096 / ffn=11008 / heads=32 / vocab=32000)
+
+| 运行 | 时间(s) | 能耗(J) | 功率(W) | 相对 baseline |
+|------|---------|---------|---------|---------------|
+| Baseline R1 | 672.5 | 1,849,868 | — | — |
+| Baseline R2 | 640.9 | 1,787,485 | — | — |
+| Baseline R3 | 663.6 | 1,837,309 | — | — |
+| Baseline 平均 | **659.0** | **1,824,888** | **~2770** | — |
+| Static 1260 R1 | 630.9 | 1,322,374 | — | time -6.2%, energy -28.5% |
+| Static 1260 R2 | 609.9 | 1,303,353 | — | time -4.8%, energy -27.1% |
+| Static 1260 R3 | 620.6 | 1,317,554 | — | time -6.5%, energy -28.3% |
+| Static 1260 平均 | **620.5** | **1,314,427** | **~2117** | **时间 -5.8%，能耗 -28.0%** |
+
+### Qwen-7B (28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4 / vocab=152064)
+
+| 运行 | 时间(s) | 能耗(J) | 功率(W) | 相对 baseline |
+|------|---------|---------|---------|---------------|
+| Baseline R1 | 737.1 | 1,970,698 | — | — |
+| Baseline R2 | 712.0 | 1,920,977 | — | — |
+| Baseline 平均 | **724.6** | **1,945,838** | **~2685** | — |
+| Static 1260 R1 | 720.4 | 1,450,166 | — | time -2.3%, energy -26.4% |
+| Static 1260 R2 | 714.7 | 1,438,435 | — | time +0.4%, energy -25.1% |
+| Static 1260 平均 | **717.6** | **1,444,301** | **~2013** | **时间 -1.0%，能耗 -25.8%** |
+
+### 关键结论
+- **16 卡无 TP 拓扑下，降频不仅没有拖慢时间，反而因 thermal throttling 减少而略有加速**
+- LLaMA-7B 的时间收益（-5.8%）大于 Qwen-7B（-1.0%），可能与模型结构差异（vocab size、层数）导致计算/通信比例不同有关
+- 能耗节省稳定在 26~28%，跨模型一致性好
+- 当前为 artifact-backed 结果，可直接作为 V100 单机节能主证据
+
+### 实验工件
+- LLaMA baseline: `v100_llama7b_16card_baseline20_20260428_062708_DGX2-1`
+- LLaMA static 1260: `v100_llama7b_16card_static1260_20_20260428_064020_DGX2-1`
+- Qwen baseline: `v100_qwen7b_16card_baseline20_20260428_055425_DGX2-1`
+- Qwen static 1260: `v100_qwen7b_16card_static1260_20_20260428_060830_DGX2-1`
