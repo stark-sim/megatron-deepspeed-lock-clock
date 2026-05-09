@@ -1,0 +1,1671 @@
+[2026-03-23 19:21:08,831] [WARNING] [runner.py:232:fetch_hostfile] Unable to find hostfile, will proceed with training with local resources only.
+[2026-03-23 19:21:08,831] [INFO] [runner.py:630:main] cmd = /usr/bin/python3 -u -m deepspeed.launcher.launch --world_info=eyJsb2NhbGhvc3QiOiBbMCwgMSwgMiwgMywgNCwgNSwgNiwgNywgOCwgOSwgMTAsIDExLCAxMiwgMTMsIDE0LCAxNV19 --master_addr=127.0.0.1 --master_port=29500 --enable_each_rank_log=None --log_level=info pretrain_gpt.py --tensor-model-parallel-size 2 --pipeline-model-parallel-size 2 --num-layers 28 --hidden-size 3584 --ffn-hidden-size 18944 --num-attention-heads 28 --num-key-value-heads 4 --seq-length 2048 --micro-batch-size 1 --global-batch-size 16 --train-iters 20 --lr 0.0001 --min-lr 0.00001 --lr-decay-style linear --lr-warmup-fraction 0.01 --weight-decay 0.1 --clip-grad 1.0 --optimizer adam --adam-beta1 0.9 --adam-beta2 0.95 --adam-eps 1e-8 --fp16 --zero-stage 1 --log-interval 5 --eval-iters 0 --exit-on-missing-checkpoint --max-position-embeddings 2048 --data-path /home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document --data-impl mmap --tokenizer-type HFTokenizer --tokenizer-model /home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat --split 98,2,0 --distributed-backend nccl --no-query-key-layer-scaling --attention-dropout 0 --hidden-dropout 0 --use-rotary-position-embeddings --untie-embeddings-and-output-weights --swiglu --normalization rmsnorm --disable-bias-linear --no-position-embedding --no-masked-softmax-fusion --no-bias-gelu-fusion --no-bias-dropout-fusion --recompute-granularity full --recompute-method uniform --deepspeed-activation-checkpointing
+[2026-03-23 19:21:15,014] [INFO] [launch.py:155:main] 0 NCCL_RAS_ENABLE=0
+[2026-03-23 19:21:15,014] [INFO] [launch.py:155:main] 0 NCCL_SOCKET_IFNAME=tailscale0
+[2026-03-23 19:21:15,014] [INFO] [launch.py:155:main] 0 NCCL_IB_DISABLE=1
+[2026-03-23 19:21:15,014] [INFO] [launch.py:162:main] WORLD INFO DICT: {'localhost': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]}
+[2026-03-23 19:21:15,014] [INFO] [launch.py:168:main] nnodes=1, num_local_procs=16, node_rank=0
+[2026-03-23 19:21:15,015] [INFO] [launch.py:179:main] global_rank_mapping=defaultdict(<class 'list'>, {'localhost': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]})
+[2026-03-23 19:21:15,015] [INFO] [launch.py:180:main] dist_world_size=16
+[2026-03-23 19:21:15,015] [INFO] [launch.py:184:main] Setting CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+[2026-03-23 19:21:15,016] [INFO] [launch.py:272:main] process 2220915 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=0', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,016] [INFO] [launch.py:272:main] process 2220916 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=1', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,017] [INFO] [launch.py:272:main] process 2220917 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=2', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,018] [INFO] [launch.py:272:main] process 2220918 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=3', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,018] [INFO] [launch.py:272:main] process 2220919 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=4', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,019] [INFO] [launch.py:272:main] process 2220920 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=5', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,020] [INFO] [launch.py:272:main] process 2220921 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=6', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,020] [INFO] [launch.py:272:main] process 2220922 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=7', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,021] [INFO] [launch.py:272:main] process 2220923 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=8', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,022] [INFO] [launch.py:272:main] process 2220924 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=9', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,022] [INFO] [launch.py:272:main] process 2220925 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=10', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,023] [INFO] [launch.py:272:main] process 2220926 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=11', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,024] [INFO] [launch.py:272:main] process 2220927 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=12', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,024] [INFO] [launch.py:272:main] process 2220928 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=13', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,025] [INFO] [launch.py:272:main] process 2220929 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=14', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+[2026-03-23 19:21:15,026] [INFO] [launch.py:272:main] process 2220930 spawned with command: ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=15', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing']
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m async_io: please install the libaio-dev package with aptspatial_inference 
+...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:250: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, input, weight, bias, gradient_accumulation_fusion,
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:288: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+spatial_inference ...... [93m[NO][0m [93m [WARNING] [0m async_io: please install the libaio-dev package with apt....... 
+[92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+--------------------------------------------------
+DeepSpeed C++/CUDA extension op report
+--------------------------------------------------
+NOTE: Ops not installed will be just-in-time (JIT) compiled at
+      runtime if needed. Op compatibility means that your system
+      meet the required dependencies to JIT install the op.
+--------------------------------------------------
+JIT compiled ops requires ninja
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+ninja .................. [91m[FAIL][0m
+--------------------------------------------------
+op name ................ installed .. compatible
+--------------------------------------------------
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m async_io requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.fused_lamb
+ ............. [93m[NO][0m ....... [92m[OKAY][0m
+async_iofused_lion  ............................  [93m[NO][0m[93m[NO][0m  ..............  [93m[NO][0m[92m[OKAY][0m
+
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ...............[93m [WARNING] [0m async_io: please install the libaio-dev package with apt [93m[NO][0m 
+....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m [93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found........
+ [93m[NO][0m
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m async_io: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+async_io ............... [93m[NO][0m ....... [93m[NO][0m
+fused_adam ............. [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adam ............... [93m[NO][0m ....... [92m[OKAY][0m
+cpu_adagrad ............ [93m[NO][0m ....... [92m[OKAY][0m
+cpu_lion ............... [93m[NO][0m ....... [92m[OKAY][0m
+dc ..................... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m Please specify the CUTLASS repo directory as environment variable $CUTLASS_PATH
+evoformer_attn ......... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m NVIDIA Inference is only supported on Ampere and newer architectures
+[93m [WARNING] [0m FP Quantizer is using an untested triton version (3.5.1), only 2.3.(0, 1) and 3.0.0 are known to be compatible with these kernels
+fp_quantizer ........... [93m[NO][0m ....... [93m[NO][0m
+fused_lamb ............. [93m[NO][0m ....... [92m[OKAY][0m
+fused_lion ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+[93m [WARNING] [0m gds requires the dev libaio .so object and headers but these were not found.
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+
+gds gds....................  [93m[NO][0m.................... .......  [93m[NO][0m[93m[NO][0m
+ ....... [93m[NO][0m
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+transformer_inference .. [93m[NO][0m ....... **** Git info for Megatron: git_hash=6629a33 git_branch=main ****[92m[OKAY][0m
+
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+inference_core_opsinference_core_ops  ..........  [93m[NO][0m[93m[NO][0m  ..............  [92m[OKAY][0m[92m[OKAY][0m
+
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. [93m[NO][0m ....... [92m[OKAY][0m
+cutlass_ops ............ [93m[NO][0m ....... [92m[OKAY][0m
+quantizer .............. ragged_ops[93m[NO][0m  ....................  [92m[OKAY][0m[93m[NO][0m
+ ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+[93m [WARNING] [0m gds: please install the libaio-dev package with apt
+[93m [WARNING] [0m If libaio is already installed (perhaps from source), try setting the CFLAGS and LDFLAGS environment variables to where it can be found.
+gds .................... [93m[NO][0m ....... [93m[NO][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+transformer_inference .. [93m[NO][0m ....... [92m[OKAY][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+inference_core_ops ..... [93m[NO][0m ....... [92m[OKAY][0m
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+DeepSpeed general environment info:
+torch install path ...............cutlass_ops  ............ ['/home/sd/.local/lib/python3.10/site-packages/torch'][93m[NO][0m
+ .......torch version  [92m[OKAY][0m....................
+ 2.9.1+cu128
+quantizerdeepspeed install path  .........................  [93m[NO][0m ['/home/sd/.local/lib/python3.10/site-packages/deepspeed'].......
+ [92m[OKAY][0mdeepspeed info
+ ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+ragged_device_ops ...... [93m[NO][0m ....... [92m[OKAY][0m
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+ragged_ops ............. [93m[NO][0m ....... [92m[OKAY][0m
+random_ltd ............. [93m[NO][0m ....... [92m[OKAY][0m
+[93m [WARNING] [0m sparse_attn requires a torch version >= 1.5 and < 2.0 but detected 2.9
+[93m [WARNING] [0m using untested triton version (3.5.1), only 1.0.0 is known to be compatible
+sparse_attn ............ [93m[NO][0m ....... [93m[NO][0m
+spatial_inference ...... [93m[NO][0m ....... [92m[OKAY][0m
+transformer ............ [93m[NO][0m ....... [92m[OKAY][0m
+stochastic_transformer . [93m[NO][0m ....... [92m[OKAY][0m
+utils .................. [93m[NO][0m ....... [92m[OKAY][0m
+--------------------------------------------------
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+DeepSpeed general environment info:
+torch install path ............... ['/home/sd/.local/lib/python3.10/site-packages/torch']
+torch version .................... 2.9.1+cu128
+deepspeed install path ........... ['/home/sd/.local/lib/python3.10/site-packages/deepspeed']
+deepspeed info ................... 0.18.3, unknown, unknown
+torch cuda version ............... 12.8
+torch hip version ................ None
+nvcc version ..................... 12.8
+deepspeed wheel compiled w. ...... torch 2.9, cuda 12.8
+shared memory (/dev/shm) size .... 755.27 GB
+using world size: 16, data-parallel-size: 4, sequence-parallel size: 1, tensor-model-parallel size: 2, pipeline-model-parallel size: 2 
+WARNING: overriding default arguments for tokenizer_type:GPT2BPETokenizer                        with tokenizer_type:HFTokenizer
+using torch.float16 for parameters ...
+------------------------ arguments ------------------------
+  accumulate_allreduce_grads_in_fp32 .............. False
+  adam_beta1 ...................................... 0.9
+  adam_beta2 ...................................... 0.95
+  adam_eps ........................................ 1e-08
+  add_bias_linear ................................. False
+  add_position_embedding .......................... False
+  adlr_autoresume ................................. False
+  adlr_autoresume_interval ........................ 1000
+  aml_data_download_path .......................... None
+  apply_layernorm_1p .............................. False
+  apply_query_key_layer_scaling ................... False
+  apply_residual_connection_post_layernorm ........ False
+  async_tensor_model_parallel_allreduce ........... True
+  attention_dropout ............................... 0.0
+  attention_softmax_in_fp32 ....................... False
+  barrier_with_L1_time ............................ True
+  bert_binary_head ................................ True
+  bert_embedder_type .............................. megatron
+  bert_load ....................................... None
+  bf16 ............................................ False
+  bias_dropout_fusion ............................. False
+  bias_gelu_fusion ................................ False
+  biencoder_projection_dim ........................ 0
+  biencoder_shared_query_context_model ............ False
+  block_data_path ................................. None
+  checkpoint_activations .......................... False
+  checkpoint_in_cpu ............................... False
+  checkpoint_num_layers ........................... 1
+  classes_fraction ................................ 1.0
+  clip_grad ....................................... 1.0
+  comm_freq_dry_run ............................... False
+  comm_high_freq .................................. None
+  comm_low_freq ................................... 800
+  comm_min_elements ............................... 104857600
+  compression_training ............................ False
+  consumed_train_samples .......................... 0
+  consumed_train_tokens ........................... 0
+  consumed_valid_samples .......................... 0
+  contigious_checkpointing ........................ False
+  cpu_optimizer ................................... False
+  cpu_torch_adam .................................. False
+  create_moe_param_group .......................... False
+  curriculum_learning_legacy ...................... False
+  data_cache_path ................................. None
+  data_efficiency_curriculum_learning ............. False
+  data_impl ....................................... mmap
+  data_parallel_random_init ....................... False
+  data_parallel_size .............................. 4
+  data_path ....................................... ['/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document']
+  data_per_class_fraction ......................... 1.0
+  data_sharding ................................... True
+  dataloader_type ................................. single
+  DDP_impl ........................................ local
+  decoder_num_layers .............................. None
+  decoder_seq_length .............................. None
+  deepscale ....................................... False
+  deepscale_config ................................ None
+  deepspeed ....................................... False
+  deepspeed_activation_checkpointing .............. True
+  deepspeed_config ................................ None
+  dino_bottleneck_size ............................ 256
+  dino_freeze_last_layer .......................... 1
+  dino_head_hidden_size ........................... 2048
+  dino_local_crops_number ......................... 10
+  dino_local_img_size ............................. 96
+  dino_norm_last_layer ............................ False
+  dino_teacher_temp ............................... 0.07
+  dino_warmup_teacher_temp ........................ 0.04
+  dino_warmup_teacher_temp_epochs ................. 30
+  distribute_checkpointed_activations ............. False
+  distribute_saved_activations .................... False
+  distributed_backend ............................. nccl
+  distributed_timeout_minutes ..................... 10
+  ds_fused_adam ................................... False
+  ds_inference .................................... False
+  ds_pipeline_enabled ............................. True
+  ds_sequence_parallel_fpdt ....................... False
+  ds_sequence_parallel_fpdt_chunk_size ............ 65536
+  ds_sequence_parallel_fpdt_offloading ............ False
+  ds_sequence_parallel_size ....................... 1
+  embedding_path .................................. None
+  embedding_weights_in_fp32 ....................... False
+  empty_unused_memory_level ....................... 0
+  enable_comm_freq_scaling ........................ False
+  enable_expert_tensor_parallelism ................ False
+  enable_zbh1_exact_semantics ..................... False
+  enable_zbh1_pipeline ............................ False
+  encoder_num_layers .............................. 28
+  encoder_seq_length .............................. 2048
+  end_weight_decay ................................ 0.1
+  eod_mask_loss ................................... False
+  eval_interval ................................... 1000
+  eval_iters ...................................... 0
+  evidence_data_path .............................. None
+  exit_duration_in_mins ........................... None
+  exit_interval ................................... None
+  exit_on_missing_checkpoint ...................... True
+  exit_signal_handler ............................. False
+  experiment_name ................................. None
+  experiment_root_dir ............................. None
+  experiment_run_id ............................... None
+  expert_interval ................................. 2
+  ffn_hidden_size ................................. 18944
+  finetune ........................................ False
+  force_ds_sequence_parallel ...................... False
+  fp16 ............................................ True
+  fp16_lm_cross_entropy ........................... False
+  fp32_residual_connection ........................ False
+  fp8_amax_compute_algo ........................... most_recent
+  fp8_amax_history_len ............................ 1
+  fp8_e4m3 ........................................ False
+  fp8_hybrid ...................................... False
+  fp8_interval .................................... 1
+  fp8_margin ...................................... 0
+  fp8_wgrad ....................................... True
+  global_batch_size ............................... 16
+  gradient_accumulation_fusion .................... True
+  head_lr_mult .................................... 1.0
+  hidden_dropout .................................. 0.0
+  hidden_size ..................................... 3584
+  hidden_size_teacher ............................. None
+  hysteresis ...................................... 2
+  ict_head_size ................................... None
+  ict_load ........................................ None
+  img_h ........................................... 224
+  img_w ........................................... 224
+  indexer_batch_size .............................. 128
+  indexer_log_interval ............................ 1000
+  inference ....................................... False
+  inference_batch_times_seqlen_threshold .......... 512
+  init_method_std ................................. 0.02
+  init_method_xavier_uniform ...................... False
+  initial_loss_scale .............................. 4294967296
+  iter_per_epoch .................................. 1250
+  kd .............................................. False
+  kd_alpha_ce ..................................... 1
+  kd_beta_ce ...................................... 1
+  kd_temp ......................................... 1.0
+  kill_switch_file ................................ None
+  kv_channels ..................................... 128
+  layernorm_epsilon ............................... 1e-05
+  lazy_mpu_init ................................... None
+  load ............................................ None
+  load_tag ........................................ None
+  load_teacher .................................... None
+  local_rank ...................................... 0
+  log_batch_size_to_tensorboard ................... False
+  log_interval .................................... 5
+  log_learning_rate_to_tensorboard ................ True
+  log_loss_scale_to_tensorboard ................... True
+  log_memory_to_tensorboard ....................... False
+  log_num_zeros_in_grad ........................... False
+  log_optimizer_states_to_tensorboard ............. False
+  log_params_norm ................................. False
+  log_timers_to_tensorboard ....................... False
+  log_validation_ppl_to_tensorboard ............... False
+  log_world_size_to_tensorboard ................... False
+  loss_scale ...................................... None
+  loss_scale_window ............................... 1000
+  lr .............................................. 0.0001
+  lr_decay_iters .................................. None
+  lr_decay_samples ................................ None
+  lr_decay_style .................................. linear
+  lr_decay_tokens ................................. None
+  lr_warmup_fraction .............................. 0.01
+  lr_warmup_iters ................................. 0
+  lr_warmup_samples ............................... 0
+  lr_warmup_tokens ................................ None
+  make_vocab_size_divisible_by .................... 128
+  mask_factor ..................................... 1.0
+  mask_prob ....................................... 0.15
+  mask_type ....................................... random
+  masked_softmax_fusion ........................... False
+  max_position_embeddings ......................... 2048
+  max_tokens_to_oom ............................... 12000
+  mem_efficient_ln ................................ True
+  memory_centric_tiled_linear ..................... False
+  merge_file ...................................... None
+  micro_batch_size ................................ 1
+  min_loss_scale .................................. 1.0
+  min_lr .......................................... 1e-05
+  mlp_type ........................................ standard
+  mmap_warmup ..................................... False
+  moe_eval_capacity_factor ........................ 1.0
+  moe_expert_parallel_size ........................ 1
+  moe_loss_coeff .................................. 0.1
+  moe_min_capacity ................................ 4
+  moe_token_dropping .............................. True
+  moe_top2_2nd_expert_sampling .................... True
+  moe_train_capacity_factor ....................... 1.0
+  mos ............................................. False
+  no_load_lr_state ................................ False
+  no_load_optim ................................... None
+  no_load_rng ..................................... None
+  no_persist_layer_norm ........................... False
+  no_pipeline_parallel ............................ False
+  no_save_optim ................................... None
+  no_save_rng ..................................... None
+  normalization ................................... rmsnorm
+  num_attention_heads ............................. 28
+  num_attention_heads_teacher ..................... None
+  num_channels .................................... 3
+  num_classes ..................................... 1000
+  num_experts ..................................... [1]
+  num_experts_switch .............................. None
+  num_experts_teacher ............................. [1]
+  num_key_value_heads ............................. 4
+  num_layers ...................................... 28
+  num_layers_per_virtual_pipeline_stage ........... None
+  num_layers_teacher .............................. None
+  num_workers ..................................... 2
+  onnx_safe ....................................... None
+  openai_gelu ..................................... False
+  optimizer ....................................... adam
+  output_bert_embeddings .......................... False
+  overlap_p2p_comm ................................ False
+  override_opt_param_scheduler .................... False
+  params_dtype .................................... torch.float16
+  partition_activations ........................... False
+  patch_dim ....................................... 16
+  perform_initialization .......................... True
+  pipeline_model_parallel_size .................... 2
+  pipeline_model_parallel_split_rank .............. None
+  profile ......................................... None
+  profile_backward ................................ False
+  profile_ranks ................................... None
+  profile_steps ................................... 2,3
+  query_in_block_prob ............................. 0.1
+  rampup_batch_size ............................... None
+  random_ltd ...................................... False
+  rank ............................................ 0
+  recompute_granularity ........................... full
+  recompute_method ................................ uniform
+  recompute_num_layers ............................ 1
+  remote_device ................................... none
+  repeated_dataloader ............................. False
+  reset_attention_mask ............................ False
+  reset_iteration ................................. False
+  reset_position_ids .............................. False
+  retriever_report_topk_accuracies ................ []
+  retriever_score_scaling ......................... False
+  retriever_seq_length ............................ 256
+  retro_add_retriever ............................. False
+  retro_cyclic_train_iters ........................ None
+  retro_encoder_attention_dropout ................. 0.1
+  retro_encoder_hidden_dropout .................... 0.1
+  retro_encoder_layers ............................ 2
+  retro_num_neighbors ............................. 2
+  retro_num_retrieved_chunks ...................... 2
+  retro_return_doc_ids ............................ False
+  retro_workdir ................................... None
+  return_data_index ............................... False
+  rope_theta ...................................... 10000
+  rotary_percent .................................. 1.0
+  sample_rate ..................................... 1.0
+  save ............................................ None
+  save_interval ................................... None
+  scatter_gather_tensors_in_pipeline .............. True
+  scattered_embeddings ............................ False
+  seed ............................................ 1234
+  seq_length ...................................... 2048
+  sequence_parallel ............................... False
+  sgd_momentum .................................... 0.9
+  short_seq_prob .................................. 0.1
+  skip_train ...................................... False
+  split ........................................... 98,2,0
+  split_transformers .............................. False
+  squared_relu .................................... False
+  standalone_embedding_stage ...................... False
+  start_weight_decay .............................. 0.1
+  swiglu .......................................... True
+  swin_backbone_type .............................. tiny
+  synchronize_each_layer .......................... False
+  tensor_model_parallel_size ...................... 2
+  tensorboard_dir ................................. None
+  tensorboard_log_interval ........................ 1
+  tensorboard_queue_size .......................... 1000
+  test_data_path .................................. None
+  tile_factor ..................................... 1
+  timing_log_level ................................ 0
+  timing_log_option ............................... minmax
+  titles_data_path ................................ None
+  tokenizer_model ................................. /home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat
+  tokenizer_type .................................. HFTokenizer
+  topk ............................................ 1
+  train_data_exact_num_epochs ..................... None
+  train_data_path ................................. None
+  train_desc_path ................................. None
+  train_doc_idx_path .............................. None
+  train_idx_path .................................. None
+  train_iters ..................................... 20
+  train_sample_idx_path ........................... None
+  train_samples ................................... None
+  train_shuffle_idx_path .......................... None
+  train_tokens .................................... None
+  transformer_impl ................................ local
+  transformer_pipeline_model_parallel_size ........ 2
+  trust_remote_code ............................... False
+  universal_checkpoint ............................ False
+  untie_embeddings_and_output_weights ............. True
+  use_checkpoint_args ............................. False
+  use_checkpoint_opt_param_scheduler .............. False
+  use_contiguous_buffers_in_local_ddp ............. True
+  use_cpu_initialization .......................... None
+  use_dataset_only ................................ False
+  use_distributed_optimizer ....................... False
+  use_flash_attn .................................. False
+  use_flash_attn_builder .......................... False
+  use_flash_attn_triton ........................... False
+  use_flash_attn_v1 ............................... False
+  use_flash_attn_v2 ............................... False
+  use_one_sent_docs ............................... False
+  use_pin_memory .................................. False
+  use_ring_exchange_p2p ........................... False
+  use_rotary_position_embeddings .................. True
+  use_tutel ....................................... False
+  valid_data_path ................................. None
+  variable_seq_lengths ............................ False
+  virtual_pipeline_model_parallel_size ............ None
+  vision_backbone_type ............................ vit
+  vision_pretraining .............................. False
+  vision_pretraining_type ......................... classify
+  vocab_extra_ids ................................. 0
+  vocab_file ...................................... None
+  vocab_size ...................................... None
+  wandb_exp_name .................................. 
+  wandb_project ................................... 
+  wandb_save_dir .................................. 
+  weight_decay .................................... 0.1
+  weight_decay_incr_style ......................... constant
+  world_size ...................................... 16
+  zero_allgather_bucket_size ...................... 0.0
+  zero_contigious_gradients ....................... False
+  zero_reduce_bucket_size ......................... 0.0
+  zero_reduce_scatter ............................. False
+  zero_stage ...................................... 1
+-------------------- end of arguments ---------------------
+setting number of micro-batches to constant 4
+> building HFTokenizer tokenizer ...
+**** Git info for Megatron: git_hash=6629a33 git_branch=main ****
+WARNING: WANDB writing requested but no legit wandb project or experiment name provided, therefore no WANDB logs will be written according to random generated project or experiment name.
+ > padded vocab (size: 151643) with 165 dummy tokens (new size: 151808)
+> initializing torch distributed ...
+> initialized tensor model parallel with size 2
+> initialized pipeline model parallel with size 2
+> setting random seeds to 1234 ...
+> initializing model parallel cuda seeds on global rank 0, model parallel rank 0, and data parallel rank 0 with model parallel seed: 3952 and data parallel seed: 1234
+> compiling dataset index builder ...
+make: Entering directory '/home/sd/Megatron-DeepSpeed/megatron/data'
+make: Nothing to be done for 'default'.
+make: Leaving directory '/home/sd/Megatron-DeepSpeed/megatron/data'
+>>> done with dataset index builder. Compilation time: 0.023 seconds
+WARNING: constraints for invoking optimized fused softmax kernel are not met. We default back to unfused kernel invocations.
+> compiling and loading fused kernels ...
+/home/sd/.local/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4876: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  warnings.warn(  # warn only once
+[rank0]:[W323 19:21:26.496618554 ProcessGroupNCCL.cpp:5072] Guessing device ID based on global rank. This can cause a hang if rank to GPU mapping is heterogeneous. You can specify device_id in init_process_group()
+[rank8]:[W323 19:21:29.785690760 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank3]:[W323 19:21:29.785692499 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank6]:[W323 19:21:29.785691977 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+>>> done with compiling and loading fused kernels. Compilation time: 3.293 seconds
+[rank9]:[W323 19:21:29.785709005 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank11]:[W323 19:21:29.785710695 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank1]:[W323 19:21:29.785736796 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank15]:[W323 19:21:29.785741829 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank4]:[W323 19:21:29.785745228 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank14]:[W323 19:21:29.785764546 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank10]:[W323 19:21:29.785768963 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank2]:[W323 19:21:29.785769289 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank5]:[W323 19:21:29.785769313 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank7]:[W323 19:21:29.785762213 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank12]:[W323 19:21:29.785765740 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank0]:[W323 19:21:29.785847623 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank13]:[W323 19:21:29.785911685 init.cpp:772] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+time to initialize megatron (seconds): 6.102
+[after megatron is initialized] datetime: 2026-03-23 19:21:29 
+building GPT model ...
+Before Building Model
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.03 GB, percent = 3.3%
+Before Building Model
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.03 GB, percent = 3.3%
+Before Building Model
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.03 GB, percent = 3.3%
+[rank6]: Traceback (most recent call last):
+[rank6]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank6]:     pretrain(train_valid_test_datasets_provider,
+[rank6]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank6]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank6]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank6]:     model = get_model(model_provider_func, model_type)
+[rank6]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank6]:     model = model_provider_func(
+[rank6]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank6]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank6]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+[rank3]: Traceback (most recent call last):
+[rank3]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank3]:     pretrain(train_valid_test_datasets_provider,
+[rank3]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank3]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank3]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank3]:     model = get_model(model_provider_func, model_type)
+[rank3]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank3]:     model = model_provider_func(
+[rank3]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank3]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank3]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+[rank8]: Traceback (most recent call last):
+[rank8]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank8]:     pretrain(train_valid_test_datasets_provider,
+[rank8]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank8]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank8]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank8]:     model = get_model(model_provider_func, model_type)
+[rank8]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank8]:     model = model_provider_func(
+[rank8]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank8]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank8]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+Before Building Model
+Before Building Model
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.03 GB, percent = 3.3%
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.03 GB, percent = 3.3%
+Before Building Model
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.04 GB, percent = 3.3%
+Before Building Model
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.04 GB, percent = 3.3%
+Before Building Model
+[rank9]: Traceback (most recent call last):
+[rank9]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank9]:     pretrain(train_valid_test_datasets_provider,
+[rank9]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank9]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank9]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank9]:     model = get_model(model_provider_func, model_type)
+[rank9]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank9]:     model = model_provider_func(
+[rank9]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank9]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank9]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.04 GB, percent = 3.3%
+Before Building Model
+[rank2]: Traceback (most recent call last):
+[rank2]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank2]:     pretrain(train_valid_test_datasets_provider,
+[rank2]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank2]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank2]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank2]:     model = get_model(model_provider_func, model_type)
+[rank2]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank2]:     model = model_provider_func(
+[rank2]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank2]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank2]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.04 GB, percent = 3.3%
+Before Building Model
+Before Building Model
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.04 GB, percent = 3.3%
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.04 GB, percent = 3.3%
+[rank4]: Traceback (most recent call last):
+[rank4]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank4]:     pretrain(train_valid_test_datasets_provider,
+[rank4]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank4]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank4]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank4]:     model = get_model(model_provider_func, model_type)
+[rank4]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank4]:     model = model_provider_func(
+[rank4]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank4]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank4]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank1]:     pretrain(train_valid_test_datasets_provider,
+[rank1]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank1]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank1]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank1]:     model = get_model(model_provider_func, model_type)
+[rank1]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank1]:     model = model_provider_func(
+[rank1]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank1]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank1]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+[rank15]: Traceback (most recent call last):
+[rank15]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank15]:     pretrain(train_valid_test_datasets_provider,
+[rank15]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank15]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank15]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank15]:     model = get_model(model_provider_func, model_type)
+[rank15]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank15]:     model = model_provider_func(
+[rank15]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank15]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank15]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+[rank7]: Traceback (most recent call last):
+[rank7]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank7]:     pretrain(train_valid_test_datasets_provider,
+[rank7]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank7]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank7]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank7]:     model = get_model(model_provider_func, model_type)
+[rank7]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank7]:     model = model_provider_func(
+[rank7]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank7]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank7]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+[rank10]: Traceback (most recent call last):
+[rank10]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank10]:     pretrain(train_valid_test_datasets_provider,
+[rank10]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank10]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank10]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank10]:     model = get_model(model_provider_func, model_type)
+[rank10]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank10]:     model = model_provider_func(
+[rank10]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank10]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank10]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+[rank11]: Traceback (most recent call last):
+[rank11]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank11]:     pretrain(train_valid_test_datasets_provider,
+[rank11]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank11]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank11]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank11]:     model = get_model(model_provider_func, model_type)
+[rank11]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank11]:     model = model_provider_func(
+[rank11]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank11]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank11]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+Before Building Model
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.06 GB, percent = 3.3%
+Before Building Model
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank0]:     pretrain(train_valid_test_datasets_provider,
+[rank0]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank0]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank0]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank0]:     model = get_model(model_provider_func, model_type)
+[rank0]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank0]:     model = model_provider_func(
+[rank0]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank0]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank0]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.06 GB, percent = 3.3%
+Before Building Model
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.07 GB, percent = 3.3%
+[rank14]: Traceback (most recent call last):
+[rank14]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank14]:     pretrain(train_valid_test_datasets_provider,
+[rank14]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank14]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank14]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank14]:     model = get_model(model_provider_func, model_type)
+[rank14]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank14]:     model = model_provider_func(
+[rank14]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank14]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank14]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+Before Building Model
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.07 GB, percent = 3.3%
+Before Building Model
+MA 0.0 GB         Max_MA 0.63 GB         CA 0.0 GB         Max_CA 1 GB 
+CPU Virtual Memory:  used = 50.07 GB, percent = 3.3%
+[rank5]: Traceback (most recent call last):
+[rank5]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank5]:     pretrain(train_valid_test_datasets_provider,
+[rank5]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank5]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank5]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank5]:     model = get_model(model_provider_func, model_type)
+[rank5]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank5]:     model = model_provider_func(
+[rank5]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank5]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank5]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+[rank13]: Traceback (most recent call last):
+[rank13]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank13]:     pretrain(train_valid_test_datasets_provider,
+[rank13]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank13]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank13]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank13]:     model = get_model(model_provider_func, model_type)
+[rank13]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank13]:     model = model_provider_func(
+[rank13]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank13]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank13]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+[rank12]: Traceback (most recent call last):
+[rank12]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 360, in <module>
+[rank12]:     pretrain(train_valid_test_datasets_provider,
+[rank12]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 182, in pretrain
+[rank12]:     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+[rank12]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 579, in setup_model_and_optimizer
+[rank12]:     model = get_model(model_provider_func, model_type)
+[rank12]:   File "/home/sd/Megatron-DeepSpeed/megatron/training.py", line 418, in get_model
+[rank12]:     model = model_provider_func(
+[rank12]:   File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 48, in model_provider
+[rank12]:     config_dict_or_path=args.deepspeed_config_dict,
+[rank12]: AttributeError: 'Namespace' object has no attribute 'deepspeed_config_dict'. Did you mean: 'deepspeed_config'?
+[rank6]:[W323 19:21:30.022861769 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank8]:[W323 19:21:30.037313728 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank3]:[W323 19:21:30.039278404 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank2]:[W323 19:21:30.061489478 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank9]:[W323 19:21:30.069905038 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank7]:[W323 19:21:30.079295133 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank1]:[W323 19:21:30.082068666 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank10]:[W323 19:21:30.096171049 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank11]:[W323 19:21:30.097935065 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank4]:[W323 19:21:30.101829824 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank14]:[W323 19:21:30.125380759 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank13]:[W323 19:21:30.133250550 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank15]:[W323 19:21:30.138565597 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank0]:[W323 19:21:30.146198715 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank5]:[W323 19:21:30.175865670 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank12]:[W323 19:21:30.190537015 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[2026-03-23 19:21:33,045] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220915
+[2026-03-23 19:21:33,075] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220916
+[2026-03-23 19:21:33,101] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220917
+[2026-03-23 19:21:33,126] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220918
+[2026-03-23 19:21:33,150] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220919
+[2026-03-23 19:21:33,173] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220920
+[2026-03-23 19:21:33,197] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220921
+[2026-03-23 19:21:33,220] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220922
+[2026-03-23 19:21:33,244] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220923
+[2026-03-23 19:21:33,267] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220924
+[2026-03-23 19:21:33,291] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220925
+[2026-03-23 19:21:33,315] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220926
+[2026-03-23 19:21:33,315] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220927
+[2026-03-23 19:21:33,339] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220928
+[2026-03-23 19:21:33,362] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220929
+[2026-03-23 19:21:33,385] [INFO] [launch.py:335:sigkill_handler] Killing subprocess 2220930
+[2026-03-23 19:21:33,409] [ERROR] [launch.py:341:sigkill_handler] ['/usr/bin/python3', '-u', 'pretrain_gpt.py', '--local_rank=15', '--tensor-model-parallel-size', '2', '--pipeline-model-parallel-size', '2', '--num-layers', '28', '--hidden-size', '3584', '--ffn-hidden-size', '18944', '--num-attention-heads', '28', '--num-key-value-heads', '4', '--seq-length', '2048', '--micro-batch-size', '1', '--global-batch-size', '16', '--train-iters', '20', '--lr', '0.0001', '--min-lr', '0.00001', '--lr-decay-style', 'linear', '--lr-warmup-fraction', '0.01', '--weight-decay', '0.1', '--clip-grad', '1.0', '--optimizer', 'adam', '--adam-beta1', '0.9', '--adam-beta2', '0.95', '--adam-eps', '1e-8', '--fp16', '--zero-stage', '1', '--log-interval', '5', '--eval-iters', '0', '--exit-on-missing-checkpoint', '--max-position-embeddings', '2048', '--data-path', '/home/sd/Megatron-DeepSpeed/data/chinese_wiki_megatron_text_document', '--data-impl', 'mmap', '--tokenizer-type', 'HFTokenizer', '--tokenizer-model', '/home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat', '--split', '98,2,0', '--distributed-backend', 'nccl', '--no-query-key-layer-scaling', '--attention-dropout', '0', '--hidden-dropout', '0', '--use-rotary-position-embeddings', '--untie-embeddings-and-output-weights', '--swiglu', '--normalization', 'rmsnorm', '--disable-bias-linear', '--no-position-embedding', '--no-masked-softmax-fusion', '--no-bias-gelu-fusion', '--no-bias-dropout-fusion', '--recompute-granularity', 'full', '--recompute-method', 'uniform', '--deepspeed-activation-checkpointing'] exits with return code = 1

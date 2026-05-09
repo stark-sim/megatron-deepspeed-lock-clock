@@ -1,0 +1,5 @@
+[Experiment] experiment_name=single_tp2pp2dp4_static1080
+[Experiment] run_id=single_tp2pp2dp4_static1080_20260323_192732_DGX2-1
+[Experiment] run_dir=/home/sd/Megatron-DeepSpeed/experiments/single_tp2pp2dp4_static1080_20260323_192732_DGX2-1
+[Checkpoint] DISABLE_CHECKPOINT=1; skipping checkpoint save/load
+[Error] HOSTFILE is required when PP>1

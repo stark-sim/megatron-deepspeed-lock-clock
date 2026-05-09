@@ -1,0 +1,27 @@
+{
+  "entries": [
+    {
+      "hostname": "localhost",
+      "slots": 8
+    },
+    {
+      "hostname": "192.168.205.202",
+      "slots": 8
+    }
+  ],
+  "path": "/tmp/hostfile_tp2pp4dp2_dual",
+  "preflight_required": true,
+  "raw_text": "localhost slots=8\n192.168.205.202 slots=8\n",
+  "selected_hosts": [
+    {
+      "hostname": "localhost",
+      "slots": 8
+    },
+    {
+      "hostname": "192.168.205.202",
+      "slots": 8
+    }
+  ],
+  "selection_reason": "first 2 host(s) from hostfile order",
+  "sha1": "aceb52b6fd71e23ce685f03130b7eb833d0b36ae"
+}

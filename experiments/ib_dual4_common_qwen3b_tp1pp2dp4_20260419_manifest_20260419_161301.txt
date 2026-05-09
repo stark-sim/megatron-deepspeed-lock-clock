@@ -1,0 +1,3 @@
+BATCH_ID=ib_dual4_common_qwen3b_tp1pp2dp4_20260419
+MANIFEST=/home/sd/Megatron-DeepSpeed/experiments/ib_dual4_common_qwen3b_tp1pp2dp4_20260419_manifest_20260419_161301.txt
+START_AT=2026-04-19 16:13:01

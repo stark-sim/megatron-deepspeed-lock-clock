@@ -1,0 +1,2 @@
+{"event_type": "initialized", "payload": {"command_sha1": "5a10f895cf1ab808426f5b05e5d68e9bcc0577b5", "status": "initialized"}, "run_id": "short_baseline_20260311_16g", "timestamp": "2026-03-11T05:01:46Z"}
+{"event_type": "checkpoint", "payload": {"checkpoint_dir": "/home/sd/Megatron-DeepSpeed/checkpoints/v100_short_baseline/short_baseline_20260311_16g", "frequency_scaling": null, "iteration": 20, "power_checkpoint_saved": false}, "run_id": "short_baseline_20260311_16g", "timestamp": "2026-03-11T05:07:36Z"}

@@ -1,0 +1,34 @@
+{
+  "description": "Qwen2.5-14B 3D并行训练功耗统计 (TP=8, PP=2, DP=2, 双节点32卡)",
+  "dataset": "Chinese Wikipedia (254540条)",
+  "total_steps": 150,
+  "node": "local (16 GPUs)",
+  "intervals": [
+    {
+      "steps": "1-50",
+      "energy_wh": 1931.07,
+      "avg_power_w": 3184.7,
+      "cumulative_energy_kwh": 1.9311
+    },
+    {
+      "steps": "51-100",
+      "energy_wh": 1941.84,
+      "avg_power_w": 3293.8,
+      "cumulative_energy_kwh": 3.8729
+    },
+    {
+      "steps": "101-150",
+      "energy_wh": 2087.37,
+      "avg_power_w": 3200.6,
+      "cumulative_energy_kwh": 5.9603
+    }
+  ],
+  "summary": {
+    "total_energy_kwh": 5.9603,
+    "avg_power_per_interval_w": 3226.4,
+    "avg_energy_per_50steps_wh": 1986.76,
+    "training_time_estimate_minutes": 112.5,
+    "loss_start": 12.96,
+    "loss_end": 7.37
+  }
+}

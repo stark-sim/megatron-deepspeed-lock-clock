@@ -1,0 +1,373 @@
+W0318 14:27:45.698000 3699431 site-packages/torch/distributed/run.py:852] 
+W0318 14:27:45.698000 3699431 site-packages/torch/distributed/run.py:852] *****************************************
+W0318 14:27:45.698000 3699431 site-packages/torch/distributed/run.py:852] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0318 14:27:45.698000 3699431 site-packages/torch/distributed/run.py:852] *****************************************
+[W318 14:27:57.565590715 socket.cpp:207] [c10d] The hostname of the client socket cannot be retrieved. err=-3
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:249: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @custom_fwd
+/home/sd/Megatron-DeepSpeed/megatron/core/tensor_parallel/layers.py:287: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  @custom_bwd
+Traceback (most recent call last):
+  File "/home/sd/Megatron-DeepSpeed/pretrain_gpt.py", line 8, in <module>
+    from megatron import get_args
+  File "/home/sd/Megatron-DeepSpeed/megatron/__init__.py", line 15, in <module>
+    from .initialize  import initialize_megatron
+  File "/home/sd/Megatron-DeepSpeed/megatron/initialize.py", line 19, in <module>
+    from megatron.core.pipeline_parallel.deepspeed_zbh1_engine import _exec_backward_only_pass, _exec_weight_pass
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/__init__.py", line 1, in <module>
+    from .schedules import get_forward_backward_func
+  File "/home/sd/Megatron-DeepSpeed/megatron/core/pipeline_parallel/schedules.py", line 17, in <module>
+    from megatron.utils import unwrap_model
+  File "/home/sd/Megatron-DeepSpeed/megatron/utils.py", line 15, in <module>
+    import amp_C
+ModuleNotFoundError: No module named 'amp_C'
+W0318 14:28:19.124000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699815 closing signal SIGTERM
+W0318 14:28:19.125000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699816 closing signal SIGTERM
+W0318 14:28:19.126000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699817 closing signal SIGTERM
+W0318 14:28:19.127000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699818 closing signal SIGTERM
+W0318 14:28:19.128000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699819 closing signal SIGTERM
+W0318 14:28:19.129000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699820 closing signal SIGTERM
+W0318 14:28:19.129000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699821 closing signal SIGTERM
+W0318 14:28:19.130000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699822 closing signal SIGTERM
+W0318 14:28:19.131000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699823 closing signal SIGTERM
+W0318 14:28:19.132000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699824 closing signal SIGTERM
+W0318 14:28:19.132000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699825 closing signal SIGTERM
+W0318 14:28:19.133000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699826 closing signal SIGTERM
+W0318 14:28:19.134000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699827 closing signal SIGTERM
+W0318 14:28:19.135000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699829 closing signal SIGTERM
+W0318 14:28:19.136000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 3699830 closing signal SIGTERM
+E0318 14:28:19.481000 3699431 site-packages/torch/distributed/elastic/multiprocessing/api.py:984] failed (exitcode: 1) local_rank: 0 (pid: 3699814) of binary: /home/sd/miniconda3/envs/tp4bit/bin/python3.12
+Traceback (most recent call last):
+  File "/home/sd/miniconda3/envs/tp4bit/bin/torchrun", line 7, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/sd/miniconda3/envs/tp4bit/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 362, in wrapper
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/sd/miniconda3/envs/tp4bit/lib/python3.12/site-packages/torch/distributed/run.py", line 991, in main
+    run(args)
+  File "/home/sd/miniconda3/envs/tp4bit/lib/python3.12/site-packages/torch/distributed/run.py", line 982, in run
+    elastic_launch(
+  File "/home/sd/miniconda3/envs/tp4bit/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 170, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sd/miniconda3/envs/tp4bit/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 317, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+pretrain_gpt.py FAILED
+------------------------------------------------------------
+Failures:
+[1]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 1 (local_rank: 1)
+  exitcode  : -15 (pid: 3699815)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699815
+[2]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 2 (local_rank: 2)
+  exitcode  : -15 (pid: 3699816)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699816
+[3]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 3 (local_rank: 3)
+  exitcode  : -15 (pid: 3699817)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699817
+[4]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 4 (local_rank: 4)
+  exitcode  : -15 (pid: 3699818)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699818
+[5]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 5 (local_rank: 5)
+  exitcode  : -15 (pid: 3699819)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699819
+[6]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 6 (local_rank: 6)
+  exitcode  : -15 (pid: 3699820)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699820
+[7]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 7 (local_rank: 7)
+  exitcode  : -15 (pid: 3699821)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699821
+[8]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 8 (local_rank: 8)
+  exitcode  : -15 (pid: 3699822)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699822
+[9]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 9 (local_rank: 9)
+  exitcode  : -15 (pid: 3699823)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699823
+[10]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 10 (local_rank: 10)
+  exitcode  : -15 (pid: 3699824)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699824
+[11]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 11 (local_rank: 11)
+  exitcode  : -15 (pid: 3699825)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699825
+[12]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 12 (local_rank: 12)
+  exitcode  : -15 (pid: 3699826)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699826
+[13]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 13 (local_rank: 13)
+  exitcode  : -15 (pid: 3699827)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699827
+[14]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 14 (local_rank: 14)
+  exitcode  : -15 (pid: 3699829)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699829
+[15]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 15 (local_rank: 15)
+  exitcode  : -15 (pid: 3699830)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 3699830
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-03-18_14:28:19
+  host      : dgx2-1
+  rank      : 0 (local_rank: 0)
+  exitcode  : 1 (pid: 3699814)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================

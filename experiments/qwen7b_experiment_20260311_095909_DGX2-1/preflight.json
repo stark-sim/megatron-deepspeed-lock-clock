@@ -1,0 +1,27 @@
+{
+  "node_results": [
+    {
+      "checks": {
+        "launcher_available": true,
+        "nvidia_smi_available": true,
+        "pynvml_available": true,
+        "python_available": true,
+        "repo_exists": true,
+        "static_clock_supported": true,
+        "tp_fits_local_node": true
+      },
+      "cuda_visible_devices": "0,1,2,3",
+      "gpu_indices": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "hostname": "DGX2-1",
+      "local_gpu_count": 4,
+      "ok": true,
+      "repo_path": "/home/sd/Megatron-DeepSpeed"
+    }
+  ],
+  "ok": true
+}

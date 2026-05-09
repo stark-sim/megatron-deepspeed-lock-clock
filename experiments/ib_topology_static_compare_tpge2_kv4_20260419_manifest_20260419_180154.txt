@@ -1,0 +1,7 @@
+BATCH_ID=ib_topology_static_compare_tpge2_kv4_20260419
+MANIFEST=/home/sd/Megatron-DeepSpeed/experiments/ib_topology_static_compare_tpge2_kv4_20260419_manifest_20260419_180154.txt
+MODEL=36L hidden2048 ffn11008 heads16 kv4
+DATASET=/home/sd/Megatron-DeepSpeed/data/qwen_data_text_document
+GLOBAL_BATCH_SIZE=4
+TRAIN_STEPS=20
+START_AT=2026-04-19 18:01:55
