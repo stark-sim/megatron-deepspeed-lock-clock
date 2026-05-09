@@ -13,6 +13,8 @@
 | `sd-1/sd-2` 当前只同步了 benchmark/data 修复路径，未完全同步 tracker/runtime 文件 | High | Medium | 成功 run 仍缺 `run.json/events.jsonl`，迫使分析退回手工日志和 provisional replay | 2026-04-07 |
 | Experiment comparison still relies on ad-hoc parsing commands | Medium | Medium | Slower analysis across many sweep points | 2026-03-11 |
 | Offline freq model still ignores `num_attention_heads` / `num_key_value_heads` / `swiglu` in analytic feature formulas | Medium | Medium | Guardrails now reject mixed workloads, but true cross-shape transfer still lacks explicit modeling | 2026-03-15 |
+| Predictor baseline thermal coefficient (0.65) is trend-inferred, not rigorously calibrated | Medium | Low | Current value reproduces "static 1800 > baseline 2505" qualitatively but may deviate quantitatively; needs dedicated baseline-vs-static same-frequency calibration | 2026-04-28 |
+| Multi-GPU desync overhead is merged into thermal throttle coefficient | Low | Medium | ΔT_desync (NCCL wait for slowest GPU) and ΔT_thermal (effective frequency drop) are distinct physical effects; separating them would improve predictor interpretability and cross-topology transfer | 2026-04-28 |
 
 ## Refactoring Priorities
 1. Add a small comparison/report script for multiple `run_id`s.

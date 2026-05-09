@@ -86,6 +86,7 @@ resolve_host_gpu_indices() {
 
 LAUNCHER="${LAUNCHER:-deepspeed}"
 EXPERIMENT_MODE="${EXPERIMENT_MODE:-baseline}"
+EXPERIMENT_MODE="${EXPERIMENT_MODE,,}"
 EXPERIMENT_NAME="${EXPERIMENT_NAME:-qwen7b_experiment}"
 TP="${TP:-4}"
 PP="${PP:-1}"
@@ -117,6 +118,9 @@ FFN_HIDDEN_SIZE="${FFN_HIDDEN_SIZE:-18944}"
 NUM_LAYERS="${NUM_LAYERS:-28}"
 NUM_HEADS="${NUM_HEADS:-28}"
 NUM_KV_HEADS="${NUM_KV_HEADS:-4}"
+VOCAB_SIZE="${VOCAB_SIZE:-}"
+PADDED_VOCAB_SIZE="${PADDED_VOCAB_SIZE:-}"
+MAKE_VOCAB_SIZE_DIVISIBLE_BY="${MAKE_VOCAB_SIZE_DIVISIBLE_BY:-}"
 SEQ_LENGTH="${SEQ_LENGTH:-2048}"
 MICRO_BATCH_SIZE="${MICRO_BATCH_SIZE:-1}"
 GLOBAL_BATCH_SIZE="${GLOBAL_BATCH_SIZE:-16}"
@@ -621,6 +625,9 @@ TRAIN_CMD=(
     --ffn-hidden-size "$FFN_HIDDEN_SIZE"
     --num-attention-heads "$NUM_HEADS"
     --num-key-value-heads "$NUM_KV_HEADS"
+    $( if [[ -n "$VOCAB_SIZE" ]]; then printf -- '--vocab-size\n%s\n' "$VOCAB_SIZE"; fi )
+    $( if [[ -n "$PADDED_VOCAB_SIZE" ]]; then printf -- '--padded-vocab-size\n%s\n' "$PADDED_VOCAB_SIZE"; fi )
+    $( if [[ -n "$MAKE_VOCAB_SIZE_DIVISIBLE_BY" ]]; then printf -- '--make-vocab-size-divisible-by\n%s\n' "$MAKE_VOCAB_SIZE_DIVISIBLE_BY"; fi )
     --micro-batch-size "$MICRO_BATCH_SIZE"
     --global-batch-size "$GLOBAL_BATCH_SIZE"
     --num-workers "$NUM_WORKERS"
@@ -628,7 +635,7 @@ TRAIN_CMD=(
     --max-position-embeddings "$SEQ_LENGTH"
     --train-iters "$TRAIN_STEPS"
     --data-path "$DATASET"
-    $( [[ -n "$DATA_CACHE_PATH" ]] && printf -- '--data-cache-path\n%s\n' "$DATA_CACHE_PATH" )
+    $( if [[ -n "$DATA_CACHE_PATH" ]]; then printf -- '--data-cache-path\n%s\n' "$DATA_CACHE_PATH"; fi )
     --data-impl mmap
     --tokenizer-type HFTokenizer
     --tokenizer-model "$TOKENIZER_PATH"
@@ -641,7 +648,7 @@ TRAIN_CMD=(
     --clip-grad 1.0
     --lr-warmup-iters "$LR_WARMUP_ITERS"
     --optimizer adam
-    $( [[ "$USE_CPU_OPTIMIZER" == "1" ]] && printf -- '--cpu-optimizer\n' )
+    $( if [[ "$USE_CPU_OPTIMIZER" == "1" ]]; then printf -- '--cpu-optimizer\n'; fi )
     --adam-beta1 0.9
     --adam-beta2 0.95
     --adam-eps 1e-8

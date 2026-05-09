@@ -14,7 +14,7 @@ from analysis.freq_model.network import apply_network_quality, load_network_qual
 from analysis.freq_model.model import CalibrationParams, _cluster_capacity_scale, _local_gpu_count_power_scale, _throughput_correction_factor, estimate_cross_node_time_penalty_s, predict_power_w, predict_throughput_tokens_per_s
 from analysis.freq_model.recommend import build_prediction_bundle
 from analysis.freq_model.workload import LoadedRunSample, ObservedMetrics, WorkloadFeatures, load_experiment_samples
-from scripts.predict_freq_sweet_spot import _validate_baseline_compatibility, _validate_workload_consistency
+from scripts.predict_freq_sweet_spot import _group_by_workload, _validate_baseline_compatibility
 
 
 SUPPORTED_CLOCKS = [1000, 1200, 1400]
@@ -551,7 +551,7 @@ def test_pipeline_parallel_efficiency_penalizes_deeper_pp():
     assert pp4_features.pipeline_exposed_fraction > pp1_features.pipeline_exposed_fraction
 
 
-def test_validate_workload_consistency_rejects_mixed_micro_batch_sizes(tmp_path: Path):
+def test_group_by_workload_splits_mixed_micro_batch_sizes(tmp_path: Path):
     experiment_root = tmp_path / "microbatch_mismatch"
     _write_run(experiment_root, "run_1000", frequency_mhz=1000, throughput_tokens_per_s=1000.0, avg_power_w=171.0)
     _write_run(experiment_root, "run_1200", frequency_mhz=1200, throughput_tokens_per_s=1200.0, avg_power_w=209.0)
@@ -562,12 +562,13 @@ def test_validate_workload_consistency_rejects_mixed_micro_batch_sizes(tmp_path:
     run_1200_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     collection = load_experiment_samples(str(experiment_root), include_baseline=False)
+    groups = _group_by_workload(collection.samples)
+    assert len(groups) == 2
+    for group_samples in groups.values():
+        assert len(group_samples) == 1
 
-    with pytest.raises(SystemExit, match="equivalent workloads"):
-        _validate_workload_consistency(collection.samples)
 
-
-def test_validate_workload_consistency_rejects_mixed_attention_shape_metadata(tmp_path: Path):
+def test_group_by_workload_splits_mixed_attention_shape_metadata(tmp_path: Path):
     experiment_root = tmp_path / "attention_shape_mismatch"
     _write_run(experiment_root, "run_1000", frequency_mhz=1000, throughput_tokens_per_s=1000.0, avg_power_w=171.0)
     _write_run(experiment_root, "run_1200", frequency_mhz=1200, throughput_tokens_per_s=1200.0, avg_power_w=209.0)
@@ -578,9 +579,10 @@ def test_validate_workload_consistency_rejects_mixed_attention_shape_metadata(tm
     run_1200_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     collection = load_experiment_samples(str(experiment_root), include_baseline=False)
-
-    with pytest.raises(SystemExit, match="equivalent workloads"):
-        _validate_workload_consistency(collection.samples)
+    groups = _group_by_workload(collection.samples)
+    assert len(groups) == 2
+    for group_samples in groups.values():
+        assert len(group_samples) == 1
 
 
 def test_validate_baseline_compatibility_rejects_mismatched_baseline_workload(tmp_path: Path):

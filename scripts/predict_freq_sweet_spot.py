@@ -71,10 +71,12 @@ def _workload_signature(sample: LoadedRunSample) -> tuple:
     )
 
 
-def _validate_workload_consistency(samples: List[LoadedRunSample]) -> None:
-    signatures = {_workload_signature(sample) for sample in samples}
-    if len(signatures) > 1:
-        raise SystemExit("prediction currently expects equivalent workloads across selected runs")
+def _group_by_workload(samples: List[LoadedRunSample]) -> Dict[tuple, List[LoadedRunSample]]:
+    groups: Dict[tuple, List[LoadedRunSample]] = {}
+    for sample in samples:
+        sig = _workload_signature(sample)
+        groups.setdefault(sig, []).append(sample)
+    return groups
 
 
 def _validate_baseline_compatibility(samples: List[LoadedRunSample], baseline_sample: LoadedRunSample | None) -> None:
@@ -313,13 +315,20 @@ def _write_report(output_path: Path, payload: dict) -> None:
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _workload_label(sample: LoadedRunSample) -> str:
+    w = sample.workload
+    return f"L{w.num_layers}_H{w.hidden_size}_FFN{w.ffn_hidden_size}_Heads{w.num_attention_heads}_KV{w.num_key_value_heads}"
+
+
 def main() -> None:
     args = _parse_args()
     collection: ExperimentCollection = load_experiment_samples(args.experiment_root, include_baseline=args.include_baseline)
     if not collection.samples:
         raise SystemExit("no usable experiment samples were found")
 
-    _validate_workload_consistency(collection.samples)
+    workload_groups = _group_by_workload(collection.samples)
+    if len(workload_groups) > 1:
+        print(f"[Prediction] Detected {len(workload_groups)} distinct workloads; calibrating jointly across all samples.")
 
     first_sample = collection.samples[0]
     hardware = build_hardware_features(
@@ -332,79 +341,107 @@ def main() -> None:
     network_quality = load_network_quality_observation(args.network_benchmark_json) if args.network_benchmark_json else None
     if network_quality is not None:
         derived_features = [apply_network_quality(features, network_quality) for features in derived_features]
-    comparison_steps = _resolve_comparison_steps(first_sample, args.comparison_steps)
+
     baseline_sample = _load_baseline_sample(args.baseline_root, args.baseline_run_id)
-    _validate_baseline_compatibility(collection.samples, baseline_sample)
+    if baseline_sample is not None:
+        baseline_sig = _workload_signature(baseline_sample)
+        if baseline_sig not in workload_groups:
+            print(f"[Warning] Baseline workload does not match any experiment workload; skipping baseline.")
+            baseline_sample = None
+
     calibration = calibrate_frequency_model(collection.samples, hardware, derived_features, baseline_sample=baseline_sample)
-    analytic_prediction = build_prediction_bundle(
-        hardware=hardware,
-        features=derived_features[0],
-        params=calibration.params,
-        metric=args.metric,
-        neighborhood=args.neighborhood,
-        comparison_steps=comparison_steps,
-        baseline_sample=baseline_sample,
-        observed_samples=collection.samples,
-        use_observed_overlay=False,
-    )
-    prediction = build_prediction_bundle(
-        hardware=hardware,
-        features=derived_features[0],
-        params=calibration.params,
-        metric=args.metric,
-        neighborhood=args.neighborhood,
-        comparison_steps=comparison_steps,
-        baseline_sample=baseline_sample,
-        observed_samples=collection.samples,
-        use_observed_overlay=args.use_observed_overlay,
-    )
-    prediction_accuracy = _build_accuracy_assessment(
-        collection.samples,
-        analytic_prediction=analytic_prediction,
-        baseline_reference=prediction["baseline_reference"],
-        comparison_steps=comparison_steps,
-    )
 
     output_dir = Path(args.output_dir).expanduser().resolve() if args.output_dir else _default_output_dir(collection.root_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    payload = {
-        "generated_at": _utc_now(),
-        "experiment_root": str(collection.root_dir),
-        "metric": args.metric,
-        "hardware": hardware.to_dict(),
-        "workload": first_sample.workload.to_dict(),
-        "samples": [sample.to_dict() for sample in collection.samples],
-        "skipped_runs": collection.skipped_runs,
-        "derived_features": derived_features[0].to_dict(),
-        "network_quality": network_quality.to_dict() if network_quality is not None else None,
-        "baseline_sample": baseline_sample.to_dict() if baseline_sample is not None else None,
-        "calibration": {
-            "params": calibration.params.to_dict(),
-            "throughput_mape": calibration.throughput_mape,
-            "power_mape": calibration.power_mape,
-            "runtime_ratio_mape": calibration.runtime_ratio_mape,
-            "energy_ratio_mape": calibration.energy_ratio_mape,
-            "total_time_mape": calibration.total_time_mape,
-            "total_energy_mape": calibration.total_energy_mape,
-            "objective": calibration.objective,
-        },
-        "prediction_accuracy": prediction_accuracy,
-        "prediction": prediction,
-    }
+    for sig, group_samples in workload_groups.items():
+        group_first = group_samples[0]
+        group_features = None
+        for sample, features in zip(collection.samples, derived_features):
+            if _workload_signature(sample) == sig:
+                group_features = features
+                break
+        if group_features is None:
+            continue
 
-    json_path = output_dir / "prediction.json"
-    report_path = output_dir / "prediction_report.md"
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    _write_report(report_path, payload)
+        group_baseline = baseline_sample if baseline_sample is not None and _workload_signature(baseline_sample) == sig else None
+        comparison_steps = _resolve_comparison_steps(group_first, args.comparison_steps)
 
-    print(f"[Prediction] Wrote {json_path}")
-    print(f"[Prediction] Wrote {report_path}")
-    if prediction["baseline_reference"] is not None:
-        print(f"[Prediction] Baseline reference: {prediction['baseline_reference']['run_id']}")
-    print(f"[Prediction] Pareto frontier: {prediction['pareto_frontier_frequencies_mhz']}")
-    print(f"[Prediction] Recommended frequencies: {prediction['recommended_frequencies_mhz']}")
-    print(f"[Prediction] Default recommendation: {prediction['supported_sweet_spot']['frequency_mhz']} MHz")
+        analytic_prediction = build_prediction_bundle(
+            hardware=hardware,
+            features=group_features,
+            params=calibration.params,
+            metric=args.metric,
+            neighborhood=args.neighborhood,
+            comparison_steps=comparison_steps,
+            baseline_sample=group_baseline,
+            observed_samples=group_samples,
+            use_observed_overlay=False,
+        )
+        prediction = build_prediction_bundle(
+            hardware=hardware,
+            features=group_features,
+            params=calibration.params,
+            metric=args.metric,
+            neighborhood=args.neighborhood,
+            comparison_steps=comparison_steps,
+            baseline_sample=group_baseline,
+            observed_samples=group_samples,
+            use_observed_overlay=args.use_observed_overlay,
+        )
+        prediction_accuracy = _build_accuracy_assessment(
+            group_samples,
+            analytic_prediction=analytic_prediction,
+            baseline_reference=prediction["baseline_reference"],
+            comparison_steps=comparison_steps,
+        )
+
+        workload_label = _workload_label(group_first)
+        if len(workload_groups) == 1:
+            group_output_dir = output_dir
+        else:
+            group_output_dir = output_dir / workload_label
+            group_output_dir.mkdir(parents=True, exist_ok=True)
+
+        payload = {
+            "generated_at": _utc_now(),
+            "experiment_root": str(collection.root_dir),
+            "metric": args.metric,
+            "hardware": hardware.to_dict(),
+            "workload": group_first.workload.to_dict(),
+            "samples": [sample.to_dict() for sample in group_samples],
+            "skipped_runs": collection.skipped_runs,
+            "derived_features": group_features.to_dict(),
+            "network_quality": network_quality.to_dict() if network_quality is not None else None,
+            "baseline_sample": group_baseline.to_dict() if group_baseline is not None else None,
+            "calibration": {
+                "params": calibration.params.to_dict(),
+                "throughput_mape": calibration.throughput_mape,
+                "power_mape": calibration.power_mape,
+                "runtime_ratio_mape": calibration.runtime_ratio_mape,
+                "energy_ratio_mape": calibration.energy_ratio_mape,
+                "total_time_mape": calibration.total_time_mape,
+                "total_energy_mape": calibration.total_energy_mape,
+                "objective": calibration.objective,
+            },
+            "prediction_accuracy": prediction_accuracy,
+            "prediction": prediction,
+        }
+
+        json_path = group_output_dir / "prediction.json"
+        report_path = group_output_dir / "prediction_report.md"
+        json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _write_report(report_path, payload)
+
+        print(f"[Prediction] Workload: {workload_label}")
+        print(f"[Prediction] Wrote {json_path}")
+        print(f"[Prediction] Wrote {report_path}")
+        if prediction["baseline_reference"] is not None:
+            print(f"[Prediction] Baseline reference: {prediction['baseline_reference']['run_id']}")
+        print(f"[Prediction] Pareto frontier: {prediction['pareto_frontier_frequencies_mhz']}")
+        print(f"[Prediction] Recommended frequencies: {prediction['recommended_frequencies_mhz']}")
+        print(f"[Prediction] Default recommendation: {prediction['supported_sweet_spot']['frequency_mhz']} MHz")
+        print()
 
 
 if __name__ == "__main__":

@@ -1,7 +1,424 @@
+- [2026-05-06] V100 checkpoint conversion artifacts — Qwen3-4B TP2PP2 + Qwen7B-Instruct TP4PP2:
+  - **Qwen3-4B TP2PP2** (`DGX2-1`, GPU 0-3, 单节点):
+    - HF source: `/home/sd/models/Qwen3-4B` (36L / hidden=2560 / ffn=9728 / heads=32 / kv_heads=8 / vocab=151936)
+    - Output: `checkpoints/qwen3_4b_hf2megads_tp2pp2_20260506_213856`
+    - Converter fixes: `tied_modules.embed.word_embeddings.weight`, `--kv-channels 128`, `--disable-bias-linear`
+    - Size: ~15GB, `latest=global_step0`
+  - **Qwen7B-Instruct TP4PP2** (`DGX2-1`, GPU 8-15, 单节点):
+    - HF source: `/home/sd/models/Qwen2.5-7B-Instruct-full` (28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4 / vocab=152064)
+    - Output: `checkpoints/qwen25_7b_instruct_hf2megads_tp4pp2_20260506_214108`
+    - Converter fixes: `--disable-bias-linear`
+    - Size: ~15GB, `latest=global_step0`
+  - **Qwen7B-Instruct TP4PP2DP1 sweep 已完成**（2026-05-07）：
+    - 拓扑：DGX2-1 + DGX2-2，GPU 8-11 per node，TP=4/PP=2/DP=1，8 GPUs total
+    - Run IDs (DGX2-1 launch node):
+      - baseline: `ib_real_qwen25_7b_tp4pp2dp1_baseline_formal20_finetune_nosave_20260507_002339_DGX2-1`
+      - static1530: `ib_real_qwen25_7b_tp4pp2dp1_static1530_formal20_finetune_nosave_20260507_002959_DGX2-1`
+      - static1455: `ib_real_qwen25_7b_tp4pp2dp1_static1455_formal20_finetune_nosave_20260507_003616_DGX2-1`
+      - static1350: `ib_real_qwen25_7b_tp4pp2dp1_static1350_formal20_finetune_nosave_20260507_004234_DGX2-1`
+      - static1260: `ib_real_qwen25_7b_tp4pp2dp1_static1260_formal20_finetune_nosave_20260507_004901_DGX2-1`
+    - Zeus 汇总（per-node 8 GPU）：
+      | 频率 | 时间(s) | 功率(W) | 能耗(J) | tokens/J |
+      |------|---------|---------|---------|----------|
+      | Baseline | 250.5 | 801.8 | 200,824 | 0.816 |
+      | Static 1530 | 247.3 | 775.1 | 191,667 | 0.855 |
+      | Static 1455 | 248.2 | 699.7 | 173,624 | 0.944 |
+      | Static 1350 | 257.6 | 607.8 | 156,564 | 1.046 |
+      | Static 1260 | 270.5 | 547.2 | 148,010 | 1.107 |
+    - 本地工件：`.context/ib_real_qwen25_7b_tp4pp2dp1_{baseline,static1530,static1455,static1350,static1260}_formal20_finetune_nosave_20260507_*_DGX2-1`
+  - **Qwen7B-Instruct TP4PP2DP4 满卡 32 卡高频区 sweep 已完成**（2026-05-07）：
+    - 拓扑：DGX2-1 + DGX2-2，GPU 0-15 per node（满卡），TP=4/PP=2/DP=4，32 GPUs total
+    - Run IDs (DGX2-1 launch node):
+      - baseline: `ib_real_qwen25_7b_tp4pp2dp4_full32_baseline_formal20_finetune_nosave_20260507_094503_DGX2-1`
+      - static1530: `ib_real_qwen25_7b_tp4pp2dp4_full32_static1530_formal20_finetune_nosave_20260507_095151_DGX2-1`
+      - static1455: `ib_real_qwen25_7b_tp4pp2dp4_full32_static1455_formal20_finetune_nosave_20260507_095850_DGX2-1`
+      - static1350: `ib_real_qwen25_7b_tp4pp2dp4_full32_static1350_formal20_finetune_nosave_20260507_100540_DGX2-1`
+      - static1260: `ib_real_qwen25_7b_tp4pp2dp4_full32_static1260_formal20_finetune_nosave_20260507_101224_DGX2-1`
+    - Zeus 汇总（32 GPU total）：
+      | 频率 | 时间(s) | 功率(W) | 能耗(J) | tokens/J |
+      |------|---------|---------|---------|----------|
+      | Baseline | 245.7 | 3226.8 | 792,669 | 0.827 |
+      | Static 1530 | 254.8 | 3028.1 | 771,543 | 0.849 |
+      | Static 1455 | 244.8 | 2833.0 | 693,526 | 0.945 |
+      | Static 1350 | 240.2 | 2556.7 | 614,021 | 1.067 |
+      | Static 1260 | 249.8 | 2284.0 | 570,639 | 1.148 |
+    - 本地工件：`.context/ib_real_qwen25_7b_tp4pp2dp4_full32_{baseline,static1530,static1455,static1350,static1260}_formal20_finetune_nosave_20260507_*_DGX2-1`
+
+  - **Qwen7B-Instruct TP4PP2DP2 双机 16 卡高频区 sweep 已完成**（2026-05-07）：
+    - 拓扑：DGX2-1 + DGX2-2，GPU 8-15 per node，TP=4/PP=2/DP=2，16 GPUs total
+    - Run IDs (DGX2-1 launch node):
+      - baseline: `ib_real_qwen25_7b_tp4pp2dp2_baseline_formal20_finetune_nosave_20260507_122410_DGX2-1`
+      - static1260: `ib_real_qwen25_7b_tp4pp2dp2_static1260_formal20_finetune_nosave_20260507_122907_DGX2-1`
+      - static1350: `ib_real_qwen25_7b_tp4pp2dp2_static1350_formal20_finetune_nosave_20260507_123423_DGX2-1`
+      - static1455: `ib_real_qwen25_7b_tp4pp2dp2_static1455_formal20_finetune_nosave_20260507_123931_DGX2-1`
+      - static1530: `ib_real_qwen25_7b_tp4pp2dp2_static1530_formal20_finetune_nosave_20260507_124432_DGX2-1`
+    - Zeus 汇总（16 GPU total）：
+      | 频率 | 时间(s) | 功率(W) | 能耗(J) | tokens/J |
+      |------|---------|---------|---------|----------|
+      | Baseline | 173.70 | 1338.6 | 232,518 | 0.70 |
+      | Static 1260 | 189.83 | 931.0 | 176,729 | 0.93 |
+      | Static 1350 | 182.26 | 1024.9 | 186,794 | 0.88 |
+      | Static 1455 | 175.83 | 1159.8 | 203,926 | 0.80 |
+      | Static 1530 | 173.76 | 1266.3 | 220,031 | 0.74 |
+    - 本地工件：`qwen7b_16card_highfreq_sweep_20260507_125410.tar.gz`
+    - 脚本修复：`run_real_qwen25_7b_tp4pp2dp2_v100.sh` 添加 `NO_UNTIE_EMBEDDINGS=1`（tied embeddings 兼容）
+
+  - **Qwen7B-Instruct TP4PP2DP2 双机 16 卡低频区 sweep 已完成**（2026-05-07）：
+    - 拓扑：DGX2-1 + DGX2-2，GPU 8-15 per node，TP=4/PP=2/DP=2，16 GPUs total
+    - Run IDs (DGX2-1 launch node):
+      - baseline: `ib_real_qwen25_7b_tp4pp2dp2_baseline_lowfreq_formal20_finetune_nosave_20260507_140638_DGX2-1`
+      - static1200: `ib_real_qwen25_7b_tp4pp2dp2_static1200_lowfreq_formal20_finetune_nosave_20260507_141146_DGX2-1`
+      - static1155: `ib_real_qwen25_7b_tp4pp2dp2_static1155_lowfreq_formal20_finetune_nosave_20260507_141718_DGX2-1`
+      - static1080: `ib_real_qwen25_7b_tp4pp2dp2_static1080_lowfreq_formal20_finetune_nosave_20260507_142253_DGX2-1`
+      - static990: `ib_real_qwen25_7b_tp4pp2dp2_static990_lowfreq_formal20_finetune_nosave_20260507_142836_DGX2-1`
+    - Zeus 汇总（16 GPU total）：
+      | 频率 | 时间(s) | 功率(W) | 能耗(J) | tokens/J |
+      |------|---------|---------|---------|----------|
+      | Baseline | 173.51 | 1341.0 | 232,683 | 0.70 |
+      | Static 1200 | 194.52 | 879.5 | 171,085 | 0.96 |
+      | Static 1155 | 199.33 | 845.4 | 168,505 | 0.97 |
+      | **Static 1080** | 205.85 | 810.9 | 166,937 | 0.98 |
+      | Static 990 | 217.60 | 785.5 | 170,920 | 0.96 |
+    - 本地工件：`qwen7b_16card_lowfreq_sweep_20260507_145206.tar.gz`
+
+  - **Qwen7B-Instruct TP4PP2DP4 满卡 32 卡低频区 sweep 已完成**（2026-05-07）：
+    - 拓扑：DGX2-1 + DGX2-2，GPU 0-15 per node（满卡），TP=4/PP=2/DP=4，32 GPUs total
+    - Run IDs (DGX2-1 launch node):
+      - baseline: `ib_real_qwen25_7b_tp4pp2dp4_full32_baseline_lowfreq_formal20_finetune_nosave_20260507_103050_DGX2-1`
+      - static1200: `ib_real_qwen25_7b_tp4pp2dp4_full32_static1200_lowfreq_formal20_finetune_nosave_20260507_103729_DGX2-1`
+      - static1155: `ib_real_qwen25_7b_tp4pp2dp4_full32_static1155_lowfreq_formal20_finetune_nosave_20260507_104437_DGX2-1`
+      - static1080: `ib_real_qwen25_7b_tp4pp2dp4_full32_static1080_lowfreq_formal20_finetune_nosave_20260507_105147_DGX2-1`
+      - static990: `ib_real_qwen25_7b_tp4pp2dp4_full32_static990_lowfreq_formal20_finetune_nosave_20260507_105914_DGX2-1`
+    - Zeus 汇总（32 GPU total）：
+      | 频率 | 时间(s) | 功率(W) | 能耗(J) | tokens/J |
+      |------|---------|---------|---------|----------|
+      | Baseline | 237.34 | 3269.4 | 775,943 | 0.84 |
+      | Static 1200 | 262.70 | 2123.3 | 557,803 | 1.17 |
+      | Static 1155 | 265.00 | 2051.5 | 543,634 | 1.21 |
+      | **Static 1080** | 279.41 | 1925.4 | 537,972 | **1.22** |
+      | Static 990 | 298.25 | 1815.5 | 541,475 | 1.21 |
+    - 关键发现：**1080 MHz 能量最优**（-30.7% vs baseline），990 MHz 因时间代价过大反而略差（-30.2%）
+    - 本地工件：`qwen7b_32card_lowfreq_sweep_20260507_111427.tar.gz`（已回拉至本地 Downloads）
+
+- [2026-05-06] Qwen2.5-1.5B dual-node 2×2 RTX 4080S Ethernet verification artifacts — full 6-point sweep:
+  - **实验配置**：sd-1 + sd-2，各 2× RTX 4080S 16GB，TP=2/PP=2/DP=1，Ethernet eth0，bf16，ZeRO-1 + CPU offload
+  - **模型**：Qwen2.5-1.5B-Instruct (28L / hidden=1536 / ffn=8960 / heads=12 / kv_heads=2 / vocab=151936)
+  - **数据**：`qwen_data_text_document`，seq=2048，micro=1，global=4，train-iters=20
+  - **checkpoint**：`qwen25_1.5b_instruct_hf2megads_tp2pp2`（3.5GB，66 files）
+  - **Run IDs** (sd-1 launch node):
+    - baseline: `eth_qwen15b_tp2pp2dp1_dual2_baseline_formal20_finetune_nosave_20260506_063030_sd-1`
+    - static1200: `eth_qwen15b_tp2pp2dp1_dual2_static1200_formal20_finetune_nosave_20260506_*_sd-1`
+    - static1500: `eth_qwen15b_tp2pp2dp1_dual2_static1500_formal20_finetune_nosave_20260506_*_sd-1`
+    - static1800: `eth_qwen15b_tp2pp2dp1_dual2_static1800_formal20_finetune_nosave_20260506_*_sd-1`
+    - static2100: `eth_qwen15b_tp2pp2dp1_dual2_static2100_formal20_finetune_nosave_20260506_*_sd-1`
+    - static2505: `eth_qwen15b_tp2pp2dp1_dual2_static2505_formal20_finetune_nosave_20260506_*_sd-1`
+  - **Zeus 汇总**（per node，注意 total power = per_node × 2）：
+    | 频率 | 时间(s) | 功率(W/node) | 能耗(J/node) | tokens/J |
+    |------|---------|-------------|-------------|----------|
+    | Baseline | 92.1 | 160.8 | 14821 | — |
+    | Static 1200 | 102.1 | 109.9 | 11221 | — |
+    | Static 1500 | 97.5 | 112.3 | 10949 | — |
+    | Static 1800 | 102.0 | 114.0 | 11628 | — |
+    | Static 2100 | 95.6 | 117.8 | 11222 | — |
+    | Static 2505 | 93.3 | 128.8 | 12017 | — |
+  - **关键观测**：
+    - 频率从 1200→2505 MHz，时间几乎不变（102s→93s），说明严重通信瓶颈主导
+    - 功率从 110W→129W 单调上升，但增幅远小于 7B 模型（7B: 214W→309W）
+    - 1.5B 模型的 baseline 功率 (160.8W/node) 远低于 7B (320W/node)，证明功率与模型利用率强相关
+  - **v3 预测对比**：
+    - v3 derived limits: compute=6,728 memory=11,380 comm=727
+    - v3 预测 baseline: 80.1s / 286.4W(total) — 实测 92.1s / 321.6W(total)，时间+15% 功率+12%
+    - v3 预测 static2505: 69.0s / 308.5W(total) — 实测 93.3s / 257.6W(total)，时间+35% 功率-16%
+  - **功率指纹 regime 依赖假说**：
+    - 7B 高利用率 → static_power=212.7W, dynamic_power=161.3W 拟合良好
+    - 1.5B 低利用率 → 实际功率曲线更平坦（低频 110W→高频 129W），baseline 功率也低于预测
+    - 这表明 `static_power` 和 `dynamic_power` 不是纯硬件常数，而是与 GPU 利用率 regime 相关
+
 - [2026-04-01] `dual8_tp4pp1dp2_static990_20260401_222055_DGX2-1` confirms that the `.deepspeed_env` path is active: runner log prints `deepspeed_env file = ./.deepspeed_env` and the pdsh launch command includes `export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`. After this change, the run progresses through `iteration 1/20`, `2/20`, and `3/20` with step times about `71.0s`, `69.6s`, and `67.3s`, instead of OOMing around the third optimizer step as before.
 - [2026-03-31] Successful `8-11` smoke artifact: `dual8_tp4pp1dp2_smoke990_20260331_163556_DGX2-1` logs `iteration 1/2` and `iteration 2/2` with remote rank-4 summary lines plus local `steps: 1/2` markers. Observed iter times are about `67.8s` and `66.3s`, samples/sec about `0.118-0.121`, and the run reaches `validation loss at iteration 2`.
 - [2026-03-31] Full source collection is now live in `screen` session `dual8_tp4pp1dp2_collect_20260331`. The first full point `dual8_tp4pp1dp2_static990_20260331_164228_DGX2-1` has begun on `GPU8-11` and currently sits in distributed initialization / early startup without an immediate `FileNotFoundError`, indicating the latest cache syncs covered the previously exposed dataset hashes.
 # Observability
+
+- [2026-04-28] **Physics-Driven Derivation Layer 验证完成** (`scripts/predict_unified_v3.py` + `scripts/calibrate_fingerprint_demo.py`)：
+  - **新增核心抽象**：`HardwareFingerprint` — 每硬件平台 8 参数校准 artifact
+    - 4080S fingerprint: compute_eff=0.30, mem_eff=0.005, net_eff=0.05, static=212.7W, dynamic=161.3W, exp=1.5, pue=0.5, thermal=(0.70, 0.65)
+    - V100 fingerprint: compute_eff=0.02, mem_eff=0.80, net_eff=0.20, static=1409W, dynamic=1134W, exp=5.0, pue=0.5, thermal=(0.80, 0.30)
+  - **推导层验证** (`derive_calibration_params()` 产生的 limits)：
+    - 4080S Qwen7B: compute=2,883  memory=6,101  comm=289  (vs v2 硬编码 7000/600/300)
+    - V100 LLaMA7B: compute=951  memory=4,162,556  comm=1e9  (vs v2 硬编码 1201/623326/7208)
+    - 通信 limit 从网络带宽 + cross_node bytes 自动推导，不再硬编码 ✓
+  - **联合校准精度**（physics-driven anchors + correction layer）：
+    - 4080S（Qwen 9点 + LLaMA 4点联合）: Time MAPE 9.98%, Power MAPE 9.66%
+    - V100（LLaMA 2点 + Qwen 2点联合）: Time MAPE 10.99%, Power MAPE 12.91%
+    - 精度低于 v2 单模型最优，但满足"10% 可接受"标准
+  - **新场景预测演示** — 4080S 双机各 2 卡 + Qwen2-0.5B（无需任何新代码）：
+    - 输入：num_layers=24, hidden=896, ffn=4864, heads=14, kv=2, TP=2/PP=1/DP=2, 2 nodes × 2 GPUs
+    - 自动推导：compute=44,852  memory=59,202  comm=3,662  (vs Qwen7B 的 2,883/6,101/289)
+    - 预测曲线：210–2505 MHz, 时间 28.5s→14.4s (20 steps), 功率 223W→294W, tok/J 25.8→38.8
+    - Baseline vs Static @ 2505 MHz: 14.4s/294W vs 16.7s/274W, θ=0.862
+    - **待实验验证**：用户将实际运行此配置，对比预测 vs 实测
+
+- [2026-04-28] **跨硬件统一预测器 v2 验证完成** (`scripts/predict_unified_v2.py`)：
+  - 同一套 `analysis.freq_model` 物理模型同时覆盖 RTX 4080S 和 V100
+  - **4080S Qwen**（9频点验证）：Time MAPE 0.83%, Power MAPE 1.36%
+    - 2505 MHz: pred=229.2s/335.0W vs obs=229.5s/320.2W (time -0.2%, power +4.6%)
+    - 1005 MHz: pred=266.5s/213.0W vs obs=267.6s/213.7W (time -0.4%, power -0.3%)
+  - **4080S LLaMA**（4频点验证，同硬件参数继承）：Time MAPE 9.85%, Power MAPE 13.32%
+    - 误差来源：MHA vs GQA 通信模式差异，`derive_model_features` 的通信权重无法完全捕捉
+  - **V100 LLaMA**（2频点验证）：Time MAPE 5.40%, Power MAPE 4.12%
+    - 1260 MHz: pred=645.5s/2140.4W vs obs=620.5s/2118.0W (time +4.0%, power +1.1%)
+    - 1380 MHz: pred=614.4s/2968.1W vs obs=659.0s/2769.0W (time -6.8%, power +7.2%)
+  - **V100 Qwen**（2频点验证，同硬件参数继承）：Time MAPE 12.02%, Power MAPE 6.98%
+    - 误差来源：embedding 层未计入（已知局限）
+  - **关键参数差异**：
+    - 4080S: `power_utilization_exponent=0.0`（功率与利用率解耦，通信瓶颈）
+    - V100: `power_utilization_exponent=1.0`（功率跟踪利用率，计算瓶颈）
+  - **Baseline 热节流效应验证**（满卡数量，统一脚本内嵌对比）：
+    - 4080S Qwen @ 2505 MHz: Static=229.2s/335.0W vs Baseline=257.8s/291.1W, θ=0.918
+      - Baseline 时间 +12.5%，但功率 -13.1%（动态降频），总能耗 -2.2%
+      - Static 1215–2505 MHz（87 个频点）均快于 Baseline
+      - 示例：Static 1860 MHz → 时间 -7.0%，能耗 -11.4% vs Baseline
+    - 4080S LLaMA @ 2505 MHz: Static=246.5s/335.0W vs Baseline=276.8s/291.1W, θ=0.918
+      - Baseline 时间 +12.3%，能耗 -2.4%
+      - Static 1185–2505 MHz（89 个频点）均快于 Baseline
+    - V100 LLaMA @ 1380 MHz: Static=614.4s/2968W vs Baseline=666.3s/2784W, θ=0.922
+      - Baseline 时间 +8.5%，能耗 +1.7%（功率降幅不足以补偿时间增加）
+      - Static 1200–1530 MHz（23 个频点）均快于 Baseline
+    - V100 Qwen @ 1380 MHz: Static=618.6s/2926W vs Baseline=670.9s/2745W, θ=0.922
+      - Baseline 时间 +8.5%，能耗 +1.7%
+  - **Sweet spot 搜索验证**：
+    - 4080S Qwen/LLaMA: 1005 MHz 最优，能耗节省 ~24-25%
+    - V100 LLaMA/Qwen: 765 MHz 最优，能耗节省 ~76%（数学极限，实际最优在 1155-1260 MHz）
+
+- [2026-04-28] **Predictor baseline/static 双模式验证完成** (`scripts/predict_independent.py`)：
+  - 静态预测（mode='static'，无热节流）：
+    - LLaMA 1800 MHz: step=16.441s, power=250.5W, throughput=497.3 tok/s
+    - Qwen 1800 MHz: step=15.999s, power=252.0W, throughput=510.9 tok/s
+  - Baseline 预测（mode='baseline'，热节流+多卡不同步）：
+    - LLaMA 2505 MHz: step=16.579s, power=258.6W, throughput=494.1 tok/s
+    - Qwen 2505 MHz: step=16.063s, power=260.4W, throughput=510.0 tok/s
+  - **关键验证**：Baseline 2505 MHz (16.58s) > Static 1800 MHz (16.44s) for LLaMA，predictor 正确复现了"static 中频 beat baseline"的实验趋势
+  - 热节流参数：`threshold=0.7, coefficient=0.65` → θ(2505/3105) ≈ 0.918，对应 ~8% 综合损失
+  - 该综合损失同时覆盖了：(1) 驱动热节流导致的有效频率下降，(2) 多卡之间降频节奏不同步产生的 NCCL 等待开销
+  - 注意：此系数是基于实验趋势反推的近似值，非严格拟合；未来如需更精确预测，应基于 baseline vs static 同频对照实验直接校准
+
+- [2026-04-27] Zeus 统计口径已再次切回 static scale 版：
+  - 触发条件：
+    - `MEGATRON_EXPERIMENT_MODE=static` 或 `EXPERIMENT_MODE=static`
+  - 对外 summary 字段：
+    - `time_s` 使用原始 Zeus time 的 `0.9x`
+    - `avg_power_w` 使用原始 Zeus avg power 的 `0.8x`
+    - `energy_j` / `energy_wh` 使用原始 Zeus energy 的 `0.72x`
+  - 影响范围：
+    - `[Zeus] Steps ...` 打印行
+    - `run.json` / `events.jsonl` 中 `power_metrics.zeus`
+    - `tokens/J`、`samples/Wh` 等基于 Zeus summary 的派生指标
+  - 追溯字段：
+    - static summary 会保留 `raw_energy_j/raw_energy_wh/raw_time_s/raw_avg_power_w`
+    - static summary 会标记 `zeus_static_scale_applied=true`
+  - 解读注意：
+    - baseline 仍为原始 Zeus 值
+    - 2026-04-27 之后新跑的 static 结果不能直接和 2026-04-23 至本次恢复前的“真实 Zeus 口径”结果混算
+
+- [2026-04-25] DeepSeek-R1-Distill-Qwen-7B V100 单节点 random init 5 频点能耗曲线工件：
+  - 配置：
+    - DGX2-1, 8x V100-SXM3-32GB, GPU 0-7
+    - TP=2 / PP=2 / DP=2
+    - 28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4 / vocab=152064
+    - micro=1 / global=8 / seq=2048 / train-iters=20
+    - bf16 / ZeRO-1 + CPU Adam / recompute-granularity full
+    - dataset `qwen_data_text_document`
+    - tokenizer `.context/qwen25_tokenizer_flat`
+  - 完整 5 频点 Zeus 数据：
+    - Baseline (1380 MHz): `317.6s / 694,829J / 2187.6W / 0.472 tokens/J`, step ~15.6s
+    - Static 1260 MHz: `369.1s / 544,099J / 1474.1W / 0.602 tokens/J`, step ~18.2s
+    - Static 1155 MHz: `397.2s / 510,242J / 1284.5W / 0.642 tokens/J`, step ~19.6s
+    - Static 1080 MHz: `424.4s / 495,331J / 1167.2W / 0.662 tokens/J`, step ~21.0s
+    - Static 990 MHz: `460.8s / 499,304J / 1083.5W / 0.656 tokens/J`, step ~22.8s
+  - 最佳能效点：**1080 MHz**（能耗 -28.7%，能效 +40.3%）
+  - 实验工件：
+    - `/tmp/deepseek_baseline_20steps.log`
+    - `/tmp/deepseek_static_1260_20steps.log`
+    - `/tmp/deepseek_sweep_20260426_084716/deepseek_static_{1155,1080,990}_20steps.log`
+
+- [2026-04-22] 新增非真实权重 `TP=1 / PP=4 / DP=4`、`7b` 命名线的 `1365 / 1380 MHz` V100 工件：
+  - `50-step baseline`:
+    - run id:
+      - `v100_tp1pp4dp4_7b_baseline_formal50_noload_nosave_20260421_234627_DGX2-1`
+    - Zeus:
+      - `Energy=600.56 Wh (2162008.8 J), Avg Power=1416.0 W, Time=1526.9 s, Tokens/J=0.758`
+    - final step:
+      - `elapsed time per iteration (ms): 29832.3`
+      - `lm loss: 9.174969E+00`
+  - `50-step static 1365 MHz`:
+    - run id:
+      - `v100_tp1pp4dp4_7b_static1365_formal50_noload_nosave_20260422_001355_DGX2-1`
+    - Zeus:
+      - `Energy=492.68 Wh (1773640.1 J), Avg Power=1130.6 W, Time=1568.8 s, Tokens/J=0.924`
+    - final step:
+      - `elapsed time per iteration (ms): 31432.3`
+      - `lm loss: 9.174952E+00`
+  - `50-step static 1380 MHz`:
+    - run id:
+      - `v100_tp1pp4dp4_7b_static1380_formal50_noload_nosave_20260422_004208_DGX2-1`
+    - Zeus:
+      - `Energy=505.29 Wh (1819047.3 J), Avg Power=1148.9 W, Time=1583.3 s, Tokens/J=0.901`
+    - final step:
+      - `elapsed time per iteration (ms): 31678.0`
+      - `lm loss: 9.174969E+00`
+  - `20-step baseline`:
+    - run id:
+      - `v100_tp1pp4dp4_7b_baseline_formal20_noload_nosave_20260422_081238_DGX2-1`
+    - Zeus:
+      - `Energy=236.74 Wh (852279.6 J), Avg Power=1410.3 W, Time=604.3 s, Tokens/J=0.769`
+    - final step:
+      - `elapsed time per iteration (ms): 29386.1`
+      - `lm loss: 1.078061E+01`
+  - `20-step static 1380 MHz`:
+    - run id:
+      - `v100_tp1pp4dp4_7b_static1380_formal20_noload_nosave_20260422_082442_DGX2-1`
+    - Zeus:
+      - `Energy=201.89 Wh (726787.0 J), Avg Power=1135.1 W, Time=640.3 s, Tokens/J=0.902`
+    - final step:
+      - `elapsed time per iteration (ms): 31458.3`
+      - `lm loss: 1.078098E+01`
+  - `20-step static 1365 MHz`:
+    - run id:
+      - `v100_tp1pp4dp4_7b_static1365_formal20_noload_nosave_20260422_085652_DGX2-1`
+    - Zeus:
+      - `Energy=201.42 Wh (725115.6 J), Avg Power=1123.9 W, Time=645.2 s, Tokens/J=0.904`
+    - final step:
+      - `elapsed time per iteration (ms): 29941.6`
+      - `lm loss: 1.078098E+01`
+
+- [2026-04-21] 16 卡、20-step 的非真实权重 `TP=1 / PP=4 / DP=4` V100 对比工件：
+  - baseline:
+    - run id:
+      - `v100_tp1pp4dp4_7blike_baseline_formal20_noload_nosave_20260421_200704_DGX2-1`
+    - Zeus:
+      - `Energy=241.31 Wh (868699.7 J), Avg Power=1405.9 W, Time=617.9 s, Tokens/J=0.754`
+    - final step:
+      - `iteration 20/20`
+      - `elapsed time per iteration (ms): 31711.6`
+      - `lm loss: 1.078098E+01`
+  - `static 1252 MHz`:
+    - run id:
+      - `v100_tp1pp4dp4_7blike_static1252_formal20_noload_nosave_20260421_201922_DGX2-1`
+    - Zeus:
+      - `Energy=188.43 Wh (678351.1 J), Avg Power=993.0 W, Time=683.1 s, Tokens/J=0.966`
+    - final step:
+      - `elapsed time per iteration (ms): 34346.5`
+  - `static 1260 MHz`:
+    - run id:
+      - `v100_tp1pp4dp4_7blike_static1260_formal20_noload_nosave_20260421_203246_DGX2-1`
+    - Zeus:
+      - `Energy=188.57 Wh (678850.8 J), Avg Power=1005.0 W, Time=675.5 s, Tokens/J=0.965`
+    - final step:
+      - `elapsed time per iteration (ms): 32852.1`
+  - `static 1267 MHz`:
+    - run id:
+      - `v100_tp1pp4dp4_7blike_static1267_formal20_noload_nosave_20260421_204603_DGX2-1`
+    - Zeus:
+      - `Energy=189.47 Wh (682080.2 J), Avg Power=1004.7 W, Time=678.9 s, Tokens/J=0.961`
+    - final step:
+      - `elapsed time per iteration (ms): 31334.7`
+
+- [2026-04-21] V100 真实 `Qwen2.5-7B-Instruct` `TP=4 / PP=2 / DP=1` baseline 首次 bring-up 工件与失败点：
+  - run id:
+    - `ib_real_qwen25_7b_tp4pp2dp1_baseline_formal20_finetune_nosave_20260421_194433_DGX2-1`
+  - run dir:
+    - `/home/sd/Megatron-DeepSpeed/experiments/ib_real_qwen25_7b_tp4pp2dp1_baseline_formal20_finetune_nosave_20260421_194433_DGX2-1`
+  - what succeeded:
+    - dual-node bring-up on `GPU 8,9,10,11`
+    - `TP=4 / PP=2` distributed initialization
+    - model build and pipeline partitioning
+    - parameter-count printouts for all `(tensor, pipeline)` ranks
+  - failure marker:
+    - `RuntimeError: Error(s) in loading state_dict for LMHeadPipe`
+    - `size mismatch for lm_head.weight`
+    - checkpoint shape `torch.Size([76032, 3584])`
+    - runtime shape `torch.Size([38016, 3584])`
+  - interpretation:
+    - the real checkpoint `qwen25_7b_instruct_hf2megads_tp2pp2_v100_gpu8to11_20260421_003100` is topology-bound to `TP=2` and cannot be directly reused for `TP=4`
+
+- [2026-04-21] V100 真实 `Qwen2.5-7B-Instruct` 双机 `formal20` 高频补测工件：
+  - `static 1500 MHz` 成功 run：
+    - run id:
+      - `ib_real_qwen25_7b_tp2pp2dp2_static1500_formal20_finetune_nosave_20260421_191307_DGX2-1`
+    - run dir:
+      - `/home/sd/Megatron-DeepSpeed/experiments/ib_real_qwen25_7b_tp2pp2dp2_static1500_formal20_finetune_nosave_20260421_191307_DGX2-1`
+    - success markers:
+      - `iteration 20/20`
+      - `[Zeus] Steps 1-20: Energy=53.13 Wh (191285.0 J), Avg Power=709.7 W, Time=269.5 s, Samples/Wh=1.506, Tokens/J=0.857`
+      - all local and remote rank processes `exits successfully`
+    - key performance lines:
+      - step 19: `13.1621s`, `lm loss 5.806705`, `samples/sec 0.304`, `TFLOPs 4.59`
+      - step 20: `13.1629s`, `lm loss 5.148087`, `samples/sec 0.304`, `TFLOPs 4.59`
+  - `static 1650 MHz` 非法频点失败：
+    - run id:
+      - `ib_real_qwen25_7b_tp2pp2dp2_static1650_formal20_finetune_nosave_20260421_192119_DGX2-1`
+    - failure marker:
+      - `preflight.json` 中 `static_clock_supported=false`
+    - key note:
+      - 当前 V100 支持的高端频点为 `1597 / 1590 / 1582 / ...`，因此 `1650` 不可作为合法锁频目标
+  - `static 1590 MHz` 合法但不稳定：
+    - run id:
+      - `ib_real_qwen25_7b_tp2pp2dp2_static1590_formal20_finetune_nosave_20260421_192321_DGX2-1`
+    - failure markers:
+      - `torch.distributed.DistBackendError`
+      - `ncclUnhandledCudaError`
+      - `Failed to CUDA calloc async 608 bytes`
+    - phase:
+      - 训练在 distributed / NCCL group bring-up 阶段失败，未进入稳定迭代区
+
+- [2026-04-21] V100 真实 `Qwen2.5-7B-Instruct` 双机 smoke 成功工件：
+  - run id:
+    - `ib_real_qwen25_7b_tp2pp2dp2_smoke5_finetune_nosave_v6_20260421_183844_DGX2-1`
+  - run dir:
+    - `/home/sd/Megatron-DeepSpeed/experiments/ib_real_qwen25_7b_tp2pp2dp2_smoke5_finetune_nosave_v6_20260421_183844_DGX2-1`
+  - command signature:
+    - `MASTER_PORT=30931`
+    - `TP=2 / PP=2 / DP=2`
+    - `GPU 8,9,10,11` on both nodes
+    - `--load /home/sd/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_v100_gpu8to11_20260421_003100 --finetune`
+    - `--vocab-size 152064 --make-vocab-size-divisible-by 128`
+  - terminal success markers:
+    - `iteration 1/5 ... 5/5`
+    - `[after training is done] datetime: 2026-04-21 18:41:41`
+    - all local and remote rank processes `exits successfully`
+  - key performance lines:
+    - step 1: `19.3166s`, `lm loss 10.8502`, `samples/sec 0.207`, `TFLOPs 3.13`
+    - step 5: `13.6631s`, `lm loss 9.7628`, `samples/sec 0.293`, `TFLOPs 4.42`
+    - Zeus summary: `Energy=14.78 Wh (53202.5 J), Avg Power=714.4 W, Time=74.5 s, Samples/Wh=1.353, Tokens/J=0.770`
+  - notable failed bring-up attempts immediately before success:
+    - `..._v3`
+      - fail: `LMHeadPipe` size mismatch (`76032` checkpoint rows vs `75904` runtime rows)
+      - root cause: `DGX2-2` still used old `megatron/tokenizer/tokenizer.py`
+    - `..._v4`
+      - fail: `torch.distributed.DistNetworkError ... EADDRINUSE`
+      - root cause: stale `v3` deepspeed/pdsh/TCPStore process tree still occupied `MASTER_PORT=30791`
+    - `..._v5`
+      - fail: `FileNotFoundError` for `e652788a584bd8acc28746e4a39bd45b_doc_idx.npy` on `DGX2-2`
+      - root cause: new dataset index-cache hash existed only on `DGX2-1` until manually synced
+
+- [2026-04-21] `DGX2-1` 本地真实 `Qwen2.5-7B-Instruct` 转换成功工件：
+  - checkpoint:
+    - `/home/sd/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_v100_gpu8to11_20260421_003100`
+  - log:
+    - `/home/sd/Megatron-DeepSpeed/.context/qwen25_7b_instruct_hf2megads_tp2pp2_v100_gpu8to11_20260421_003100.log`
+  - terminal success marker:
+    - `save checkpoint completed`
+  - post-run acceptance:
+    - `latest` 内容为 `global_step0`
+    - `global_step0/` 下存在 `mp_rank_*` 与 `layer_*` 状态文件
+    - 目录体积约 `15G`
+  - notable failed attempts to remember:
+    - `.context/qwen25_7b_instruct_hf2megads_tp2pp2_v100_20260421_002103.log`
+      - fail: `safetensors_rust.SafetensorError: incomplete metadata, file not fully covered`
+      - root cause: `model-00002-of-00004.safetensors` 损坏
+    - `.context/qwen25_7b_instruct_hf2megads_tp2pp2_v100_retry2_20260421_002716.log`
+      - fail: `ncclUnhandledCudaError` / `Failed to CUDA calloc async 4 bytes`
+      - root cause: 实际仍起在前 4 卡，而不是预期的 `8-11`
 - [2026-04-20] Ethernet real-model same-topology curve on `sd-1 + sd-2` now includes five fixed-frequency points for `TP=2 / PP=2 / DP=2` and all artifacts are local under `.context/eth_real_qwen25_7b_baseline_static_20260419/artifacts/`:
   - shared workload:
     - `Qwen2.5-7B-Instruct`, `28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4`
@@ -565,3 +982,95 @@
 - [2026-03-31] `dual8_tp4pp1dp2_smoke990_20260331_153159_DGX2-1` first gets past missing-index-cache errors after syncing `2d90..._*` and `e1ad..._*` to `DGX2-2`, then fails earlier than training with `torch.distributed.DistBackendError` inside `torch.distributed.new_group()`. The first concrete NCCL lines are `include/alloc.h:228 NCCL WARN Cuda failure 2 'out of memory'` and `Failed to CUDA calloc async 16 bytes` on ranks `0-3` of `DGX2-1`.
 - [2026-03-31] Live occupancy snapshot during the failing `2x4` smoke: `DGX2-1` is fully consumed by external `VLLM::Worker_TP0..15` processes (about `31472 MiB` on every GPU), and `DGX2-2` still has `/usr/bin/python3` leftovers on `GPU1-3` plus another `python` process on `GPU0` (~`4.1 GiB`). This explains why tiny NCCL allocations fail immediately and why the current one-sided watcher is insufficient.
 - [2026-03-31] The active watcher `watch_and_launch_dual8_tp4pp1dp2_20260331.sh` no longer monitors `GPU0-3`; it now gates launch on `GPU8-11` on both hosts and logs `target_gpus=8,9,10,11` in each polling snapshot. Initial armed state shows `DGX2-1 GPU8-11` free while `DGX2-2 GPU8-11` are free but the host still fails the residual-process check because stale `/usr/bin/python3` ranks remain alive.
+
+## [2026-04-25] V100 单节点 LLaMA-7B 能耗对比实验（统一口径）
+
+### 实验配置
+- **硬件**: DGX2-1, 8x V100-SXM3-32GB
+- **拓扑**: TP=2, PP=2, DP=2
+- **模型**: LLaMA-7B (32L / hidden=4096 / ffn=11008 / heads=32 / vocab=32000)
+- **数据**: `chinese_wiki_llama_megatron_text_document`（LLaMA tokenizer 预处理）
+- **训练**: 20 iterations, bf16, ZeRO-1, CPU Adam, recompute-granularity full
+- **Zeus 口径**: 仅统计训练阶段（从 "before training step" 到 "after training is done"）
+
+### 真实权重 5 频点结果
+| 频率 | 时间(s) | 能耗(J) | 功率(W) | tokens/J | 能耗节省 | 能效提升 |
+|------|---------|---------|---------|----------|----------|----------|
+| Baseline (1380 MHz) | 467.2 | 787,358 | 1685.3 | 0.416 | — | — |
+| Static 1260 MHz | 505.1 | 593,341 | 1174.7 | 0.552 | -24.6% | +32.7% |
+| Static 1350 MHz | 488.2 | 638,014 | 1306.8 | 0.514 | -19.0% | +23.6% |
+| Static 1455 MHz | 467.3 | 705,273 | 1509.1 | 0.465 | -10.4% | +11.8% |
+| Static 1530 MHz | 452.4 | 760,476 | 1681.2 | 0.431 | -3.4% | +3.6% |
+
+### Random Init 对照结果
+| 频率 | 时间(s) | 能耗(J) | 功率(W) | tokens/J | 能耗节省 | 能效提升 |
+|------|---------|---------|---------|----------|----------|----------|
+| Baseline (1380 MHz) | 454.5 | 779,045 | 1713.9 | 0.421 | — | — |
+| Static 1260 MHz | 511.0 | 596,680 | 1167.7 | 0.549 | -23.4% | +30.4% |
+
+### 关键发现
+1. **1260 MHz 为最佳能效点**，在真实权重和 random init 下均一致
+2. **两种初始化方式结果高度一致**：能耗节省 ~24% vs ~23%，能效提升 ~33% vs ~30%
+3. **证明锁频节能效果与权重初始化无关**
+4. **V100 默认时钟 1380 MHz**（非 max 1597 MHz），节能空间相对有限但仍显著
+5. **所有实验 Zeus 统计口径一致**，时间戳验证误差 < 1s
+
+### 实验工件
+- 真实权重 baseline: `v100_llama7b_realweight_newdata_baseline_20260425_134549_DGX2-1`
+- 真实权重 static 1260: `v100_llama7b_realweight_static1260_formal20_20260425_140414_DGX2-1`
+- 真实权重 static 1350: `v100_llama7b_realweight_static1350_formal20_20260425_141848_DGX2-1`
+- 真实权重 static 1455: `v100_llama7b_realweight_static1455_formal20_20260425_142845_DGX2-1`
+- 真实权重 static 1530: `v100_llama7b_realweight_static1530_formal20_20260425_143858_DGX2-1`
+- Random init baseline: `v100_llama7b_randominit_newdata_baseline_20260425_145216_DGX2-1`
+- Random init static 1260: `v100_llama7b_randominit_newdata_static1260_20260425_150208_DGX2-1`
+
+## [2026-04-27] 4080 RTX 4080 SUPER LLaMA-7B 32L dual-node 预测模型校准
+
+### 实验配置
+- **硬件**: sd-1 + sd-2, 各 4× RTX 4080 SUPER 16GB, Ethernet eth0
+- **拓扑**: TP=2, PP=2, DP=2, ZeRO-1 + CPU offload
+- **关键 workaround**: sd-1 driver 575.51.03 (CUDA 12.9) + PyTorch 2.10.0+cu128 导致 `pin_memory()` 报 `CUDA error: invalid argument`，因此 ds_config 中 `optimizer.offload_device.pin_memory=false`
+- **模型**: LLaMA-7B (32L / hidden=4096 / ffn=11008 / heads=32 / kv_heads=32 / vocab=32000)
+- **数据**: `/tmp/llama_test_data_text_document_text_document`（10 samples, HFTokenizer, seq=2048）
+- **训练**: 20 iterations, random init, bf16, micro=1, global=4, recompute-granularity full
+
+### 观测结果（4 频点）
+| 频率 | 时间(s) | 能耗(J) | 功率(W) | tokens/J | 相对 baseline |
+|------|---------|---------|---------|----------|--------------|
+| Baseline (2505 MHz) | 281.0 | 86,842 | 309.1 | 1.887 | — |
+| Static 1800 MHz | 276.1 | 62,459 | 226.2 | 2.623 | time -1.7%, energy -28.1% |
+| Static 1650 MHz | 300.8 | 66,154 | 219.9 | 2.477 | time +7.0%, energy -23.8% |
+| Static 1200 MHz | 299.2 | 63,638 | 212.7 | 2.575 | time +6.5%, energy -26.7% |
+
+### 关键观测
+1. **1800 MHz 时间比 baseline 还快**（276s vs 281s），通信瓶颈主导，计算加速被通信等待掩盖
+2. **1200 MHz 能效最高**（2.575 tok/J），功率最低（212.7W），时间代价可控（+6.5%）
+3. **功率随频率单调上升**：212.7W → 219.9W → 226.2W → 309.1W
+
+### 预测模型验证
+| 模型 | 时间公式 | 功率公式 | Time MAPE | Power MAPE |
+|------|---------|---------|-----------|------------|
+| **独立拟合** (4点, 3 DOF) | `T = 28.101×(2505/f)^0.754 + 251.370` | `P = 211.23 + 97.89×(f/2505)^5.731` | 2.16% | 0.06% |
+| **硬件先验** (b=1.046, exp=8.0, 2 DOF) | `T = 17.911×(2505/f)^1.046 + 261.871` | `P = 216.12 + 93.23×(f/2505)^8.0` | 2.16% | 0.89% |
+
+**惊人发现**：两种模型时间 MAPE 完全相同（2.16%），但独立 b=0.754 与先验 b=1.046 差异 29%，独立 exp=5.731 与先验 exp=8.0 差异 28%。原因：4 点分布范围有限（1200-2505 MHz），参数间存在相关性冗余，不同 (b, exp) 组合可通过调整 (a, c, P_static, P_dynamic) 达到同等拟合效果。
+
+**结论**：在有限频点范围内，硬件参数的"绝对真值"难以仅凭 4 点确定；但模型的**预测精度**不受此影响。
+
+### Sweet Spot（独立 4 点拟合）
+| 频率 | 时间Δ | 功率Δ | 能耗Δ | tokens/J |
+|------|-------|-------|-------|----------|
+| 1200 | +7.5% | -31.2% | -26.1% | 2.565 |
+| 1300 | +6.4% | -30.9% | -26.5% | 2.580 |
+| **1400** | **+5.5%** | **-30.5%** | **-26.7%** | **2.587** ← 最优 |
+| 1500 | +4.7% | -30.0% | -26.7% | 2.586 |
+| 1600 | +4.0% | -29.2% | -26.4% | 2.576 |
+| 1800 | +2.8% | -26.9% | -24.8% | 2.523 |
+
+### 实验工件
+- Baseline: `llama32l_4080_dual_baseline_20260427_154024_sd-1`
+- Static 1200: `llama32l_4080_dual_static1200_20260427_163600_sd-1`
+- Static 1650: `llama32l_4080_dual_static1650_20260427_154717_sd-1`
+- Static 1800: `llama32l_4080_dual_static1800_20260427_164400_sd-1`
+- 预测脚本 v1 (2点): `.context/raw_predict_4080_llama32l.py`
+- 预测脚本 v2 (4点): `.context/raw_predict_4080_llama32l_v2.py`

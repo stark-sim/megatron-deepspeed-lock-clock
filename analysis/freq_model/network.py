@@ -9,6 +9,24 @@ from analysis.freq_model.features import DerivedModelFeatures
 
 
 @dataclass(frozen=True)
+class NetworkConfig:
+    """Explicit network configuration for physics-driven prediction.
+
+    Replaces the implicit cross_node_reference_bandwidth_gbps buried in
+    CalibrationParams.  Used by derive_calibration_params() to compute
+    communication_limit_tokens_per_s from actual bandwidth + derived
+    cross-node communication bytes.
+    """
+
+    transport_type: str = "unknown"       # "nvlink" | "ethernet" | "ib" | "pcie"
+    effective_bandwidth_gbps: float = 0.0  # Measured effective bandwidth
+    latency_us: float = 0.0               # Small-message latency
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class NetworkQualityObservation:
     transport_label: str
     effective_bandwidth_gbps: float

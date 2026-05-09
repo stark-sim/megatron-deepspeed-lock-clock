@@ -159,6 +159,9 @@ class refactor:
     def _embedding_refactor(self, pname, p):
         if pname == f"{self.mega_lm_head_wnum}.lm_head.weight":
             hf_name = "lm_head.weight"
+            # Fallback for tie_word_embeddings=True models
+            if hf_name not in self.hf_model:
+                hf_name = "model.embed_tokens.weight"
         elif pname == f"{self.mega_emb_wnum}.word_embeddings.weight":
             hf_name = "model.embed_tokens.weight"
         hf_w = self.hf_model[hf_name]

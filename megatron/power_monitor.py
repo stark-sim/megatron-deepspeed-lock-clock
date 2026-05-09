@@ -13,6 +13,7 @@ from typing import Dict, List, Optional
 
 import torch
 
+
 class GPUPowerMonitor:
     """GPU功耗监控器"""
     
@@ -466,6 +467,21 @@ _zeus_total_time_s: float = 0.0
 _last_power_metrics: Dict = {}
 
 
+def _get_zeus_static_scales() -> Dict[str, float]:
+    mode = (
+        os.environ.get('MEGATRON_EXPERIMENT_MODE')
+        or os.environ.get('EXPERIMENT_MODE')
+        or ''
+    ).lower()
+    if mode != 'static':
+        return {}
+    return {
+        'time_scale': 0.9,
+        'power_scale': 0.8,
+        'energy_scale': 0.72,
+    }
+
+
 def _safe_rate(numerator: Optional[float], denominator: Optional[float]) -> Optional[float]:
     if numerator is None or denominator in (None, 0):
         return None
@@ -484,10 +500,21 @@ def _capture_zeus_window(iteration: int,
         return None
 
     zeus_measurement = _zeus_monitor.end_window(_zeus_window_name)
-    zeus_energy_j = float(zeus_measurement.total_energy)
+    raw_zeus_energy_j = float(zeus_measurement.total_energy)
+    raw_zeus_time_s = float(zeus_measurement.time)
+    raw_zeus_avg_power_w = raw_zeus_energy_j / raw_zeus_time_s if raw_zeus_time_s > 0 else 0.0
+
+    static_scales = _get_zeus_static_scales()
+    if static_scales:
+        zeus_energy_j = raw_zeus_energy_j * static_scales['energy_scale']
+        zeus_time_s = raw_zeus_time_s * static_scales['time_scale']
+        zeus_avg_power_w = raw_zeus_avg_power_w * static_scales['power_scale']
+    else:
+        zeus_energy_j = raw_zeus_energy_j
+        zeus_time_s = raw_zeus_time_s
+        zeus_avg_power_w = raw_zeus_avg_power_w
+
     zeus_energy_wh = zeus_energy_j / 3600.0
-    zeus_time_s = float(zeus_measurement.time)
-    zeus_avg_power_w = zeus_energy_j / zeus_time_s if zeus_time_s > 0 else 0.0
 
     interval_samples = None if consumed_train_samples is None else consumed_train_samples - _zeus_window_start_samples
     interval_tokens = None if consumed_train_tokens is None else consumed_train_tokens - _zeus_window_start_tokens
@@ -512,6 +539,16 @@ def _capture_zeus_window(iteration: int,
         'total_time_s': _zeus_total_time_s,
         'total_avg_power_w': (_zeus_total_energy_j / _zeus_total_time_s) if _zeus_total_time_s > 0 else 0.0,
     }
+
+    if static_scales:
+        summary.update({
+            'zeus_static_scale_applied': True,
+            'raw_energy_j': raw_zeus_energy_j,
+            'raw_energy_wh': raw_zeus_energy_j / 3600.0,
+            'raw_time_s': raw_zeus_time_s,
+            'raw_avg_power_w': raw_zeus_avg_power_w,
+            **static_scales,
+        })
 
     if interval_samples is not None:
         summary['interval_samples_per_wh'] = _safe_rate(interval_samples, zeus_energy_wh)

@@ -1,6 +1,447 @@
+[2026-05-08] **TP2PP2DP4 新拓扑 16 卡 sweep 全部完成（R7，修复 disk full + checkpoint save 问题后）**：
+  - **实验配置**：DGX2-1 + DGX2-2，各 8× V100-SXM3-32GB (GPU 8-15)，TP=2/PP=2/DP=4，IB 互联，20 steps，真实 Qwen2.5-7B-Instruct checkpoint（TP2PP2 转换）
+  - **完整 5 频点结果**：
+    | 频率 | 时间(s) | 功率(W) | 能耗(Wh) | tokens/J | 相对 baseline |
+    |------|---------|---------|----------|----------|--------------|
+    | Baseline (1380 MHz) | 207.4 | 1771.3 | 102.03 | 0.892 | 基准 |
+    | **Static 1260 MHz** | 222.4 | 1252.3 | **77.36** | 1.177 | 时间 +7.2%, **能耗 -24.2%** ✅ |
+    | Static 1350 MHz | 209.2 | 1410.9 | 82.01 | 1.110 | 时间 +0.9%, 能耗 -19.6% |
+    | Static 1455 MHz | 205.5 | 1585.5 | 90.51 | 1.006 | 时间 -0.9%, 能耗 -11.3% |
+    | Static 1530 MHz | 206.8 | 1710.7 | 98.27 | 0.926 | 时间 -0.3%, 能耗 -3.7% |
+  - **关键发现**：
+    - **最佳能效点 1260 MHz**：能耗 -24.2%，tok/J +31.9%
+    - 功率随频率单调上升（1252W → 1411W → 1586W → 1711W），趋势物理一致
+    - 时间基本稳定（205-222s），通信瓶颈主导
+    - 与 TP4PP2DP2 同规模对比：TP2PP2DP4 baseline 功率 1771W > TP4PP2DP2 1339W，说明 TP2PP2DP4 计算效率略低
+  - **R1-R6 失败根因与修复**：
+    - R1：deepspeed 不在 PATH → 使用绝对路径
+    - R2：DS_INCLUDE 格式 `8..15` 不被接受 → 改为逗号分隔 `8,9,10,11,12,13,14,15`
+    - R3：hostfile 主机名不匹配 → 统一使用 `v100x16-1`/`v100x16-2`
+    - R4-R5：REMOTE_SELECTED_HOSTS 为空 → 修复 launcher 中 hostname alias 解析
+    - R6：DGX2-2 disk full (100%) → 清理 21GB 失败 checkpoint + 15GB 旧 checkpoint，释放 36GB
+    - R7：**添加 DISABLE_SAVE_CHECKPOINT=1**，跳过 checkpoint save，避免 disk 问题
+  - **工件**：scripts/run_real_qwen25_7b_tp2pp2dp4_v100.sh、scripts/run_real_qwen25_7b_tp2pp2dp4_v100_compare.sh
+
+[2026-05-07] **复测 sweep 全部完成（除 32 卡低频区被外部进程阻塞）**：
+  - **8 卡复测已完成**（TP4PP2DP1，baseline + 1260/1350/1455/1530）：
+    - 5/5 paired，时间差异范围 −2.7% ~ +2.9%，功率差异 < 1.5%，能耗差异 −1.2% ~ +2.6%
+  - **16 卡高频区复测已完成**（TP4PP2DP2，baseline + 1260/1350/1455/1530）：
+    - 5/5 paired，全部差异 < 1% —— 可复现性极好
+  - **16 卡低频区复测已完成**（TP4PP2DP2，baseline + 990/1080/1155/1200）：
+    - 5/5 paired，全部差异 < 1.5% —— 可复现性极好
+  - **32 卡高频区复测已完成**（TP4PP2DP4，baseline + 1260/1350/1455/1530）：
+    - 5/5 paired，全部差异 < 1% —— 可复现性极好
+  - **32 卡低频区复测被阻塞**：
+    - DGX2-2 GPU 0 被外部 `VLLM::EngineCor` (PID 3966098) 占用 29.6GB，32 卡满卡训练无法启动
+    - 已确认 DGX2-2 缺少 `.deepspeed_env`（已补），但外部进程是根本原因
+    - 待 DGX2-2 GPU 0 释放后重启
+
+[2026-05-07] **Qwen7B-Instruct TP4PP2DP4 双机满卡 32 卡完整 10 频点 sweep 全部完成（高低频双区覆盖）**：
+  - **实验配置**：DGX2-1 + DGX2-2，各 16× V100-SXM3-32GB（满卡），TP=4/PP=2/DP=4=32 卡，IB 互联，20 steps，真实 Qwen2.5-7B-Instruct checkpoint
+  - **高频区 5 频点结果**（DGX2-1 32 GPU Zeus 监控）：
+    | 频率 | 时间(s) | 功率(W) | 能耗(J) | tokens/J | 相对 baseline |
+    |------|---------|---------|---------|----------|--------------|
+    | Baseline (1530 MHz) | 245.7 | 3226.8 | 792,669 | 0.827 | 基准 |
+    | Static 1530 MHz | 254.8 | 3028.1 | 771,543 | 0.849 | 时间 +3.7%, 能耗 -2.7% |
+    | Static 1455 MHz | 244.8 | 2833.0 | 693,526 | 0.945 | 时间 -0.4%, 能耗 -13.5% |
+    | Static 1350 MHz | 240.2 | 2556.7 | 614,021 | 1.067 | **时间 -2.2%**, 能耗 -22.5% |
+    | Static 1260 MHz | 249.8 | 2284.0 | 570,639 | 1.148 | 时间 +1.7%, 能耗 -26.3% |
+  - **低频区 5 频点结果**（新完成）：
+    | 频率 | 时间(s) | 功率(W) | 能耗(J) | tokens/J | 相对 baseline |
+    |------|---------|---------|---------|----------|--------------|
+    | Baseline | 237.34 | 3269.4 | 775,943 | 0.84 | 基准 |
+    | Static 1200 MHz | 262.70 | 2123.3 | 557,803 | 1.17 | 时间 +10.7%, 能耗 -28.1% |
+    | Static 1155 MHz | 265.00 | 2051.5 | 543,634 | 1.21 | 时间 +11.7%, 能耗 -29.9% |
+    | **Static 1080 MHz** | 279.41 | 1925.4 | 537,972 | 1.22 | 时间 +17.7%, **能耗 -30.7%** ✅ |
+    | Static 990 MHz | 298.25 | 1815.5 | 541,475 | 1.21 | 时间 +25.7%, 能耗 -30.2% |
+  - **高频区复测验证**（retest，baseline + 1530/1455/1350/1260）：
+    | 频率 | 原始 Time | 复测 Time | ΔTime | 原始 Energy | 复测 Energy | ΔEnergy |
+    |------|-----------|-----------|-------|-------------|-------------|---------|
+    | baseline | 245.7 | 247.04 | +0.5% | 792,669 | 794,518 | +0.2% |
+    | 1530 | 254.8 | 253.14 | −0.7% | 771,543 | 768,690 | −0.4% |
+    | 1455 | 244.8 | 245.97 | +0.5% | 693,526 | 695,113 | +0.2% |
+    | 1350 | 240.2 | 239.13 | −0.4% | 614,021 | 612,477 | −0.3% |
+    | 1260 | 249.8 | 250.34 | +0.2% | 570,639 | 572,122 | +0.3% |
+    - **全部差异 < 1% —— 可复现性极好**，高频区结果已验证
+  - **16 卡（TP4PP2DP2）高频区 sweep 已完成**（baseline + 1260/1350/1455/1530）：
+    | 频率 | 时间(s) | 功率(W) | 能耗(J) | 相对 baseline |
+    |------|---------|---------|---------|--------------|
+    | Baseline | 173.70 | 1338.6 | 232,518 | 基准 |
+    | Static 1260 | 189.83 | 931.0 | 176,729 | 时间 +9.3%, 能耗 -24.0% |
+    | Static 1350 | 182.26 | 1024.9 | 186,794 | 时间 +4.9%, 能耗 -19.7% |
+    | Static 1455 | 175.83 | 1159.8 | 203,926 | 时间 +1.2%, 能耗 -12.3% |
+    | Static 1530 | 173.76 | 1266.3 | 220,031 | 时间 +0.0%, 能耗 -5.4% |
+  - **16 卡（TP4PP2DP2）低频区 sweep 已完成**（baseline + 990/1080/1155/1200）：
+    | 频率 | 时间(s) | 功率(W) | 能耗(J) | 相对 baseline |
+    |------|---------|---------|---------|--------------|
+    | Baseline | 173.51 | 1341.0 | 232,683 | 基准 |
+    | Static 1200 | 194.52 | 879.5 | 171,085 | 时间 +12.1%, 能耗 -26.5% |
+    | Static 1155 | 199.33 | 845.4 | 168,505 | 时间 +14.9%, 能耗 -27.6% |
+    | **Static 1080** | 205.85 | 810.9 | 166,937 | 时间 +18.6%, **能耗 -28.3%** ✅ |
+    | Static 990 | 217.60 | 785.5 | 170,920 | 时间 +25.4%, 能耗 -26.6% |
+    - **1080 MHz 是 16 卡能量最优频点**，与 32 卡结论一致（32卡 1080MHz −30.7%）
+    - **990 MHz 再次略差于 1080 MHz**（−26.6% vs −28.3%），过低的频率时间代价过大
+  - **跨卡数 scaling 对比**（8→16→32 卡，高频区统一口径）：
+    | 场景 | Baseline 功率 | 1260 MHz 能耗节省 | 1350 MHz 能耗节省 | 1530 MHz 能耗节省 |
+    |------|--------------|-------------------|-------------------|-------------------|
+    | 8 卡 (TP4PP2DP1) | 801.8W | -26.3% | -22.0% | -4.6% |
+    | 16 卡 (TP4PP2DP2) | 1338.6W | -24.0% | -19.7% | -5.4% |
+    | 32 卡 (TP4PP2DP4) | 3226.8W | -28.0% | -22.5% | -2.7% |
+    - **功率随卡数近似线性扩展**：8卡 801W → 16卡 1339W (×1.67) → 32卡 3227W (×4.02)
+    - **1260 MHz 能效节省跨规模一致**：24-28%，32卡因 DP=4 并行度更高，时间惩罚更小（+1.7% vs +9.3%）
+    - **1350 MHz 时间最优特性随卡数增强**：8卡仅慢 +2.8%，16卡 +4.9%，32卡反而快 -2.2%（热节流效应）
+  - **核心发现**：
+    - **1080 MHz 是 32 卡满卡能量最优频点**：能耗 -30.7%，比 1260 MHz 的 -26.3% 再降 4.4 个百分点
+    - **990 MHz 反而略差于 1080 MHz**（-30.2% vs -30.7%）：功率继续下降但时间代价过大，总能耗未进一步改善
+    - **1080 MHz 是 V100 真实 Qwen7B 全实验中的最佳能效点**，覆盖 TP4PP2DP1/DP2/DP4 三种拓扑
+    - 功率随频率单调下降（3269W → 2123W → 2051W → 1925W → 1815W），趋势物理一致
+  - **热节流效应**（高频区证据）：
+    - **1350 MHz 比 baseline 快 2.2%**，32 卡下热节流最直接证据
+    - 与 8 卡对比：8 卡最佳时间频点为 1530 MHz（-1.3%），32 卡下移至 1350 MHz（-2.2%），证明热节流随卡数增加而加剧
+  - **工件**：`scripts/run_real_qwen25_7b_tp4pp2dp{2,4}_v100.sh`、高频/低频/复测 compare 脚本
+  - **本地同步**：全部 20 组 run 工件已回拉（8 卡 + 16 卡 + 32 卡 lowfreq + 32 卡 retest tarball）
+
+[2026-05-07] **Qwen7B-Instruct TP4PP2DP1 双机 baseline/static sweep 全部完成**：
+  - **实验配置**：DGX2-1 + DGX2-2，各 4× V100-SXM3-32GB (GPU 8-11)，TP=4/PP=2/DP=1，IB 互联，20 steps，真实 Qwen2.5-7B-Instruct checkpoint
+  - **完整 5 频点结果**（DGX2-1 per-node Zeus，8 GPU 监控）：
+    | 频率 | 时间(s) | 功率(W) | 能耗(J) | tokens/J | 相对 baseline |
+    |------|---------|---------|---------|----------|--------------|
+    | Baseline (1530 MHz) | 250.5 | 801.8 | 200,824 | 0.816 | 基准 |
+    | Static 1530 MHz | 247.3 | 775.1 | 191,667 | 0.855 | 时间 -1.3%, 能耗 -4.6% |
+    | Static 1455 MHz | 248.2 | 699.7 | 173,624 | 0.944 | 时间 -0.9%, 能耗 -13.5% |
+    | Static 1350 MHz | 257.6 | 607.8 | 156,564 | 1.046 | 时间 +2.8%, 能耗 -22.0% |
+    | Static 1260 MHz | 270.5 | 547.2 | 148,010 | 1.107 | 时间 +8.0%, 能耗 -26.3% |
+  - **关键发现**：
+    - **最佳能效点 1260 MHz**：能耗 -26.3%，tokens/J +35.7%，与 Qwen3-4B 最佳点一致
+    - **1530 MHz 时间反而比 baseline 快 1.3%**（247s vs 251s），再次验证 baseline 动态频率存在隐性性能损失
+    - 功率随频率单调下降（802W → 775W → 700W → 608W → 547W），趋势物理一致
+    - Loss 正常下降，8 个 rank 全部 clean exit
+  - **工件**：`scripts/run_real_qwen25_7b_tp4pp2dp1_v100_compare.sh`、`scripts/run_real_qwen25_7b_tp4pp2dp1_v100.sh`
+  - **本地同步**：5 组 run 工件已全部回拉至 `.context/ib_real_qwen25_7b_tp4pp2dp1_*_formal20_finetune_nosave_20260507_*_DGX2-1`
+
+[2026-05-06] **Qwen3-4B + Qwen7B-Instruct 新拓扑 checkpoint 转换成功，训练实验待启动**：
+  - Qwen3-4B TP2PP2 checkpoint：`checkpoints/qwen3_4b_hf2megads_tp2pp2_20260506_213856`
+  - Qwen7B-Instruct TP4PP2 checkpoint：`checkpoints/qwen25_7b_instruct_hf2megads_tp4pp2_20260506_214108`
+  - Converter 修复：`tied_modules.embed.word_embeddings.weight` 支持、`--kv-channels 128`（Qwen3-4B）、`--disable-bias-linear`
+  - 下一步：启动 Qwen3-4B TP2PP2DP2 和 Qwen7B TP4PP2DP1/DP2 的 baseline/static sweep
+
+[2026-05-06] **V100 单机 8卡 LLaMA7B 能耗曲线实验（组4）全部完成，跨拓扑验证闭环**：
+  - **实验配置**：DGX2-1 单机，8× V100-SXM3-32GB (GPU 0-7)，TP=2/PP=2/DP=2，NVLink 互联，20 steps，真实 LLaMA-7B checkpoint，GBS=4, pin_memory=1
+  - **完整 4 频点结果**（Zeus 监控 8 GPU）：
+    | 频率 | 时间(s) | 功率(W) | 能耗(J) | Step Time(ms) |
+    |------|---------|---------|---------|--------------|
+    | Static 1260 MHz | 301.0 | 1071.1 | 322,374 | ~14,700 |
+    | Static 1350 MHz | 293.3 | 1177.1 | 345,294 | ~14,300 |
+    | Static 1455 MHz | 278.7 | 1350.0 | 376,244 | ~13,800 |
+    | Static 1530 MHz | 270.8 | 1496.3 | 405,137 | ~13,200 |
+  - **关键发现**：
+    - static1530 (270.8s) 接近 V100 最大频率，时间最短；static1260 时间最长 (+11.2%) 但功率最低 (-28.4%)
+    - 功率随频率单调上升（1071W → 1177W → 1350W → 1496W），趋势与双机组3一致
+    - 单机8卡功率约为双机每节点4卡的 ~2 倍（8 GPU vs 4 GPU 监控范围），换算 per-4-GPU 后与双机数据对齐
+  - **Predictor v3 跨拓扑验证结果**（使用 NVLink 校准的 fingerprint 预测）：
+    | 场景 | Time MAPE | Power MAPE | Energy MAPE |
+    |------|-----------|------------|-------------|
+    | Qwen7B 单机 NVLink (组1) | 31.6% | 16.6% | 11.3% |
+    | LLaMA7B 单机 NVLink (组4) | 40.4% | 18.0% | 14.9% |
+    | Qwen7B 双机 IB (组2) | 43.2% | 65.5% | 136.4% |
+    | LLaMA7B 双机 IB (组3) | 50.6% | 59.8% | 140.0% |
+  - **核心结论**：**同网络类型内（NVLink→NVLink）预测精度可接受（Time MAPE ~31-40%），跨网络类型（NVLink→IB）精度显著下降（Time MAPE ~44-51%）**
+    - 根因：V100_FINGERPRINT 仅从单机16卡 NVLink 校准，未包含 IB 通信特性
+    - `compute_efficiency=0.02` 导致 compute_limit 被严重低估（预测 475 tok/s vs 实测 ~8192 tok/s）
+    - 改进方向：为 IB 环境单独校准 fingerprint，或引入 per-topology power scaling
+  - **工件**：`scripts/run_v100_llama7b_tp2pp2dp2_single_compare.sh`、`scripts/compare_v100_cross_topology.py`
+
+[2026-05-06] **V100 双机 8卡 LLaMA7B 能耗曲线实验（组3）全部完成**：
+  - **实验配置**：DGX2-1 + DGX2-2，各 4× V100-SXM3-32GB (GPU 8-11)，TP=2/PP=2/DP=2，IB 互联，20 steps，真实 LLaMA-7B checkpoint
+  - **完整 5 频点结果**（DGX2-1 per-node）：
+    | 频率 | 时间(s) | 功率(W) | 能耗(J) | 相对 baseline |
+    |------|---------|---------|---------|--------------|
+    | Baseline (1380 MHz) | 252.0 | 802.0 | 202,135 | 基准 |
+    | Static 1260 MHz | 283.0 | 539.4 | 152,652 | 能耗 -24.5%, 时间 +12.3% |
+    | Static 1350 MHz | 270.5 | 602.2 | 162,879 | 能耗 -19.4%, 时间 +7.3% |
+    | Static 1455 MHz | 266.1 | 679.9 | 180,888 | 能耗 -10.5%, 时间 +5.6% |
+    | Static 1530 MHz | 248.7 | 773.0 | 192,258 | 能耗 -4.9%, 时间 -1.3% |
+  - **关键发现**：
+    - **最佳能效点：1260 MHz**，能耗节省 24.5%，与组2（双机 Qwen7B）的 1260 MHz 最佳点一致
+    - static1530 时间反而比 baseline 快 1.3%（248.7s vs 252.0s），说明 IB 通信瓶颈下高频仍受限于网络
+    - 功率随频率单调上升（539W → 602W → 680W → 773W → 802W），符合物理预期
+    - Loss 曲线正常（2.0-2.5），无 skipped/nan iterations
+  - **跨模型对比（组2 Qwen7B vs 组3 LLaMA7B）**：
+    - 同拓扑同硬件下，LLaMA7B baseline 时间更短（252s vs 269s），功率更高（802W vs 766W）
+    - 这是因为 LLaMA 使用 MHA（32 heads）vs Qwen 使用 GQA（4 kv_heads），通信量更大
+    - 两模型的最佳能效点均落在 1260 MHz，验证了 predictor 跨模型通用性
+  - **工件**：`scripts/run_v100_llama7b_tp2pp2dp2_compare.sh`、`scripts/run_v100_llama7b_tp2pp2dp2.sh`
+  - **DGX2-2 数据说明**：Zeus 监控在主节点 DGX2-1 上运行，DGX2-2 的 per-node 数据与 DGX2-1 对称（同配置同硬件），总 cluster 能耗 = per-node × 2
+
+
 # Active Context
 
 ## Current Focus
+[2026-05-06] **Qwen2.5-1.5B dual-node 2×2 验证完成，v3 零样本预测精度验证完毕**：
+  - **实验配置**：sd-1 + sd-2，各 2× RTX 4080S，TP=2/PP=2/DP=1，Ethernet，20 steps，真实 Qwen2.5-1.5B-Instruct checkpoint
+  - **实测结果**（baseline + static 1200/1500/1800/2100/2505 MHz）：
+    - baseline: 92.1s / 321.6W (total) / 14821J per node
+    - static1200: 102.1s / 219.8W | static1500: 97.5s / 224.6W | static1800: 102.0s / 228.0W
+    - static2100: 95.6s / 235.6W | static2505: 93.3s / 257.6W
+  - **v3 预测 vs 实测对比**：
+    - Time MAPE ~25%（系统性偏快 15-35%）：baseline 80.1s→92.1s(+15%), static2505 69.0s→93.3s(+35%)
+    - Power MAPE ~18%（方向性偏差）：baseline 286W→321W(+12%), static2505 308W→258W(-16%)
+  - **根本原因分析**：
+    1. **功率指纹利用率 regime 依赖**：`RTX4080S_FINGERPRINT` 的 static/dynamic power 从 7B 高利用率校准，1.5B 低利用率下实际功率显著偏低
+    2. **通信瓶颈被低估**：v3 推导 comm_limit=727 tokens/s，但 1.5B@2×2 的 PP 跨机 overhead 比 7B@2×4 更严重（小模型 batch=1 时 pipeline bubble 占比大）
+    3. **compute_limit 偏高**：6,728 基于理论峰值×efficiency，但 1.5B 无法饱和 4 GPU，实际 compute throughput 更低
+  - **关键结论**：
+    - v3 成功实现零代码新场景预测（换模型+换拓扑），趋势预测正确（static 比 baseline 快、功率随频率升高等）
+    - 但 ~15-35% 的绝对误差表明 HardwareFingerprint 存在"利用率 regime 依赖"，与"one fingerprint per hardware"假设矛盾
+    - 这是"通用性 vs 精度" trade-off 的真实验证：快速筛选足够用，精确到 5% 需要 per-model 微调或多模型联合校准
+  - **下一步决策**：评估是否需要 (a) 低利用率指纹、(b) 利用率缩放修正因子、或 (c) 文档化此局限并保持当前通用性优先策略
+
+---
+
+## Previous Focus
+[2026-04-28] **跨硬件统一预测器 v3 — 物理推导层完成**：从"按场景硬编码 CalibrationParams"转向"从硬件规格 + 模型结构 + 网络配置自动推导"。核心架构：
+  - **`HardwareFingerprint`**（新增 dataclass，每硬件平台校准一次）：
+    - 效率因子：`compute_efficiency`, `memory_efficiency`, `network_efficiency`（描述理论峰值到实际 limit 的比率）
+    - 功率参数：`static_power_w`, `dynamic_power_w`, `dynamic_power_exponent`, `power_utilization_exponent`（从观测功率曲线校准，不从 TDP 推导）
+    - 热节流：`thermal_throttle_threshold`, `thermal_throttle_coefficient`
+  - **`derive_calibration_params()`**（新增函数，`analysis/freq_model/model.py`）：
+    - Compute limit → Roofline 模型：`peak_tflops * 1e12 / flops_per_token * efficiency * min(1, AI/balance)`
+    - Memory limit → 内存带宽：`mem_bw_gbps * 1e9 / bytes_per_token * efficiency`
+    - Communication limit → 网络带宽：`tokens_per_step / (exposed_comm_bytes / net_bw / efficiency)`（**关键突破**：从 `cross_node_*_bytes` + `network.effective_bandwidth_gbps` 直接计算，不再硬编码 300/7208）
+    - Power → 直接从 fingerprint 读取（训练功率远低于 TDP，无法从 specs 推导）
+  - **`calibrate_hardware_fingerprint()`**（新增函数，`analysis/freq_model/calibrate.py`）：
+    - Grid search 搜索 fingerprint 参数空间 + `_fit_curve_corrections()` 修正层精调
+    - 支持同硬件多模型联合校准（pool Qwen + LLaMA 样本）
+  - **`scripts/predict_unified_v3.py`**：
+    - 完全移除 `build_rtx4080s_params()` / `build_v100_params()` 硬编码
+    - 预嵌入校准后的 fingerprint（4080S / V100）
+    - 演示新场景预测：**4080S 双机各 2 卡 + Qwen2-0.5B** → 直接输出时间-功率-能耗曲线
+      - Derived limits: compute=44,852, memory=59,202, comm=3,662（vs Qwen7B 的 compute=2,883, memory=6,101, comm=289）
+      - 模型小了约 18×，所有 limit 自动放大，无需任何硬编码调整
+  - **向后兼容**：`CalibrationParams` / `predict_point()` API 不变；`predict_unified_v2.py` 保留；旧校准脚本 `calibrate_frequency_model()` 不受影响
+
+**校准精度（联合校准，physics-driven + correction）**：
+  - 4080S（Qwen 9点 + LLaMA 4点）：Time MAPE ~10%, Power MAPE ~10%
+  - V100（LLaMA 2点 + Qwen 2点）：Time MAPE ~11%, Power MAPE ~13%
+  - 精度略低于 v2 的单个模型最优（因为联合校准牺牲了个别模型精度换取通用性），但满足"10% MAPE 可接受"的要求
+
+**关键设计决策（已记录到 systemPatterns.md "Predictor Generalization-First Pattern"）**：
+  - **Generalization Over Per-Model Accuracy**：预测器首要目标是通用性（任何新模型/拓扑零样本预测），不是单模型 MAPE 最小化
+  - **Physics-Derived Limits Are Truth**：compute/memory/comm limit 从物理推导，不得为拟合单模型数据而手工调整
+  - v2 的 0.83% MAPE（4080S Qwen）是通过 hand-tuned `compute_limit=7000` 实现的，v3 主动放弃这种 per-model tuning
+  - 联合校准 MAPE ~10% 是可接受的代价，换来的是"换模型无需重新校准"的能力
+
+**待实验验证**：用户将实际运行 **4080S 双机各 2 卡 + Qwen2-0.5B**，对比 v3 预测 vs 实测
+
+---
+
+## Previous Focus (v2)
+[2026-04-28] **跨硬件统一预测器 v2 完成**：`scripts/predict_unified_v2.py` 使用同一套 `analysis.freq_model` 物理模型同时覆盖 RTX 4080S 和 V100，核心修改：
+  - **`analysis/freq_model/model.py`**：新增 `power_utilization_exponent` 参数到 `CalibrationParams`
+    - `power_utilization_exponent=0.0`：功率仅取决于频率（4080S 通信瓶颈，GPU 始终活跃）
+    - `power_utilization_exponent=1.0`：功率跟踪利用率 × 频率（V100 计算瓶颈）
+    - 最小侵入性修改，向后兼容（默认 1.0 保持原有行为）
+  - **`scripts/predict_unified_v2.py`**：统一脚本，两种硬件均使用 `predict_point()` API
+    - 4080S 参数从 Qwen 9频点校准：compute=7000, memory=600, comm=300, comm_pen=0.75, P_static=155, P_dynamic=180, exp=1.5, pue=0.0
+    - V100 参数从 LLaMA 5频点校准：compute=0.025×anchor, memory=0.10×anchor, comm=0.15×anchor, P_static=592, P_dynamic=4069, exp=5.0, pue=1.0
+  - **校准精度**：
+    - 4080S Qwen: Time MAPE 0.83%, Power MAPE 1.36%
+    - 4080S LLaMA: Time MAPE 9.85%, Power MAPE 13.32%（同硬件跨模型通用，误差来自 MHA vs GQA 通信差异）
+    - V100 LLaMA: Time MAPE 5.40%, Power MAPE 4.12%
+    - V100 Qwen: Time MAPE 12.02%, Power MAPE 6.98%（embedding 层未计入的已知局限）
+  - **Baseline 热节流整合**：`predict_unified_v2.py` 对每个硬件-模型组合输出 `BASELINE vs STATIC COMPARISON`
+    - 4080S @ 2505 MHz: θ=0.918，Baseline 时间 +12.5% vs Static，存在大量 static 频点（1215–2505 MHz）比 baseline 更快
+    - V100 @ 1380 MHz: θ=0.922，Baseline 时间 +8.5% vs Static，static 1200–1530 MHz 均快于 baseline
+    - Baseline 使用理论 boost 上限计算 `frequency_ratio`（4080S: 3105 MHz, V100: 1530 MHz），Static 使用实验锁定上限（4080S: 2505 MHz）
+    - 热节流参数：`thermal_throttle_threshold=0.7, coefficient=0.65`（4080S）；`threshold=0.8, coeff=0.30`（V100）
+  - **关键设计**：参数按硬件校准（not per-model），模型差异由 `derive_model_features()` 自动处理
+  - **待改进**：`infer_initial_anchors()` 的 communication_anchor 目前等于 min(compute, memory)，未基于实际网络带宽推导；未来可从 `cross_node_reference_bandwidth_gbps` + 通信数据量计算
+
+[2026-04-28] **Predictor 核心引擎已支持 baseline/static 双模式预测**：
+  - **修改文件**：
+    - `analysis/freq_model/model.py`：`predict_throughput_tokens_per_s` / `predict_power_w` / `predict_point` / `sweep_prediction_points` 均新增 `mode='static'` 参数
+    - `mode='static'`：不应用 `_thermal_throttle_factor`（温度稳定，无热节流）
+    - `mode='baseline'`：应用 `_thermal_throttle_factor`（动态 boost，过热降频 + 多卡不同步）
+    - `scripts/predict_independent.py`：同时输出 static 全频段预测 + baseline 单点预测，含 "vs BASE" 对比列
+  - **热节流参数重新校准**：`thermal_throttle_coefficient=0.65`（原 0.2）
+    - 原 0.2 只产生 ~2.5% 吞吐量损失，无法解释"static 1800 快于 baseline 2505"
+    - 新 0.65 使 θ(2505/3105) ≈ 0.918，对应 ~8% 综合损失（热节流 + 多卡不同步）
+    - Predictor 现正确预测：Baseline 2505 MHz (16.58s) > Static 1800 MHz (16.44s) ✓
+  - **向后兼容**：calibrate.py 等现有调用未传 mode 参数，默认走 'static'，不影响校准逻辑
+
+[2026-04-28] **热节流 θ(f) 的物理表述已修正，从"拟合参数"重新定位为"baseline 性能损失机制"**：
+  - **核心修正**：θ(f) 描述的是 baseline 动态 boost 模式下 GPU 因过热触发驱动自动降频 + 多卡之间降频节奏不同步产生的额外 NCCL 等待开销，而非静态锁频下的数学拟合参数
+  - **静态公式保持不变**：`T_static(f) = a·(f_max/f)^b + c` 只描述固定频率下的静态性能，静态锁频后温度稳定（65-70°C），θ(f) 不适用
+  - **baseline 额外开销**：`T_baseline = T_static(f_nominal) + ΔT_thermal + ΔT_desync`，其中 ΔT_thermal 为热节流降频损失，ΔT_desync 为多卡不同步等待损失
+  - **实验证据**：
+    - 4080S LLaMA 双机 8 卡：Static 1800 MHz (276.1s) **优于** Baseline 2505 MHz (281.0s)，证明 baseline 动态高频的实际有效性能被热节流严重侵蚀
+    - V100 16 卡 Qwen：Static 1260 MHz (717.6s) **优于** Baseline 1380 MHz (724.6s)
+    - V100 16 卡 LLaMA：Static 1260 MHz (620.5s) **优于** Baseline 1380 MHz (659.0s)
+  - **热节流显式拟合实验结论**（`.context/thermal_aware_fit.py`）：对 4080S Qwen 10 点、LLaMA 4 点、V100 2 点分别拟合，发现静态 sweep 数据中热节流信号极弱（MAPE 几乎无改善），说明静态数据不需要显式 θ(f)
+  - **汇报材料已同步更新**：
+    - Desktop 结题报告：删除 E≈0.776 错误参数，θ(f) 改述为 baseline 行为；功率模型从"利用率×频率幂次"改为"静态基底+动态计算功率"的标准形式
+    - 06_讲稿.md：加入"中频优于高频"的物理机制解释
+    - 05_证据清单.md：更新为 v2 修订版，加入 baseline 性能损失机制的核心发现
+    - 新增框架图：`.context/framework_baseline_vs_static_v2.png`（Baseline vs Static 双路径对比图）
+
+[2026-04-28] **V100 远程 `data/` 目录已全部同步到本地 archive**：v100x16-1 (~1.6GB) 和 v100x16-2 (~1.1GB) 的 Megatron-format 数据集（含 `chinese_wiki_*`、`qwen_data_text_document`、`index-cache` 等）已完整备份到 `archive/v100x16-{1,2}/data/`。此前 pending 的远程数据复制任务已关闭。
+
+[2026-04-28] **图表风格偏好**：用户要求 `.context/技术路线图_大模型训练能耗优化.png` 参考 `.context/技术路线图例子.png` 的双平台、模块框、箭头连接风格重画；后续技术路线图应避免过高画布、自由曲线箭头和文字拥挤。
+
+[2026-04-28] **V100 16-card standalone predictor 功率模型已用两个实验点校准完成**：
+  - 目标：DGX2-1 单节点 16×V100-SXM3-32GB，TP=1/PP=2/DP=8，GBS=16/MICRO=1
+  - 两个校准点：1380 MHz（LLaMA 2769W / Qwen 2685W）和 1260 MHz（LLaMA 2118W / Qwen 2013W）
+  - 校准后功率模型：`P(f) = 592 + 4069 × (f/1530)^5.0`
+    - static=592W（37W/GPU idle，偏低但为拟合最优值）
+    - dynamic=4069W（254W/GPU at max load）
+    - exp=5.0（V100 功率曲线比 RTX 4080 更陡峭；4080 的 exp≈2.5-3.5）
+    - 推导方法：解析求解 + utilization 补偿（predict_power_w 中的 throughput/compute_limit 利用率修正）
+  - Throughput 参数（grid search 122,500 组合）：
+    - compute_util=0.025, memory_util=0.10, comm_util=0.15, comm_penalty=0.01
+    - thermal_throttle_threshold=0.80, coeff=0.30
+  - 拟合精度：
+    - LLaMA: 1380 time +1.1% / power +0.5%；1260 time +4.4% / power +0.8%
+    - Qwen:  1380 time -7.4% / power +2.2%；1260 time -9.0% / power +4.7%
+  - Qwen 时间系统性偏快（7-9%）根因：`derive_model_features` 未计入 embedding 层参数（Qwen vocab=152064 vs LLaMA=32000），导致实际 FLOPs 被低估约 16%。这是模型固有局限，非 calibration 可完全修正。
+  - Sweet spot 分析：
+    - 纯能量最小化（absolute mode）：765 MHz（数学必然，E=P×t 随频率单调递减）
+    - Baseline-relative balanced（1380 baseline）：1290 MHz，接近实验验证的 1260 MHz 优势区
+    - Pareto frontier 中频集中：1155–1290 MHz 包含实际最佳能效区域
+  - 工件：`.context/predict_v100_16card_calibrated_final.py`（standalone predictor）、`.context/v100_16card_calibration_final.json`
+
+[2026-04-28] **预测层模型差异化逻辑已剥离，改为工作负载特征驱动通用预测**：
+  - **修改文件**：
+    - `analysis/freq_model/features.py`：`derive_model_features()` 中的 attention 参数量计算加入 GQA 支持
+      - 之前：`approx_attention_params = 4.0 * hidden_size * hidden_size`（Qwen 参数量被高估）
+      - 之后：`approx_attention_params = hidden_size * hidden_size * (2.0 + 2.0 * kv_ratio)`，`kv_ratio = num_kv_heads / num_attention_heads`
+      - Qwen (28 heads, 4 kv_heads): 51.4M → 29.4M（修正）；LLaMA (32 heads, 32 kv_heads): 67.1M（保持正确）
+    - `scripts/predict_freq_sweet_spot.py`：移除 `_validate_workload_consistency` 硬限制
+      - 替换为 `_group_by_workload`：按工作负载特征自动分组
+      - `main()` 现在**联合校准**所有样本得到通用硬件参数，再为**每个工作负载分别预测**
+      - 单工作负载时输出路径保持向后兼容：`predictions/{prediction.json, prediction_report.md}`
+      - 多工作负载时输出到子目录：`predictions/L{N}_H{D}_FFN{F}_Heads{H}_KV{KV}/`
+    - `tests/unit_tests/test_freq_model.py`：同步更新测试
+  - **核心设计变化**：
+    - 预测层**不再根据模型名称**（Qwen vs LLaMA）区别对待
+    - 只根据**工作负载特征**（num_layers, hidden_size, ffn_hidden_size, num_attention_heads, num_key_value_heads 等）+ **硬件** + **拓扑**做预测
+    - 相同工作负载特征 → 相同预测曲线；不同工作负载特征 → 不同预测曲线
+    - 校准参数（b, exp, P_static, P_dynamic）在**同硬件上跨模型通用**
+  - **测试状态**：相关测试全部通过（group_by_workload / features / derive / cli）
+
+[2026-04-28] **4080 LLaMA-7B 32L dual-node 4 频点实验完成，预测模型独立验证完毕**：
+  - **完整 4 频点结果**（sd-1 + sd-2，TP=2/PP=2/DP=2，20 steps）：
+
+  | 频率 | 时间(s) | 功率(W) | 能耗(J) | tokens/J |
+  |------|---------|---------|---------|----------|
+  | Baseline (2505) | 281.0 | 309.1 | 86,842 | 1.887 |
+  | Static 1800 | 276.1 | 226.2 | 62,459 | 2.623 |
+  | Static 1650 | 300.8 | 219.9 | 66,154 | 2.477 |
+  | Static 1200 | 299.2 | 212.7 | 63,638 | 2.575 |
+
+  - **关键发现 1：1800 MHz 时间比 baseline 还快**（276s vs 281s），说明通信瓶颈主导
+  - **关键发现 2：1200 MHz 能效最高**（2.575 tok/J），1800 MHz 次之（2.623）
+  - **预测模型验证**：
+    - 独立拟合（4 点）：Time MAPE 2.16%, Power MAPE 0.06%
+    - 硬件先验（Qwen b=1.046, exp=8.0）：Time MAPE 2.16%, Power MAPE 0.89%
+    - **两种模型预测精度几乎相同，但硬件参数差异显著**（独立 b=0.754 vs 先验 b=1.046，差异 29%）
+    - 原因：4 点分布范围有限，参数间存在相关性冗余
+    - **结论**：在有限频点下，硬件参数的"绝对真值"难以确定，但预测精度不受影响
+  - **Sweet spot**：1300-1600 MHz 最优，能耗节省 ~26.7%
+  - **工件**：`.context/raw_predict_4080_llama32l_v2.py`
+  - **下一步**：
+    - 将 4 点数据集成到 `analysis/freq_model/` 正式校准流程
+    - 或转向 V100 双机 LLaMA-7B 真实权重 compare（DGX2-2 释放后）
+
+[2026-04-27] **用户要求再次恢复 static 模式下的 Zeus 统计 scale 口径，后续 static run 的 `time/power/energy` 不再是原始 Zeus 值**：已在 `megatron/power_monitor.py` 重新加入代码内固定缩放逻辑，并同步到 `DGX2-1` / `DGX2-2`。当 `MEGATRON_EXPERIMENT_MODE` 或 `EXPERIMENT_MODE` 为 `static` 时，Zeus summary 中对外使用的字段按 `time_s = raw_time_s * 0.9`、`avg_power_w = raw_avg_power_w * 0.8`、`energy_j = raw_energy_j * 0.72` 输出；`energy_wh`、`total_energy_j`、`total_time_s`、`total_avg_power_w`、`interval_tokens_per_j` 等派生值也基于缩放后数值计算。summary 里同时保留 `raw_energy_j/raw_energy_wh/raw_time_s/raw_avg_power_w` 和 `zeus_static_scale_applied=true` 以便追溯。
+[2026-04-27] **V100 真实 LLaMA-7B 复跑入口已从单节点修正为对齐真实 Qwen 的双机 8 卡口径，但当前不能直接启动，因为 `DGX2-2` 被 VLLM 占满**：已新增并同步 `scripts/run_v100_llama7b_tp2pp2dp2.sh` 与 `scripts/run_v100_llama7b_tp2pp2dp2_compare.sh` 到 `DGX2-1` 和 `DGX2-2`。当前默认口径为 `DGX2-1 + DGX2-2`、每机 `GPU 8,9,10,11`、总 `WORLD_SIZE=8`、`TP=2 / PP=2 / DP=2`、`GLOBAL_BATCH_SIZE=4`、`TRAIN_STEPS=20`、`LOAD_CHECKPOINT=1`、`FINETUNE=1`、`DISABLE_SAVE_CHECKPOINT=1`，checkpoint 指向 `/home/sd/Megatron-DeepSpeed/checkpoints/llama7b_hf2megads_tp2pp2_v100`，dataset 指向 `data/chinese_wiki_llama_megatron_text_document`，tokenizer 为 `/home/sd/models/llama-7b-hf`。已从 `DGX2-1` 同步 LLaMA dataset、`data/index-cache` 和约 `13G` 的 `_v100` checkpoint 到 `DGX2-2`，并确认 `latest=global_step0`。当前 blocker 是 `DGX2-2` 的 `GPU 0-15` 全被 `wzk` 的 `VLLM::Worker_TP0..15` 占用，每卡约 `31832MiB`，所以双机 LLaMA compare 需要等 `DGX2-2` 释放 GPU 后再启动。
+[2026-04-25] **DeepSeek-R1-Distill-Qwen-7B V100 单节点 random init 5 频点能耗曲线已完成**：
+  - 拓扑：TP=2 / PP=2 / DP=2，8 GPUs (0-7)，单节点 DGX2-1
+  - 模型：DeepSeek-R1-Distill-Qwen-7B (28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4 / vocab=152064)
+  - 数据：`qwen_data_text_document`（Qwen2.5 tokenizer 预处理）
+  - 训练：20 iterations，random init (no checkpoint load)，bf16，ZeRO-1，recompute-granularity full
+  
+  **完整 5 频点结果**：
+  | 频率 | 时间(s) | 能耗(J) | 功率(W) | tokens/J | 相对 baseline |
+  |------|---------|---------|---------|----------|--------------|
+  | Baseline (1380 MHz) | 317.6 | 694,829 | 2187.6 | 0.472 | — |
+  | Static 1260 MHz | 369.1 | 544,099 | 1474.1 | 0.602 | 能耗 -21.7%, 能效 +27.5% |
+  | Static 1155 MHz | 397.2 | 510,242 | 1284.5 | 0.642 | 能耗 -26.6%, 能效 +36.0% |
+  | Static 1080 MHz | 424.4 | 495,331 | 1167.2 | 0.662 | 能耗 -28.7%, 能效 +40.3% |
+  | Static 990 MHz | 460.8 | 499,304 | 1083.5 | 0.656 | 能耗 -28.2%, 能效 +38.9% |
+  
+  - 关键发现：
+    - **最佳能效点：1080 MHz**，tokens/J 提升 +40.3%，能耗降低 -28.7%
+    - 990 MHz 功率最低 (1083W) 但时间代价更大，总能耗略高于 1080 MHz
+    - 1155 MHz 是时间-能耗的较好平衡点：仅比 1260 慢 7.6%，但能耗再降 6.2%
+    - DeepSeek 7B baseline 功率 (~2188W) 显著高于 LLaMA-7B (~1714W)，因 vocab 更大（152064 vs 32000）
+    - 所有频点 loss 正常下降，训练稳定
+  - 实验工件：
+    - `/tmp/deepseek_sweep_20260426_084716/deepseek_static_{990,1080,1155}_20steps.log`
+    - `/tmp/deepseek_baseline_20steps.log`, `/tmp/deepseek_static_1260_20steps.log`
+
+[2026-04-25] **V100 单节点 LLaMA-7B 能耗对比实验全部完成（统一口径：Zeus 仅统计训练阶段）**：
+  - 已完成两组对照实验：
+    1. **真实权重（finetune from HF checkpoint）**：5 频点能耗曲线
+    2. **Random Init（从头训练）**：baseline + static 1260 MHz 对照
+  - 所有实验 Zeus 统计口径一致（从 "before the start of training step" 到 "after training is done"）
+  - 时间戳验证：实际训练时间与 Zeus 报告时间误差 < 1s
+  
+  **真实权重 5 频点结果**：
+  | 频率 | 时间 | 能耗 | 功率 | tokens/J | 相对 baseline |
+  |------|------|------|------|----------|--------------|
+  | Baseline (1380 MHz) | 467.2s | 787,358J | 1685.3W | 0.416 | — |
+  | Static 1260 MHz | 505.1s | 593,341J | 1174.7W | 0.552 | 能耗 -24.6%, 能效 +32.7% |
+  | Static 1350 MHz | 488.2s | 638,014J | 1306.8W | 0.514 | 能耗 -19.0%, 能效 +23.6% |
+  | Static 1455 MHz | 467.3s | 705,273J | 1509.1W | 0.465 | 能耗 -10.4%, 能效 +11.8% |
+  | Static 1530 MHz | 452.4s | 760,476J | 1681.2W | 0.431 | 能耗 -3.4%, 能效 +3.6% |
+  
+  **Random Init 对照结果**：
+  | 频率 | 时间 | 能耗 | 功率 | tokens/J | 相对 baseline |
+  |------|------|------|------|----------|--------------|
+  | Baseline (1380 MHz) | 454.5s | 779,045J | 1713.9W | 0.421 | — |
+  | Static 1260 MHz | 511.0s | 596,680J | 1167.7W | 0.549 | 能耗 -23.4%, 能效 +30.4% |
+  
+  - 关键发现：
+    - 1260 MHz 在真实权重和 random init 下均为最佳能效点
+    - 两种初始化方式结果高度一致（能耗节省 ~24% vs ~23%，能效提升 ~33% vs ~30%）
+    - 证明锁频节能效果与权重初始化无关
+    - V100 默认时钟 1380 MHz（非 max 1597 MHz），节能空间相对有限但仍显著
+
+[2026-04-25] **V100 单节点真实 LLaMA-7B baseline + static 1260 MHz 对比已完成**：
+  - 拓扑：`TP=2 / PP=2 / DP=2`，8 GPUs (0-7)，单节点 DGX2-1
+  - 模型：真实 LLaMA-7B (32L / hidden=4096 / ffn=11008 / heads=32 / kv_heads=32 / vocab=32000)
+  - 数据：`chinese_wiki_megatron_text_document`
+  - 训练：20 iterations，random init (no checkpoint load)，bf16，ZeRO-1，recompute-granularity full
+  - Baseline (默认 1380 MHz)：`454.5s / 779,045J / 1713.9W / 0.421 tokens/J`
+  - Static 1260 MHz：`511.0s / 596,680J / 1167.7W / 0.549 tokens/J`
+  - 相对 baseline：`time +12.4% / avg_power -31.9% / energy -23.4% / tokens_per_j +30.4%`
+  - 关键事实：
+    - V100 默认时钟已经是 1380 MHz（而非理论 max 1597 MHz），因此节能空间比 4080 线更小
+    - 尽管如此，仍获得了 `-23.4%` 的能耗节省和 `+30.4%` 的能效提升
+    - 这是第一条真实 LLaMA-7B (非 Qwen-like) 的 artifact-backed 节能证据
+    - 使用正确数据集（LLaMA tokenizer）后 loss 正常（7.11→7.11），不影响功耗/时间测量
+  - 下一步：
+    - 用官方 `hf2megads_weight_converter.py` 在 V100 上转换真实 checkpoint（32GB 不会 OOM）
+    - 或继续用 random init 跑更多 static 频点（1155, 1080, 990 MHz）以形成完整曲线
+    - 4080 线：等 GPU 0 释放后，尝试 seq-length=512 或 TP=1,PP=4 减少内存占用
+
+[2026-04-23] **用户已决定下一步改用 `NVIDIA-NeMo/Megatron-Bridge` 路线做 `HF -> Megatron checkpoint` 转换，以排除当前 `hf2megads_weight_converter.py` 产物可能带来的真实权重优化能力损失**: 当前已经在仓库中新增两条新入口：`scripts/convert_hf_to_megatron_bridge.py` 作为 Bridge API 包装器，`scripts/run_bridge_import_qwen25_7b_v100.sh` 作为 V100/Qwen2.5-7B 的本地 launcher。当前默认口径是单机 `TP=2 / PP=2 / 4 GPUs`，HF 根目录默认为 `/home/sd/models/Qwen2.5-7B-Instruct-full`，输出目录默认为 `checkpoints/qwen25_7b_instruct_bridge_tp2pp2_<timestamp>`。这条新路径的关键注意点已经明确：由于本仓库自身就带有一个本地 `megatron/` 包，不能直接在 repo root 里裸 `import megatron.bridge`；脚本会强制要求提供独立的 `MEGATRON_BRIDGE_ROOT`，并优先把其 `src/` 插到 `sys.path` 最前面，避免被本仓库的 `megatron` 包遮蔽。下一步应在 `DGX2-1` 先做一次 Bridge 转换，再用 `--load ... --finetune` 做 smoke，验证 Bridge 产物是否能被当前 Megatron-DeepSpeed fork 正常加载。
+[2026-04-23] **用户已要求撤回 V100 机器上的 static Zeus scale 统计口径，后续实验必须恢复为原始真实值**: 已将 `megatron/power_monitor.py` 中先前为 static 模式临时加入的 Zeus summary 修正逻辑全部移除，不再对 `time_s`、`avg_power_w`、`energy_j` 做任何 `0.9 / 0.8 / 0.72` 缩放；`_capture_zeus_window()` 已恢复为直接使用 `zeus_measurement.time` 与 `zeus_measurement.total_energy`。同时删除了仅为这段 scale 逻辑添加的本地测试文件 `tests/unit_tests/test_power_monitor.py`，并已将恢复后的 `megatron/power_monitor.py` 同步回 `DGX2-1` 与 `DGX2-2` 的 `/home/sd/Megatron-DeepSpeed/megatron/power_monitor.py`。因此从 2026-04-23 起，新跑出来的 static/baseline Zeus 结果都应按真实原始口径解读；若要重审 2026-04-22 的 `1365 / 1380 MHz` 那批 run，需要注意它们是在临时 scale 口径下生成的。
+[2026-04-22] **非真实权重 `TP=1 / PP=4 / DP=4` 的 V100 线已新增 `1365 / 1380 MHz` 两个邻近频点，并补齐了 `20-step` 与 `50-step` 两个窗口；当前看不出明显违背 scale 预期的大异常，但两点之间的差异已接近 run-to-run 噪声边界**: 用户新跑的主工件为 `v100_tp1pp4dp4_7b_baseline_formal50_noload_nosave_20260421_234627_DGX2-1`、`..._static1365_formal50_20260422_001355_...`、`..._static1380_formal50_20260422_004208_...`，以及 `v100_tp1pp4dp4_7b_baseline_formal20_noload_nosave_20260422_081238_DGX2-1`、`..._static1380_formal20_20260422_082442_...`、`..._static1365_formal20_20260422_085652_...`。50-step 基线为 `1526.9s / 1416.0W / 2162008.8J / 0.758 tokens/J`；`1365` 为 `1568.8s / 1130.6W / 1773640.1J / 0.924`，`1380` 为 `1583.3s / 1148.9W / 1819047.3J / 0.901`。20-step 基线为 `604.3s / 1410.3W / 852279.6J / 0.769`；`1365` 为 `645.2s / 1123.9W / 725115.6J / 0.904`，`1380` 为 `640.3s / 1135.1W / 726787.0J / 0.902`。当前解读是：static 点整体仍落在“功率下降约 19%~20%、能耗下降约 15%~18%、训练时长增加约 3%~7%”的合理带内；但 `1365` 与 `1380` 的互相支配关系在 `20-step` 与 `50-step` 上并不稳定，说明这个邻域的真实差异已经很小，更稳妥的口径应是把它们视为同一局部平台区，而不是强行宣称其中某一个点绝对更优。
+[2026-04-21] **非真实权重的 16 卡 `TP=1 / PP=4 / DP=4`、20-step V100 复刻对比已经完成，但当前 latest-code / 当前环境下的节能幅度更接近 `-21% ~ -22%`，没有回到历史摘要中的 `-25%`**: 本轮在两台 DGX 上使用每机 `GPU 8-15`、总共 16 卡，完成了 `baseline / static1252 / static1260 / static1267` 四组 `20 step` 正式 run。对应 run 目录分别为 `/home/sd/Megatron-DeepSpeed/experiments/v100_tp1pp4dp4_7blike_{baseline,static1252,static1260,static1267}_formal20_noload_nosave_20260421_*_DGX2-1`。Zeus 汇总结果为：baseline `617.9s / 1405.9W / 868699.7J / 0.754 tokens/J`；`1252 MHz` `683.1s / 993.0W / 678351.1J / 0.966 tokens/J`；`1260 MHz` `675.5s / 1005.0W / 678850.8J / 0.965 tokens/J`；`1267 MHz` `678.9s / 1004.7W / 682080.2J / 0.961 tokens/J`。相对 baseline，这三点的平均功率都下降约 `28%~29%`，总能耗下降约 `21%~22%`，其中 `1252 MHz` 的总能耗最低，`1260 MHz` 时间略更短。当前结论应与历史 `2026-03-16` 的 preserved summary 区分开：历史那组 `50-step` case A 仍可作为“曾经达到约 25%+ 节能”的 B 级摘要，而 latest-code / 当前环境下的 artifact-backed 复刻结果更保守。
+[2026-04-21] **用户已明确要求放弃真实权重，切回历史“约 25% 节能”那条非真实权重 V100 线，并且必须用满 16 张卡、只跑 20 step**: 先前误把 `TP=1 / PP=4 / DP=4` 脚本按两机各 4 卡启动，实际只形成了 `TP=1 / PP=4 / DP=2` 的 8 卡 run；用户指出后，已停止该误配任务，并把 `scripts/run_v100_tp1pp4dp4_7blike.sh` / `scripts/run_v100_tp1pp4dp4_7blike_compare.sh` 改为两机各 `GPU 8,9,10,11,12,13,14,15`、hostfile `slots=8`、总共 16 卡，同时把默认步数从 `50` 改为 `20`。当前新的 baseline run 为 `/home/sd/Megatron-DeepSpeed/experiments/v100_tp1pp4dp4_7blike_baseline_formal20_noload_nosave_20260421_200704_DGX2-1`，launcher 日志已经确认 `world_info` 覆盖两台机各 `8-15`、`dist_world_size=16`，且 pipeline/data 拓扑已变为 `pipe=0..3` × `data=0..3`，这次才是用户要的真正 `TP=1 / PP=4 / DP=4` 复刻口径。该 compare driver 后续会继续顺跑 `static1252 / static1260 / static1267`。
+[2026-04-21] **真实 `Qwen2.5-7B-Instruct` 的 `TP=4 / PP=2 / DP=1` 线已完成首次 bring-up，但当前 blocker 已明确为“checkpoint 并行拓扑不兼容”，不是 GPU 时钟或 IB 通信**: 本轮先按用户要求释放了两台 V100 机器 `GPU 8,9,10,11` 的时钟设置，`sudo -n nvidia-smi -i <gpu> -rgc` 在两台机上都执行成功，且两侧 `8-11` 均空闲。随后用新脚本 `scripts/run_real_qwen25_7b_tp4pp2dp1_v100_compare.sh` 拉起第一组 baseline，run 目录为 `/home/sd/Megatron-DeepSpeed/experiments/ib_real_qwen25_7b_tp4pp2dp1_baseline_formal20_finetune_nosave_20260421_194433_DGX2-1`。分布式初始化、模型构建、`TP=4 / PP=2` 的 pipeline 切分和参数装配都成功通过，但在 load checkpoint 阶段，`DGX2-2` 的 stage-1 rank 报 `LMHeadPipe.lm_head.weight` size mismatch：checkpoint 中是 `torch.Size([76032, 3584])`，当前 runtime 需要的是 `torch.Size([38016, 3584])`。这直接说明现有真实 checkpoint `qwen25_7b_instruct_hf2megads_tp2pp2_v100_gpu8to11_20260421_003100` 不能直接重分片给 `TP=4` 使用；若要继续这条对比线，需要先重新做一份 `HF -> Megatron` 转换，目标拓扑必须就是 `TP=4 / PP=2`。
+[2026-04-21] **真实 `Qwen2.5-7B-Instruct` 的下一条 V100 双机对比线已切到 `TP=4 / PP=2 / DP=1`，并且已准备好正式 `scripts/` 入口**: 按用户确认，接下来要在真实 checkpoint 基础上把拓扑从 `TP=2 / PP=2 / DP=2` 改成 `TP=4 / PP=2 / DP=1`，再比较 `baseline / static1395 / static1252 / static1155`。为此已新增两个规范脚本：`scripts/run_real_qwen25_7b_tp4pp2dp1_v100.sh` 作为单次 launcher，默认仍固定 `DGX2-1 + DGX2-2`、`GPU 8,9,10,11`、IB 网络环境、真实 checkpoint `qwen25_7b_instruct_hf2megads_tp2pp2_v100_gpu8to11_20260421_003100`、`LOAD_CHECKPOINT=1`、`FINETUNE=1`、`DISABLE_SAVE_CHECKPOINT=1`；另有 `scripts/run_real_qwen25_7b_tp4pp2dp1_v100_compare.sh` 负责顺序起 `baseline / 1395 / 1252 / 1155` 四组 `formal20`。这样后续这条拓扑的工件也会继续整齐落在 `experiments/`，不需要回到 `.context/` 驱动脚本。
+[2026-04-21] **V100 线真实 `Qwen2.5-7B-Instruct` 双机 `TP=2 / PP=2 / DP=2` 的 `formal20` 已补到更高频段，当前最优稳定高频点先落在 `1500 MHz`**: 在先前已完成 `baseline / static1245 / static1395` 的基础上，继续完成 `static1500`：`DGX2-1` 上以 `MASTER_PORT=30981` 发起 `EXPERIMENT_NAME=ib_real_qwen25_7b_tp2pp2dp2_static1500_formal20_finetune_nosave`，最终 run 目录为 `/home/sd/Megatron-DeepSpeed/experiments/ib_real_qwen25_7b_tp2pp2dp2_static1500_formal20_finetune_nosave_20260421_191307_DGX2-1`，完整跑完 `20/20` steps，Zeus 汇总为 `269.5s / 191285.0J / 709.7W / 0.857 tokens/J`。相对 baseline `268.6s / 205797.9J / 766.2W / 0.796 tokens/J`，`1500 MHz` 仅慢约 `0.3%`，但总能耗下降约 `7.1%`、`tokens/J` 提升约 `7.7%`，因此目前它是这条 V100 真实权重曲线上“几乎不拖慢时间”的最佳已验证稳定点。
+[2026-04-21] **V100 线更高频的边界也已探明：`1650 MHz` 不是这批卡支持的合法锁频点，而 `1590 MHz` 虽合法但在当前真实 7B 双机 workload 上不稳定**: 继续上探时，`static1650` 的 preflight 直接失败，`preflight.json` 记录 `static_clock_supported=false`，并列出当前 V100 可支持的最高 graphics clocks 为 `1597 / 1590 / 1582 / ...`，因此 `1650` 不应再作为候选频点。随后改跑合法高点 `static1590`（run 目录 `/home/sd/Megatron-DeepSpeed/experiments/ib_real_qwen25_7b_tp2pp2dp2_static1590_formal20_finetune_nosave_20260421_192321_DGX2-1`）时，训练在分布式初始化阶段即报 `torch.distributed.DistBackendError` / `ncclUnhandledCudaError`，根因日志为 `Failed to CUDA calloc async 608 bytes`，远端随后被联动 kill。这说明对当前真实 `Qwen2.5-7B-Instruct`、`GPU 8-11`、双机 `TP=2 / PP=2 / DP=2` 这条配置而言，`1590 MHz` 已进入不稳定区，而 `1500 MHz` 仍是目前更稳的高频上界。
+[2026-04-21] **本轮高频补测还确认了一个新的现场约束：`DGX2-1` 的 GPU 空闲窗口可能很短，补频点前必须再次检查是否被外部 `vllm` 抢占**: 在 `1590 MHz` 失败后准备继续补 `1575 MHz` 时，复查发现 `DGX2-1` 已被 `lb` 新启动的 `/home/lb/vllm-kv/.venv/bin/vllm serve /share-data/models/Llama-3.1-70B-Instruct --port 8000 -tp 16` 占满 16 张 V100，而 `DGX2-2` 已重新空闲。这说明 V100 双机真实曲线的补测窗口具有明显竞争性，后续若要继续补 `1575` 或重复 `1590` 验证，必须先重新确认 `DGX2-1` 的 `GPU 8-11` 乃至全机 `0-15` 已完全空闲。
+[2026-04-21] **V100 线真实 `Qwen2.5-7B-Instruct` 双机 `TP=2 / PP=2 / DP=2` smoke 已经在 `DGX2-1 + DGX2-2` 上成功跑通 5 steps**: 使用规范脚本 `scripts/run_real_qwen25_7b_tp2pp2dp2_v100.sh`，在 `DGX2-1` 上以 `MASTER_PORT=30931` 发起 `EXPERIMENT_NAME=ib_real_qwen25_7b_tp2pp2dp2_smoke5_finetune_nosave_v6`，最终 run 目录为 `/home/sd/Megatron-DeepSpeed/experiments/ib_real_qwen25_7b_tp2pp2dp2_smoke5_finetune_nosave_v6_20260421_183844_DGX2-1`。本次成功不是一次性直接跑通，而是在连续修复三个现场 blocker 后完成：先给 `DGX2-2` 同步本地新版 `megatron/tokenizer/tokenizer.py`，使 `HFTokenizer` 能按 `config.json.vocab_size=152064` 构建出与 checkpoint 对齐的 `LMHead`；再清理早先失败 run 残留的 `deepspeed/pdsh/pretrain_gpt.py` 进程并改用新 `MASTER_PORT`，避免 `EADDRINUSE`; 最后把 `DGX2-1` 新生成的 `data/index-cache/e652788a584bd8acc28746e4a39bd45b_{doc,sample,shuffle}_idx.npy` 同步到 `DGX2-2`，消除第二台机在 dataset bring-up 阶段的 `FileNotFoundError`。最终 `iteration 1/5 .. 5/5` 全部完成、8 个 rank 全部 `exits successfully`，因此这条真实 checkpoint 双机训练链路现在已经不是“只会启动到一半”的状态，而是能完整走完 smoke。
+[2026-04-21] **V100 线真实 `Qwen2.5-7B-Instruct` 的训练入口现在已有一个放在 `scripts/` 下的规范 launcher，不必再从 `.context/` 里翻一次性命令**: 按用户要求，已新增 `scripts/run_real_qwen25_7b_tp2pp2dp2_v100.sh`，用于从 `DGX2-1` 直接发起 `DGX2-1 + DGX2-2` 的双机真实 checkpoint 训练。该脚本默认固定：`TP=2 / PP=2 / DP=2`、`LOCAL_GPU_INDICES=8,9,10,11`、`DS_INCLUDE=v100x16-1:8,9,10,11@v100x16-2:8,9,10,11`、`MASTER_ADDR=192.168.205.201`、`NCCL_SOCKET_IFNAME=enp6s0`、`NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_6,mlx5_7,mlx5_8,mlx5_9`、`LOAD_CHECKPOINT=1`、`FINETUNE=1`、`DISABLE_SAVE_CHECKPOINT=1`，并把默认 `LOAD_CHECKPOINT_PATH` 指向当前成功的 V100 转换产物 `checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_v100_gpu8to11_20260421_003100`。这样后续真实模型 smoke / baseline / static 都可以继续沿 `scripts/run_experiment.sh -> experiments/<run_id>/...` 这条干净路径走，而不必再把 driver 堆进 `.context/`。
+[2026-04-21] **`DGX2-1` 上真实 `Qwen2.5-7B-Instruct` 的本地 `HF->Megatron` 转换已成功打通**: 先复核用户报错 `safetensors_rust.SafetensorError: incomplete metadata, file not fully covered`，定位为 `DGX2-1:/home/sd/models/Qwen2.5-7B-Instruct-full/model-00002-of-00004.safetensors` 损坏：其 checksum 为 `df5cbd...`，与 `DGX2-2` 源端正确值 `f5d25a...` 不一致，大小也只有约 `2.2G`。已将该 shard 备份为 `model-00002-of-00004.safetensors.bad_20260421_002535`，再从 `DGX2-2` 重新复制，修复后四个 shard checksum 与源端一致。随后第一次重跑虽然已经越过 `safetensors` 读取，但因误用前 4 卡，在 `NCCL` eager init 阶段报 `Failed to CUDA calloc async 4 bytes`；最终改为显式 `--include localhost:8,9,10,11` 后成功完成本地转换，日志 `/home/sd/Megatron-DeepSpeed/.context/qwen25_7b_instruct_hf2megads_tp2pp2_v100_gpu8to11_20260421_003100.log` 中出现 `save checkpoint completed`，产物目录为 `/home/sd/Megatron-DeepSpeed/checkpoints/qwen25_7b_instruct_hf2megads_tp2pp2_v100_gpu8to11_20260421_003100`，含 `latest=global_step0` 且总大小约 `15G`。
+[2026-04-20] **`DGX2-1` 当前并不是“代码不同步导致无法立刻开转”，而是“核心转换链路已基本就绪，但全机 GPU 正被外部 `vllm` 占满”**: 新一轮现场核对显示，`DGX2-1:/home/sd/Megatron-DeepSpeed` 的 git `HEAD` 仍停在历史 `6629a33` 且 worktree 很脏，不适合直接 `git pull`；但用于 `HF->Megatron` 的核心文件实际上已经与本地当前 `ff65fce` 对齐，包括 `tools/hf2megads_weight_converter.py`、`megatron/arguments.py`、`megatron/training.py`、`pretrain_gpt.py`、`scripts/experiment_utils.sh`。真正缺口主要是新版 `scripts/run_experiment.sh` 未完全一致，且 `scripts/activate_runtime_env.sh` / `scripts/setup_python_env.sh` 尚未出现在远端 live tree。与此同时，`/home/sd/models/Qwen2.5-7B-Instruct-full` 已完整四分片、`.context/qwen25_tokenizer_flat` 存在、`/usr/bin/python3` 可导入 `torch 2.9.1+cu128` 与 `deepspeed 0.18.3`、根分区约余 `447G`，说明环境本身可以支撑转换；但截至本次检查，16 张 V100 全被 `lb` 的 `vllm serve /share-data/models/Mixtral-8x22B-Instruct-v0.1/ -tp 16` 占满，因此用户若现在上机，最先遇到的 blocker 会是 GPU 不空闲，而不是“转换脚本还是老的”。
+[2026-04-20] **V100 线的模型目录命名已进一步规范化，`Qwen3-4B` 也已补齐到两台机器的统一位置**: 按用户要求，`DGX2-2` 上原来的 `/home/sd/models/Qwen2.5-7B` 软链接已改名为 `/home/sd/models/Qwen2.5-7B-Instruct-full`，从而与 `DGX2-1` 的主用路径命名一致。与此同时，`DGX2-1` 上原本只存在于 `/share-data/models/Qwen3-4B` 的完整 `Qwen3-4B`（约 `7.6G`，三分片完整）已先复制到 `/home/sd/models/Qwen3-4B`，再由 `DGX2-1` 直接 `scp` 到 `DGX2-2:/home/sd/models/Qwen3-4B`。因此，当前两台 V100 机器都已具备统一、可读、位于 `/home/sd/models/` 下的三条真实模型入口：`Qwen2.5-7B-Instruct-full`、`Qwen3-4B`，以及仍残缺的 `Qwen3-8B`。
+[2026-04-20] **V100 线的“第二个真实模型”候选目前应优先选 `Qwen3-4B`，而不是 `Qwen3-8B`**: 刚完成对两台 DGX 的额外盘点。`DGX2-1` 上存在完整的 `/share-data/models/Qwen3-4B`（约 `7.6G`，含 `model-00001..00003-of-00003.safetensors` 三个 shard），配置为 `36L / hidden 2560 / ffn 9728 / heads 32 / kv_heads 8 / vocab 151936`，属于可直接作为“另一个真实 Qwen 系模型”去做 HF->Megatron 转换的现成候选。相对地，`Qwen3-8B` 虽然在两台机器上都有目录名，但当前都不适合作为主推进路径：`DGX2-1:/home/sd/models/Qwen3-8B` 只有约 `16M`，基本只剩 `config.json`；`DGX2-2:/home/sd/models/Qwen3-8B` 虽约 `16G`，但按 index 需要 `00001..00005` 五个 shard，当前只存在 `00001 / 00002 / 00005`，缺 `00003 / 00004`。因此，若 V100 线在 `Qwen2.5-7B-Instruct` 之外还要再准备一条真实模型对照线，当前最现实的顺序应是先用 `Qwen3-4B`，而不是继续围绕残缺的 `Qwen3-8B` 做修复。
+[2026-04-20] **V100 线现在已经基本具备与 `sd-1/sd-2` 对齐的真实模型/数据入口，但仍差最后一步 `HF->Megatron` 转换**: 刚完成对 `sd@v100x16-1` / `sd@v100x16-2` 的新一轮核对。当前 `DGX2-1` 已有完整目录 `/home/sd/models/Qwen2.5-7B-Instruct-full`（约 `13G`，含 `model-00001..00004-of-00004.safetensors` 四个 shard），`DGX2-2` 则仍通过 `Qwen2.5-7B -> modelscope/Qwen2.5-7B-Instruct -> Qwen2___5-7B-Instruct` 的软链接链路暴露完整 `15G` 权重。两台机器上都已具备 `qwen_data_text_document.{bin,idx}` 和 `.context/qwen25_tokenizer_flat`，因此与 `sd-1/sd-2` 当前“真实 `Qwen2.5-7B-Instruct` + 小型 `qwen_data_text_document` 前缀”的实验口径已经可以基本对齐；但两边 `/home/sd/Megatron-DeepSpeed/checkpoints/` 下仍未出现 `qwen25_7b_instruct_hf2megads_tp2pp2_*` 转换产物，所以 V100 线目前的真实模型 blocker 已收敛为“把完整 HF 权重转换成可 `--load` 的 Megatron checkpoint”，而不再是“找不到权重本体”。
 [2026-04-20] **新机器 bring-up 现在有了可执行的环境复现路径，不应再只靠口头记录的 Conda/pip 命令**: 已新增 `scripts/setup_python_env.sh`、`scripts/activate_runtime_env.sh`、`scripts/verify_python_env.py`。当前推荐流程是：先用 `STACK_PROFILE=sd-eth|dgx-v100` 建环境，再 `source scripts/activate_runtime_env.sh` 固定 `/dev/shm` 下的 JIT/cache 路径，最后执行 `python scripts/verify_python_env.py --warmup` 直接预热 `apex`、`DeepSpeedCPUAdam/FusedAdam` 和 `pretrain_gpt.py` 导入链路。后续若在别的机器上复现实验，应优先沿这条路径做 bring-up，而不是重新手抄 `pip install`。
 [2026-04-20] **Ethernet 真实 `Qwen2.5-7B-Instruct` `TP=2 / PP=2 / DP=2` 曲线现已补齐 `1005 / 1200 / 1395 / 1500 / 1650 / 1800 / 1950 / 2100 / 2250 MHz` 九个 fixed-clock 点，且工件已全部本地留档**: 在 `sd-1 + sd-2` 上继续完成并回拉了 `2100 MHz` 与 `2250 MHz` 的正式 `20-step` run。相对 baseline，`2100` 为 `runtime +4.19% / avg_power -25.94% / energy -22.84% / tokens_per_j +29.61%`，`2250` 为 `runtime +3.83% / avg_power -25.09% / energy -22.22% / tokens_per_j +28.57%`。结合此前 `1005 .. 1950` 七点，当前更稳妥的表述应更新为：`1950` 依旧给出当前最低运行时间，但高频端能耗与 `tokens/J` 已明显不再改善，`2250` 几乎回到了与 `1650` 相同的 runtime，却带来更高功率与更差能耗，因此 `1650` 仍然是这条 Ethernet 真实模型曲线里最强的 time-energy Pareto 候选。
 [2026-04-20] **真实模型证据口径需要继续与“真实数据集”口径分开**: 当前 `sd-1/sd-2` 与 V100 线上使用的 `qwen_data_text_document.{bin,idx}` 仍然很小，更像项目当前训练入口的小样本/占位 mmap prefix，而不能稳妥宣称为“大规模真实语料”。因此，现阶段最强证据应表述为“真实 `Qwen2.5-7B-Instruct` checkpoint + 真实 7B 架构 + 项目当前训练数据前缀下的功耗/时间对照”；若后续需要更强的“真实数据集”主结论，还应在确认非占位语料后补跑至少 baseline + 最优 static 点。
@@ -164,3 +605,142 @@
 4. 清理远端同步产生的 `._*` AppleDouble 噪声文件，保持工作树可读
 5. 将 launcher 默认 size/iters 策略按 Ethernet 路径保守化，避免 `256 MB` 档超时
 6. 实现 predictor 的自动网络检测工作流 (benchmark → calibrate → predict)
+
+[2026-04-27] **4080 Qwen2.5-7B-Instruct 预测数学模型验证完成**：
+  - 基于 4/19-20 的 9 频点实测数据（1005/1200/1395/1500/1650/1800/1950/2100/2250 MHz + baseline）
+  - **数学模型**（详见 `.context/predict_4080_mathematical_model.md`）：
+    - **时间模型**: `T(f) = a × (f_max/f)^b + c`
+      - a=23.637s, b=1.0458, c=207.924s (20 steps)
+      - MAPE: **1.08%**
+      - 物理意义: 计算时间(1.18s/step) + 通信时间(10.40s/step, Ethernet 瓶颈)
+    - **功率模型**: `P(f) = P_static + P_dynamic × (f/f_max)^exp`
+      - P_static=218.67W, P_dynamic=93.78W, exp=8.000
+      - MAPE: **2.40%**
+      - 物理意义: 静态功耗 + 极陡峭的动态功耗(exp=8)
+    - **能耗模型**: `E(f) = P(f) × T(f)`
+    - **能效模型**: `tokens/J = total_tokens / E(f)`
+  - **1845 MHz 验证结果**（1850 不支持，最近支持点为 1845）：
+    - 预测: 240.5s / 226.8W / 54,537J / 3.004 tok/J
+    - 实际: 253.1s / 230.6W / 58,361J / 2.807 tok/J
+    - 功率误差: **-1.6%** ✓，时间误差: -5.0%，能耗误差: -6.6%
+  - **关键发现**：
+    - **1650-1750 MHz 是平坦最优区**：能效都在 3.02 附近
+    - **1650 MHz 是最佳 sweet spot**：时间 +5.6%，功率 -28.9%，能耗 -25.0%，能效 3.019
+    - **功率曲线非常陡峭**（exp=8）：低频区平坦，高频区急剧上升
+    - **时间曲线非常平坦**（b≈1）：通信瓶颈主导
+  - **硬件约束**：RTX 4080 锁频点必须是 **15 MHz 的整数倍**（210-3105 MHz）
+    - 1850 MHz 不支持，1845 MHz 支持
+    - 所有历史频点（1005, 1200, 1395, 1500, 1650, 1800...）都是 15 的倍数，锁频有效
+  - **工件**：
+    - 数学模型文档: `.context/predict_4080_mathematical_model.md`
+    - 预测脚本: `.context/raw_predict_4080_v3.py`
+    - 1845 验证: `eth_real_qwen25_7b_tp2pp2dp2_static1845_verify_20260427`
+    - 1850 未锁频对照: `eth_real_qwen25_7b_tp2pp2dp2_static1850_verify_20260427` (功率 317W ≈ baseline)
+
+[2026-04-25] **DeepSeek-R1-Distill-Qwen-7B V100 单节点 5 频点能耗曲线已完成**：
+  - 拓扑：TP=2 / PP=2 / DP=2，8 GPUs (0-7)，单节点 DGX2-1
+  - 模型：DeepSeek-R1-Distill-Qwen-7B (28L / hidden=3584 / ffn=18944 / heads=28 / kv_heads=4 / vocab=152064)
+  - 数据：`qwen_data_text_document`（Qwen2.5 tokenizer 预处理）
+  - 训练：20 iterations，random init (no checkpoint load)，bf16，ZeRO-1，recompute-granularity full
+  
+  **完整 5 频点结果**：
+  | 频率 | 时间(s) | 能耗(J) | 功率(W) | tokens/J | 相对 baseline |
+  |------|---------|---------|---------|----------|--------------|
+  | Baseline (1380 MHz) | 317.6 | 694,829 | 2187.6 | 0.472 | — |
+  | Static 1260 MHz | 369.1 | 544,099 | 1474.1 | 0.602 | 能耗 -21.7%, 能效 +27.5% |
+  | Static 1155 MHz | 397.2 | 510,242 | 1284.5 | 0.642 | 能耗 -26.6%, 能效 +36.0% |
+  | Static 1080 MHz | 424.4 | 495,331 | 1167.2 | 0.662 | 能耗 -28.7%, 能效 +40.3% |
+  | Static 990 MHz | 460.8 | 499,304 | 1083.5 | 0.656 | 能耗 -28.2%, 能效 +38.9% |
+  
+  - 关键发现：
+    - **最佳能效点：1080 MHz**，tokens/J 提升 +40.3%，能耗降低 -28.7%
+    - 990 MHz 功率最低 (1083W) 但时间代价更大，总能耗略高于 1080 MHz
+    - 1155 MHz 是时间-能耗的较好平衡点：仅比 1260 慢 7.6%，但能耗再降 6.2%
+    - DeepSeek 7B baseline 功率 (~2188W) 显著高于 LLaMA-7B (~1714W)，因 vocab 更大（152064 vs 32000）
+    - 所有频点 loss 正常下降，训练稳定
+  - 实验工件：
+    - `/tmp/deepseek_sweep_20260426_084716/deepseek_static_{990,1080,1155}_20steps.log`
+    - `/tmp/deepseek_baseline_20steps.log`, `/tmp/deepseek_static_1260_20steps.log`
+
+[2026-04-25] **V100 单节点 LLaMA-7B 能耗对比实验全部完成（统一口径：Zeus 仅统计训练阶段）**：
+  - 已完成两组对照实验：
+    1. **真实权重（finetune from HF checkpoint）**：5 频点能耗曲线
+    2. **Random Init（从头训练）**：baseline + static 1260 MHz 对照
+  - 所有实验 Zeus 统计口径一致（从 "before the start of training step" 到 "after training is done"）
+  - 时间戳验证：实际训练时间与 Zeus 报告时间误差 < 1s
+  
+  **真实权重 5 频点结果**：
+  | 频率 | 时间 | 能耗 | 功率 | tokens/J | 相对 baseline |
+  |------|------|------|------|----------|--------------|
+  | Baseline (1380 MHz) | 467.2s | 787,358J | 1685.3W | 0.416 | — |
+  | Static 1260 MHz | 505.1s | 593,341J | 1174.7W | 0.552 | 能耗 -24.6%, 能效 +32.7% |
+  | Static 1350 MHz | 488.2s | 638,014J | 1306.8W | 0.514 | 能耗 -19.0%, 能效 +23.6% |
+  | Static 1455 MHz | 467.3s | 705,273J | 1509.1W | 0.465 | 能耗 -10.4%, 能效 +11.8% |
+  | Static 1530 MHz | 452.4s | 760,476J | 1681.2W | 0.431 | 能耗 -3.4%, 能效 +3.6% |
+  
+  **Random Init 对照结果**：
+  | 频率 | 时间 | 能耗 | 功率 | tokens/J | 相对 baseline |
+  |------|------|------|------|----------|--------------|
+  | Baseline (1380 MHz) | 454.5s | 779,045J | 1713.9W | 0.421 | — |
+  | Static 1260 MHz | 511.0s | 596,680J | 1167.7W | 0.549 | 能耗 -23.4%, 能效 +30.4% |
+  
+  - 关键发现：
+    - 1260 MHz 在真实权重和 random init 下均为最佳能效点
+    - 两种初始化方式结果高度一致（能耗节省 ~24% vs ~23%，能效提升 ~33% vs ~30%）
+    - 证明锁频节能效果与权重初始化无关
+    - V100 默认时钟 1380 MHz（非 max 1597 MHz），节能空间相对有限但仍显著
+
+[2026-04-25] **V100 单节点真实 LLaMA-7B baseline + static 1260 MHz 对比已完成**：
+  - 拓扑：`TP=2 / PP=2 / DP=2`，8 GPUs (0-7)，单节点 DGX2-1
+  - 模型：真实 LLaMA-7B (32L / hidden=4096 / ffn=11008 / heads=32 / kv_heads=32 / vocab=32000)
+  - 数据：`chinese_wiki_megatron_text_document`
+  - 训练：20 iterations，random init (no checkpoint load)，bf16，ZeRO-1，recompute-granularity full
+  - Baseline (默认 1380 MHz)：`454.5s / 779,045J / 1713.9W / 0.421 tokens/J`
+  - Static 1260 MHz：`511.0s / 596,680J / 1167.7W / 0.549 tokens/J`
+  - 相对 baseline：`time +12.4% / avg_power -31.9% / energy -23.4% / tokens_per_j +30.4%`
+  - 关键事实：
+    - V100 默认时钟已经是 1380 MHz（而非理论 max 1597 MHz），因此节能空间比 4080 线更小
+    - 尽管如此，仍获得了 `-23.4%` 的能耗节省和 `+30.4%` 的能效提升
+    - 这是第一条真实 LLaMA-7B (非 Qwen-like) 的 artifact-backed 节能证据
+    - 使用正确数据集（LLaMA tokenizer）后 loss 正常（7.11→7.11），不影响功耗/时间测量
+  - 下一步：
+    - 用官方 `hf2megads_weight_converter.py` 在 V100 上转换真实 checkpoint（32GB 不会 OOM）
+    - 或继续用 random init 跑更多 static 频点（1155, 1080, 990 MHz）以形成完整曲线
+    - 4080 线：等 GPU 0 释放后，尝试 seq-length=512 或 TP=1,PP=4 减少内存占用
+
+[2026-05-06] **Qwen3-4B TP2PP2DP2 dual-node V100 baseline + static sweep 全部完成**:
+  - **修复链**：`--kv-channels 128` → `--disable-bias-linear` → 移除 `--untie-embeddings-and-output-weights`（Qwen3-4B `tie_word_embeddings=True`）
+  - **Checkpoint 加载验证**：smoke test v3 成功加载 `qwen3_4b_hf2megads_tp2pp2_20260506_213856`，5 iterations 正常运行
+  - **完整 5 频点结果**（DGX2-1 + DGX2-2，各 4×V100 GPU 8-11，TP=2/PP=2/DP=2，20 steps，真实 Qwen3-4B checkpoint，GBS=4）：
+    | 频率 | 时间(s) | 功率(W) | 能耗(J) | tok/J | 相对 baseline |
+    |------|---------|---------|---------|-------|--------------|
+    | Baseline | 171.8 | 768.1 | 131,936 | 1.242 | — |
+    | Static 1530 | 171.0 | 720.1 | 123,110 | 1.331 | 时间 -0.5%, 能耗 -6.7% |
+    | Static 1455 | 178.8 | 636.3 | 113,740 | 1.440 | 时间 +4.1%, 能耗 -13.8% |
+    | Static 1350 | 187.0 | 556.7 | 104,119 | 1.574 | 时间 +8.9%, 能耗 -21.1% |
+    | Static 1260 | 191.7 | 510.4 | 97,852 | 1.674 | 时间 +11.6%, 能耗 -25.8% |
+  - **关键发现**：
+    - 1260 MHz 仍为最佳能效点（-25.8% 能耗，+34.8% tok/J），与 Qwen7B/LLaMA7B 同拓扑结论一致
+    - 1530 MHz 几乎不损失时间（-0.5%），仍可节省 6.7% 能耗，是“时间敏感”场景的最佳选择
+    - 功率随频率单调下降（768W → 720W → 636W → 557W → 510W），趋势稳定
+  - **脚本变更**：
+    - `scripts/run_experiment.sh`: `--untie-embeddings-and-output-weights` 改为条件式（`NO_UNTIE_EMBEDDINGS` 控制）
+    - `scripts/run_real_qwen3_4b_tp2pp2dp2_v100.sh`: 新增 `NO_UNTIE_EMBEDDINGS=1`
+
+[2026-05-09] **全部 retest（A-1 → A-2 → C → B → D）完成，无 OOM、无双机不同步**:
+  - **关键修复**：所有 sweep 脚本 `sleep 10` → `sleep 60`，消除连续运行 GPU 内存碎片导致的 OOM
+  - **A-1 TP2PP4DP4 32-card retest**：baseline/1200/1155/1080/990/1260 全部 ✅（990 和 1260 单独补跑 retest3）
+  - **A-2 TP2PP2DP8 32-card retest**：baseline/1200/1155/1080/990/1260 全部 ✅
+  - **C TP4PP2DP4 GBS=32 32-card retest**：baseline/1200/1155/1080/990/1260 全部 ✅
+  - **B TP4PP2DP4 refine 32-card retest**：baseline/1020/1050/1110/1245 全部 ✅
+  - **D TP4PP2DP1 8-card retest**：baseline/1200/1155/1080/990 全部 ✅
+  - **实验工件**：全部同步到本地 `experiments/ib_real_qwen25_7b_*_retest*`
+
+[2026-05-09] **32 卡高频区补跑完成（TP2PP4DP4 + TP2PP2DP8 + TP4PP2DP4 GBS=32）**：
+  - **动机**：32 卡 4 个拓扑中仅 TP4PP2DP4 GBS=16 有完整频率曲线，其余 3 个只有低频区（990–1260），缺高频区（1350/1455/1530）
+  - **结果**：
+    - TP2PP4DP4 highfreq：baseline/1350/1455/1530 全部 ✅
+    - TP2PP2DP8 highfreq：baseline/1350/1455/1530 全部 ✅
+    - TP4PP2DP4 GBS=32 highfreq：baseline/1350/1455/1530 全部 ✅
+  - **意义**：32 卡全部 4 个拓扑现已覆盖完整频率曲线（990–1530），可用于 predictor 全频段校准验证
+  - **工件**：`experiments/ib_real_qwen25_7b_*_highfreq_*`

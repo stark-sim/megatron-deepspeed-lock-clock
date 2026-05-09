@@ -5,9 +5,9 @@ from typing import List, Tuple
 
 from analysis.freq_model.cross_node import fit_cross_node_penalty_model
 from analysis.freq_model.features import DerivedModelFeatures
-from analysis.freq_model.hardware import HardwareFeatures
-from analysis.freq_model.network import extract_network_benchmark_curve, summarize_network_benchmark
-from analysis.freq_model.model import CalibrationParams, infer_initial_anchors, predict_power_w, predict_throughput_tokens_per_s
+from analysis.freq_model.hardware import HardwareFeatures, HardwareFingerprint
+from analysis.freq_model.network import NetworkConfig, extract_network_benchmark_curve, summarize_network_benchmark
+from analysis.freq_model.model import CalibrationParams, infer_initial_anchors, predict_power_w, predict_throughput_tokens_per_s, derive_calibration_params
 from analysis.freq_model.workload import LoadedRunSample
 
 
@@ -462,6 +462,8 @@ def calibrate_frequency_model(
     saturation_ratios = [0.72, 0.78, 0.84, 0.90, 0.96, 1.0]
     static_power_candidates = [min(powers) * ratio for ratio in [0.25, 0.35, 0.45, 0.55, 0.65, 0.75]]
     dynamic_exponents = [1.2, 1.4, 1.6, 1.8, 2.0, 2.2]
+    thermal_thresholds = [1.0, 0.88, 0.80]
+    thermal_coefficients = [0.0, 0.20, 0.35]
 
     best_params: CalibrationParams | None = None
     best_metrics: CalibrationMetrics | None = None
@@ -472,54 +474,58 @@ def calibrate_frequency_model(
             for communication_limit in communication_candidates:
                 for communication_penalty in communication_penalties:
                     for throughput_saturation_ratio in saturation_ratios:
-                        base_params = CalibrationParams(
-                            compute_limit_at_max_tokens_per_s=compute_limit,
-                            memory_limit_tokens_per_s=memory_limit,
-                            communication_limit_tokens_per_s=communication_limit,
-                            communication_penalty=communication_penalty,
-                            static_power_w=0.0,
-                            dynamic_power_w=0.0,
-                            dynamic_power_exponent=1.6,
-                            throughput_saturation_ratio=throughput_saturation_ratio,
-                            reference_total_gpu_count=max(base_features.node_count * max(base_features.gpus_per_node, 1), 1),
-                            reference_gpus_per_node=max(base_features.gpus_per_node, 1),
-                            reference_pipeline_parallel_efficiency=base_features.pipeline_parallel_efficiency,
-                            reference_topology_count=topology_count,
-                            reference_multi_topology_calibration=multi_topology,
-                            reference_topology_dispersion=topology_dispersion,
-                        )
-                        predicted_throughputs = [
-                            predict_throughput_tokens_per_s(freq, hardware, features, base_params)
-                            for freq, features in zip(frequencies, derived_features)
-                        ]
-                        for static_power_w in static_power_candidates:
-                            for dynamic_power_exponent in dynamic_exponents:
-                                power_params = replace(
-                                    base_params,
-                                    static_power_w=static_power_w,
-                                    dynamic_power_exponent=dynamic_power_exponent,
+                        for thermal_threshold in thermal_thresholds:
+                            for thermal_coefficient in thermal_coefficients:
+                                base_params = CalibrationParams(
+                                    compute_limit_at_max_tokens_per_s=compute_limit,
+                                    memory_limit_tokens_per_s=memory_limit,
+                                    communication_limit_tokens_per_s=communication_limit,
+                                    communication_penalty=communication_penalty,
+                                    static_power_w=0.0,
+                                    dynamic_power_w=0.0,
+                                    dynamic_power_exponent=1.6,
+                                    throughput_saturation_ratio=throughput_saturation_ratio,
+                                    thermal_throttle_threshold=thermal_threshold,
+                                    thermal_throttle_coefficient=thermal_coefficient,
+                                    reference_total_gpu_count=max(base_features.node_count * max(base_features.gpus_per_node, 1), 1),
+                                    reference_gpus_per_node=max(base_features.gpus_per_node, 1),
+                                    reference_pipeline_parallel_efficiency=base_features.pipeline_parallel_efficiency,
+                                    reference_topology_count=topology_count,
+                                    reference_multi_topology_calibration=multi_topology,
+                                    reference_topology_dispersion=topology_dispersion,
                                 )
-                                dynamic_power_w = _solve_dynamic_power(
-                                    frequencies,
-                                    predicted_throughputs,
-                                    powers,
-                                    hardware,
-                                    power_params,
-                                )
-                                params = replace(power_params, dynamic_power_w=dynamic_power_w)
-                                metrics = _evaluate_metrics(
-                                    samples,
-                                    hardware,
-                                    derived_features,
-                                    params,
-                                    baseline_throughput,
-                                    baseline_tokens_per_j,
-                                )
-                                objective = _base_objective(metrics, throughput_saturation_ratio, memory_limit, max_observed_throughput)
-                                if best_objective is None or objective < best_objective:
-                                    best_params = params
-                                    best_metrics = metrics
-                                    best_objective = objective
+                                predicted_throughputs = [
+                                    predict_throughput_tokens_per_s(freq, hardware, features, base_params)
+                                    for freq, features in zip(frequencies, derived_features)
+                                ]
+                                for static_power_w in static_power_candidates:
+                                    for dynamic_power_exponent in dynamic_exponents:
+                                        power_params = replace(
+                                            base_params,
+                                            static_power_w=static_power_w,
+                                            dynamic_power_exponent=dynamic_power_exponent,
+                                        )
+                                        dynamic_power_w = _solve_dynamic_power(
+                                            frequencies,
+                                            predicted_throughputs,
+                                            powers,
+                                            hardware,
+                                            power_params,
+                                        )
+                                        params = replace(power_params, dynamic_power_w=dynamic_power_w)
+                                        metrics = _evaluate_metrics(
+                                            samples,
+                                            hardware,
+                                            derived_features,
+                                            params,
+                                            baseline_throughput,
+                                            baseline_tokens_per_j,
+                                        )
+                                        objective = _base_objective(metrics, throughput_saturation_ratio, memory_limit, max_observed_throughput)
+                                        if best_objective is None or objective < best_objective:
+                                            best_params = params
+                                            best_metrics = metrics
+                                            best_objective = objective
 
     if best_params is None or best_metrics is None or best_objective is None:
         raise RuntimeError("failed to calibrate frequency model")
@@ -613,4 +619,173 @@ def calibrate_frequency_model(
         runtime_ratio_mape=final_metrics.runtime_ratio_mape,
         energy_ratio_mape=final_metrics.energy_ratio_mape,
         objective=final_objective,
+    )
+
+
+
+def _fingerprint_objective(metrics: CalibrationMetrics) -> float:
+    """Objective for fingerprint grid search.
+
+    Same weighting as _base_objective but without the smoothness penalties
+    (those were heuristics for the old anchor-search space; the physics-driven
+    derivation layer handles smoothness via Roofline / bandwidth models).
+    """
+    return (
+        (0.10 * metrics.throughput_mape)
+        + (0.10 * metrics.power_mape)
+        + (0.30 * metrics.total_time_mape)
+        + (0.30 * metrics.total_energy_mape)
+        + (0.10 * metrics.runtime_ratio_mape)
+        + (0.10 * metrics.energy_ratio_mape)
+    )
+
+
+def calibrate_hardware_fingerprint(
+    samples: List[LoadedRunSample],
+    hardware: HardwareFeatures,
+    derived_features: List[DerivedModelFeatures],
+    network: NetworkConfig,
+    baseline_sample: LoadedRunSample | None = None,
+) -> tuple[HardwareFingerprint, CalibrationResult]:
+    """Calibrate a HardwareFingerprint from observed samples.
+
+    Instead of searching the full CalibrationParams space (compute_limit,
+    memory_limit, comm_limit, P_static, P_dynamic, ...), we search over the
+    much smaller HardwareFingerprint space (~6 efficiency factors) and let
+    derive_calibration_params() compute the actual limits from hardware specs,
+    workload features, and network configuration.
+
+    This produces physically interpretable parameters and generalizes to new
+    models/topologies on the same hardware platform without re-calibration.
+    """
+    if not samples or not derived_features:
+        raise ValueError("at least one sample and derived feature are required")
+
+    baseline_throughput, baseline_tokens_per_j = _reference_throughput_and_efficiency(
+        samples, baseline_sample
+    )
+
+    # --- Search grids (coarse first) ---
+    # Limits: derived from specs, scaled by efficiency.
+    # Efficiency can be very low (<0.05) because theoretical peaks assume
+    # ideal tensor-core utilization while real training mixes non-TC ops,
+    # framework overhead, and memory stalls.
+    compute_efficiencies = [0.005, 0.02, 0.08, 0.30, 0.80]
+    memory_efficiencies = [0.005, 0.02, 0.08, 0.30, 0.80]
+    # Only search network efficiency when multi-node; otherwise irrelevant.
+    has_multinode = any(f.node_count > 1 for f in derived_features)
+    network_efficiencies = [0.02, 0.05, 0.20, 0.50] if has_multinode else [0.20]
+
+    # Power: calibrated from observed data (NOT derived from TDP).
+    # Derive search ranges from observed power samples.
+    observed_powers = [s.observed.avg_power_w for s in samples]
+    min_power = min(observed_powers) if observed_powers else 100.0
+    max_power = max(observed_powers) if observed_powers else 500.0
+    power_range = max_power - min_power
+    static_power_candidates = [
+        min_power * 0.4,
+        min_power * 0.7,
+        min_power * 1.0,
+    ]
+    dynamic_power_candidates = [
+        max(power_range * 0.2, 10.0),
+        max(power_range * 0.7, 10.0),
+        max(power_range * 1.5, 10.0),
+    ]
+    dynamic_power_exponents = [1.0, 1.5, 2.5, 3.5, 5.0]
+    power_utilization_exponents = [0.0, 0.5, 1.0]
+
+    # Thermal: fixed for static-mode evaluation (no effect on throughput).
+    # Baseline-mode thermal parameters should be supplied by caller or
+    # calibrated separately from baseline vs static comparisons.
+    thermal_threshold = 1.0
+    thermal_coefficient = 0.0
+
+    best_fingerprint: HardwareFingerprint | None = None
+    best_params: CalibrationParams | None = None
+    best_metrics: CalibrationMetrics | None = None
+    best_objective: float | None = None
+
+    total_combinations = (
+        len(compute_efficiencies)
+        * len(memory_efficiencies)
+        * len(network_efficiencies)
+        * len(static_power_candidates)
+        * len(dynamic_power_candidates)
+        * len(dynamic_power_exponents)
+        * len(power_utilization_exponents)
+    )
+    evaluated = 0
+
+    for compute_eff in compute_efficiencies:
+        for mem_eff in memory_efficiencies:
+            for net_eff in network_efficiencies:
+                for static_pw in static_power_candidates:
+                    for dynamic_pw in dynamic_power_candidates:
+                        for dyn_exp in dynamic_power_exponents:
+                            for pue in power_utilization_exponents:
+                                fingerprint = HardwareFingerprint(
+                                    compute_efficiency=compute_eff,
+                                    memory_efficiency=mem_eff,
+                                    network_efficiency=net_eff,
+                                    static_power_w=static_pw,
+                                    dynamic_power_w=dynamic_pw,
+                                    dynamic_power_exponent=dyn_exp,
+                                    power_utilization_exponent=pue,
+                                    thermal_throttle_threshold=thermal_threshold,
+                                    thermal_throttle_coefficient=thermal_coefficient,
+                                )
+                                params = derive_calibration_params(
+                                    hardware, derived_features[0], network, fingerprint
+                                )
+                                metrics = _evaluate_metrics(
+                                    samples,
+                                    hardware,
+                                    derived_features,
+                                    params,
+                                    baseline_throughput,
+                                    baseline_tokens_per_j,
+                                )
+                                objective = _fingerprint_objective(metrics)
+                                evaluated += 1
+
+                                if best_objective is None or objective < best_objective:
+                                    best_fingerprint = fingerprint
+                                    best_params = params
+                                    best_metrics = metrics
+                                    best_objective = objective
+
+    if best_fingerprint is None or best_params is None or best_metrics is None or best_objective is None:
+        raise RuntimeError("failed to calibrate hardware fingerprint")
+
+    # --- Phase 2: Fit curve corrections on top of physics-driven anchors ---
+    # The physics-driven layer gives us the correct magnitudes; now apply
+    # the same correction-layer search that calibrate_frequency_model() uses
+    # to fine-tune curve shape (low/high freq corrections, topology scaling).
+    corrected_params, corrected_metrics, corrected_objective = _fit_curve_corrections(
+        samples,
+        hardware,
+        derived_features,
+        best_params,
+        baseline_throughput,
+        baseline_tokens_per_j,
+    )
+    scaled_params, scaled_metrics, scaled_objective = _fit_topology_base_scaling(
+        samples,
+        hardware,
+        derived_features,
+        corrected_params,
+        baseline_throughput,
+        baseline_tokens_per_j,
+    )
+
+    return best_fingerprint, CalibrationResult(
+        params=scaled_params,
+        throughput_mape=scaled_metrics.throughput_mape,
+        power_mape=scaled_metrics.power_mape,
+        total_time_mape=scaled_metrics.total_time_mape,
+        total_energy_mape=scaled_metrics.total_energy_mape,
+        runtime_ratio_mape=scaled_metrics.runtime_ratio_mape,
+        energy_ratio_mape=scaled_metrics.energy_ratio_mape,
+        objective=scaled_objective,
     )

@@ -134,7 +134,12 @@ def derive_model_features(hardware: HardwareFeatures, workload: WorkloadFeatures
     tokens_per_step = float(workload.global_batch_size * workload.seq_length)
     samples_per_step = float(workload.global_batch_size)
 
-    approx_attention_params = 4.0 * workload.hidden_size * workload.hidden_size
+    # Attention params with GQA support: q_proj + k_proj + v_proj + o_proj
+    # k_proj and v_proj scale by (num_kv_heads / num_attention_heads)
+    kv_ratio = float(workload.num_key_value_heads) / max(float(workload.num_attention_heads), 1.0)
+    approx_attention_params = float(
+        workload.hidden_size * workload.hidden_size * (2.0 + 2.0 * kv_ratio)
+    )
     approx_mlp_params = 3.0 * workload.hidden_size * workload.ffn_hidden_size
     approx_model_params = float(workload.num_layers * (approx_attention_params + approx_mlp_params))
 

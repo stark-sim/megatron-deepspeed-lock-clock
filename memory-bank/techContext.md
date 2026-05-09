@@ -1,4 +1,110 @@
 # Tech Context
+[2026-04-28] **`user@sd-1` / `user@sd-2` 登录环境硬件容量口径已核对，二者是 LXD/container 入口而非完整裸机视图**：
+- CPU：两台都暴露 `2 × AMD EPYC 7K62 48-Core Processor`，共 `96` 物理核 / `192` 线程。
+- 内存：两台 `/proc/meminfo` 与 cgroup `memory.max` 都显示 `100 GiB` 额度（`107374182400` bytes），应视为当前登录环境/container 可用额度，不要直接写成宿主机完整物理内存。
+- 硬盘视图：
+  - `sd-1` rootfs 挂在 `/dev/mapper/vg0-root[/lxd-data/containers/sd-1/rootfs]`，容量约 `5.3T`；`lsblk` 还可见 `1.7T Samsung MZ7L31T9`、`2 × 21.8T ST24000DM001`、`2 × 1.8T Samsung 990 EVO Plus 2TB`。
+  - `sd-2` rootfs 挂在 `/dev/sda2[/lxd-data/containers/sd-2/rootfs]`，容量约 `1.7T`；当前登录环境只暴露 `1.7T Samsung MZ7L31T9` 这块磁盘。
+[2026-04-24] **当前 `Megatron-Bridge` 主线在 `DGX2-1` 上的 bare-metal bring-up 同时受两条运行时约束限制：`transformer-engine` 是源码级硬依赖，而用户新建的 `python=3.12` 环境里默认拿到的 `torch` wheel 已不再覆盖 V100 (`sm70`)**：
+- 现场导入链已验证：
+  - `megatron.bridge.__init__` 会立即执行 `import megatron.bridge.models`
+  - `megatron.bridge.models.conversion.model_bridge` 会导入 `peft_bridge`
+  - `peft_bridge` 会导入 `megatron.bridge.peft.canonical_lora`
+  - `canonical_lora` / `lora_layers.py` 顶层直接 `import transformer_engine.pytorch as te`
+- 这意味着当前 Bridge 版本下，哪怕只想做 `HF -> Megatron checkpoint` conversion-only，也不能把 `transformer-engine` 当成可选依赖绕过
+- 同一现场还出现了 PyTorch 的官方 runtime 警告：当前 `megatron-bridge` Conda env 中的 wheel 仅包含 `sm75+ / sm80+ / sm90+ / sm100+ / sm120+`，不覆盖 V100 的 `compute capability 7.0`
+- 运行含义：
+  - 仅修复 `modelopt` 不够；要继续在 `DGX2-1` 上跑 Bridge，至少还需要一个能导入 `transformer_engine` 的环境
+  - 但如果继续沿用当前 `python=3.12` 下拿到的这版 `torch` wheel，即便 Bridge 导入通过，后续在 V100 上执行也存在基础 CUDA 架构不匹配风险
+[2026-04-23] **`Megatron-Bridge` 在本仓库里有一个特定的导入冲突风险：`megatron.bridge` 会被当前 repo 自带的 `megatron/` 包遮蔽**：
+- 当前仓库本身就是 `Megatron-DeepSpeed` fork，repo root 下存在本地 `megatron/`
+- 而 `NVIDIA-NeMo/Megatron-Bridge` 的 Python API 入口同样在 `megatron.bridge`
+- 运行含义：
+  - 不能在当前 repo root 下直接依赖默认 `PYTHONPATH` 去 `import megatron.bridge`
+  - 应显式指定一个独立的 `MEGATRON_BRIDGE_ROOT` checkout，并优先把其 `src/` 插到 `sys.path` 最前面，确保先解析到 Bridge 提供的 `megatron.bridge`
+[2026-04-21] **真实 `Qwen2.5-7B-Instruct` 的 Megatron checkpoint 当前必须视为“并行拓扑绑定”的产物，不能假设可跨 `TP` 直接复用**：
+- 已现场验证：
+  - `qwen25_7b_instruct_hf2megads_tp2pp2_v100_gpu8to11_20260421_003100` 可用于 `TP=2 / PP=2`
+  - 但在 `TP=4 / PP=2` runtime 上会于 `LMHeadPipe` load 阶段报 `76032 x 3584` vs `38016 x 3584` mismatch
+- 运行含义：
+  - 若要切到新的 tensor-parallel topology（如 `TP=4`），不能只改 launcher 参数然后继续 `--load` 原来的 `tp2` checkpoint
+  - 正确路径是重新执行一次 `HF -> Megatron` 转换，目标输出的 checkpoint 拓扑必须与训练时的 `TP/PP` 匹配
+[2026-04-21] **V100 双机真实 `Qwen2.5-7B-Instruct` 的 static 高频点现在已有明确稳定性边界，不应盲目再往上抬频**：
+- 当前已验证的频点状态：
+  - `1245 MHz`：稳定，但 runtime 相对 baseline 明显变慢
+  - `1395 MHz`：稳定，时间/能耗更平衡
+  - `1500 MHz`：稳定，runtime 基本贴住 baseline，当前是更高频的优先候选
+  - `1590 MHz`：合法锁频，但在当前真实 7B 双机 workload 上会在 NCCL bring-up 阶段报 `Failed to CUDA calloc async 608 bytes`
+  - `1650 MHz`：不是这批 V100 支持的合法 graphics clock，preflight 会直接拒绝
+- 运行含义：
+  - 若目标是“尽量不拖慢时间同时仍省电”，当前优先验证或复测的高频点应围绕 `1500 MHz`，必要时再试 `1530 / 1560 / 1575`
+  - 不应再直接把 `1650` 当成 V100 static sweep 的默认上探点
+[2026-04-21] **V100 双机真实 `Qwen2.5-7B-Instruct` smoke 现在有三个必须满足的现场前提，缺一不可**：
+- `DGX2-2` 必须同步本地新版 `megatron/tokenizer/tokenizer.py`
+  - 关键作用是让 `_HFTokenizer.vocab_size` 取 `max(tokenizer.vocab_size, config.json.vocab_size)`，从而把 Qwen runtime vocab 提升到 `152064`
+  - 如果缺这段补丁，`DGX2-2` stage-1 会把 `LMHead` 建成 `75904 x 3584`，在 load `qwen25_7b_instruct_hf2megads_tp2pp2_v100_gpu8to11_20260421_003100` 时触发 `76032 vs 75904` mismatch
+- 两台机都必须具备相同的 dataset index-cache hash 文件
+  - 本次真实 smoke 用到的是 `e652788a584bd8acc28746e4a39bd45b_{doc,sample,shuffle}_idx.npy`
+  - `DGX2-1` 可在首次 dataset build 时生成，但 `DGX2-2` 不会自动收到；若缺失，远端会在 `GPTDataset` 初始化阶段报 `FileNotFoundError`
+- 每次失败后都应先清理残留 run，再换新的 `MASTER_PORT`
+  - 仅仅重跑同一脚本不够，因为失败的 `deepspeed/pdsh/pretrain_gpt.py` 可能继续占着旧 rendezvous 端口，直接导致下一次 `EADDRINUSE`
+[2026-04-20] **`DGX2-1` 的“代码是否足够新到能做 HF->Megatron 转换”目前需要按文件层面判断，不能只看 repo `HEAD`**：
+- 远端 live repo 仍停在 `6629a33`，并且是 dirty worktree，不适合在现场直接 `git pull`
+- 但本轮 checksum 核对显示，下列转换关键文件已经与本地当前 `ff65fce` 一致：
+  - `tools/hf2megads_weight_converter.py`
+  - `megatron/arguments.py`
+  - `megatron/training.py`
+  - `pretrain_gpt.py`
+  - `scripts/experiment_utils.sh`
+- 相对地，辅助脚本层并未完全跟上：
+  - `scripts/run_experiment.sh` checksum 与本地不同
+  - `scripts/activate_runtime_env.sh` 不在远端 live tree
+  - `scripts/setup_python_env.sh` 不在远端 live tree
+- 运行含义：
+  - 若只是要在 `DGX2-1` 上执行一次本地 `hf2megads`，当前不一定需要先把整个 repo 同步到最新 git
+  - 但若想复用最新的 clean-shell bring-up / launcher 路径，则仍应补同步上述脚本，或手工导出等价运行时环境变量
+[2026-04-20] **`DGX2-1` 上真实 `Qwen2.5-7B-Instruct` 转换的参数修正点已经明确，不应再复用昨晚那条失败命令**：
+- 旧失败日志 `/home/sd/Megatron-DeepSpeed/.context/qwen25_7b_instruct_local_hf2megads_tp2pp2_dgx1_20260420_003409.log` 使用了：
+  - `--tokenizer-model /home/sd/models/Qwen2.5-7B-Instruct`
+  - `--hf-ckpt-dir /home/sd/models/Qwen2.5-7B-Instruct`
+- 其直接失败点是 `HFTokenizer` 初始化阶段 `vocab_file=None`
+- 当前应改用的稳定入口是：
+  - `--tokenizer-model /home/sd/Megatron-DeepSpeed/.context/qwen25_tokenizer_flat`
+  - `--hf-ckpt-dir /home/sd/models/Qwen2.5-7B-Instruct-full`
+- 补充事实：
+  - `/home/sd/models/Qwen2.5-7B-Instruct-full` 当前已完整含 `model-00001..00004-of-00004.safetensors`
+  - `/home/sd/Megatron-DeepSpeed/checkpoints/` 下仍未出现 `qwen25_7b_instruct_hf2megads*`
+[2026-04-20] **`DGX2-1` 当前运行转换的首要 blocker 是 GPU 占用，而不是磁盘或 Python runtime**：
+- `/usr/bin/python3` 当前可直接导入 `torch 2.9.1+cu128` 与 `deepspeed 0.18.3`
+- `/home/sd` 根分区约余 `447G`
+- 但 16 张 V100 当前全部被 `lb` 的 `vllm serve /share-data/models/Mixtral-8x22B-Instruct-v0.1/ -tp 16` 占满，且现场还有配套 benchmark 进程
+- 运行含义：
+  - 若用户现在去 `DGX2-1` 手工开转，首先需要等待或协调释放 GPU，而不是优先处理磁盘或 Python 依赖
+[2026-04-20] **V100 线当前推荐只使用 `/home/sd/models/` 下的统一模型路径，不再混用早期临时位置**：
+- `Qwen2.5-7B-Instruct`：
+  - `DGX2-1`: `/home/sd/models/Qwen2.5-7B-Instruct-full`
+  - `DGX2-2`: `/home/sd/models/Qwen2.5-7B-Instruct-full`（软链接到完整 modelscope Instruct 目录）
+- `Qwen3-4B`：
+  - `DGX2-1`: `/home/sd/models/Qwen3-4B`
+  - `DGX2-2`: `/home/sd/models/Qwen3-4B`
+- 运行含义：
+  - 后续无论是 `hf2megads` 转换还是用户手工检查，都应优先使用这些 `/home/sd/models/...` 路径，避免再依赖 `DGX2-1` 的 `/share-data/models/...` 或 `DGX2-2` 上名字误导性的旧软链接
+[2026-04-20] **V100 线当前备用真实模型的可用性有明确分层**：
+- `Qwen3-4B`
+  - 当前可用路径：`DGX2-1:/share-data/models/Qwen3-4B`
+  - 完整性：完整三分片，可直接作为 HF 根目录使用
+  - 架构：`36L / hidden 2560 / ffn 9728 / heads 32 / kv_heads 8 / vocab 151936`
+- `Qwen3-8B`
+  - `DGX2-1:/home/sd/models/Qwen3-8B` 当前只是近乎空壳的 stub（约 `16M`）
+  - `DGX2-2:/home/sd/models/Qwen3-8B` 虽保留 `config + index + 3 个 shard`，但仍缺 `model-00003-of-00005.safetensors` 与 `model-00004-of-00005.safetensors`
+  - 运行含义：在补齐缺片前，不应把 `Qwen3-8B` 当作可转换或可训练的稳定输入
+[2026-04-20] **V100 线真实 7B 入口路径现已具备明确的“该用哪份权重、不要用哪份权重”的运行时规则**：
+- `DGX2-1` 应使用 `/home/sd/models/Qwen2.5-7B-Instruct-full` 作为 `Qwen2.5-7B-Instruct` 的本地 HF 根目录；旧路径 `/home/sd/models/Qwen2.5-7B-Instruct` 仍是残缺副本，不应再用于转换或训练
+- `DGX2-2` 当前最稳的真实权重路径仍是 `/home/sd/cache/modelscope/Qwen/Qwen2___5-7B-Instruct`；`/home/sd/models/Qwen2.5-7B` 只是指向它的软链接
+- 两台 V100 机器都已有：
+  - `data/qwen_data_text_document.{bin,idx}`
+  - `.context/qwen25_tokenizer_flat`
+- 两台 V100 机器当前都还没有 `qwen25_7b_instruct_hf2megads_tp2pp2_*` 形式的 Megatron 转换产物，因此真实模型启动前仍需先做 `HF->Megatron`，不能直接复用 `sd-1/sd-2` 上的 `--load` 路径
 [2026-04-20] **Python 环境 bring-up 已被脚本化，且当前必须把“安装环境”和“运行时预热”分开处理**：
 - 新增脚本：
   - `scripts/setup_python_env.sh`

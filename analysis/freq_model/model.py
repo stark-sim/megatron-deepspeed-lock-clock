@@ -5,7 +5,8 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
 from analysis.freq_model.features import DerivedModelFeatures
-from analysis.freq_model.hardware import HardwareFeatures
+from analysis.freq_model.hardware import HardwareFeatures, HardwareFingerprint
+from analysis.freq_model.network import NetworkConfig
 
 
 @dataclass(frozen=True)
@@ -71,6 +72,9 @@ class CalibrationParams:
     base_topology_shape_sensitivity: float = 0.0
     base_topology_min_throughput_scale: float = 0.18
     base_topology_max_power_scale: float = 1.75
+    thermal_throttle_threshold: float = 1.0
+    thermal_throttle_coefficient: float = 0.0
+    power_utilization_exponent: float = 1.0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -142,6 +146,107 @@ def infer_initial_anchors(
         "memory_anchor": memory_anchor,
         "communication_anchor": communication_anchor,
     }
+
+
+# Transport-type → communication-penalty mapping for physics-driven derivation.
+_TRANSPORT_PENALTY: dict[str, float] = {
+    "nvlink": 0.01,
+    "ib": 0.10,
+    "ethernet": 0.75,
+    "pcie": 0.50,
+}
+
+
+def derive_calibration_params(
+    hardware: HardwareFeatures,
+    features: DerivedModelFeatures,
+    network: NetworkConfig,
+    fingerprint: HardwareFingerprint,
+) -> CalibrationParams:
+    """Derive CalibrationParams from hardware specs + workload features + network + fingerprint.
+
+    This is the physics-driven derivation layer.  Instead of per-scenario hard-coded
+    parameters, the throughput limits are computed from first principles:
+
+      * compute_limit  → Roofline model (peak TFLOPS × efficiency × AI/hw_balance)
+      * memory_limit   → Memory bandwidth × efficiency / bytes_per_token
+      * comm_limit     → tokens_per_step / (exposed_comm_bytes / net_bw / efficiency)
+
+    The power-model parameters (static_power_w, dynamic_power_w, exponent) are NOT
+    derived from TDP because training power is typically far below thermal design
+    power.  They are calibrated from observed power-frequency data and stored in
+    the fingerprint.
+
+    The fingerprint is calibrated **once per hardware platform** and reused for
+    any model or topology on that platform.
+
+    Default fingerprint values (all 0.0) produce near-zero limits — callers must
+    supply a calibrated fingerprint or use the legacy hand-crafted path.
+    """
+    # --- Compute limit (Roofline model) ---
+    peak_compute_tokens_s = 0.0
+    if hardware.peak_fp16_tensor_tflops_per_gpu and features.approx_flops_per_token > 0:
+        peak_compute_tokens_s = (
+            hardware.peak_fp16_tensor_tflops_per_gpu * hardware.gpu_count * 1_000_000_000_000.0
+        ) / features.approx_flops_per_token
+
+    roofline_scale = 1.0
+    if features.arithmetic_intensity_flops_per_byte > 0 and features.hardware_balance_flops_per_byte > 0:
+        roofline_scale = min(
+            1.0,
+            features.arithmetic_intensity_flops_per_byte / max(features.hardware_balance_flops_per_byte, 1e-9),
+        )
+
+    compute_limit = peak_compute_tokens_s * roofline_scale * max(fingerprint.compute_efficiency, 1e-9)
+
+    # --- Memory limit ---
+    memory_limit = 0.0
+    if hardware.memory_bandwidth_gbps_per_gpu and features.tokens_per_step > 0:
+        bytes_per_token = features.approx_memory_bytes_per_step / max(features.tokens_per_step, 1e-9)
+        peak_memory_tokens_s = (
+            hardware.memory_bandwidth_gbps_per_gpu * hardware.gpu_count * 1_000_000_000.0
+        ) / max(bytes_per_token, 1e-9)
+        memory_limit = peak_memory_tokens_s * max(fingerprint.memory_efficiency, 1e-9)
+
+    # --- Communication limit (from network bandwidth + derived comm bytes) ---
+    communication_limit = 1e9  # Single-node default: not bottlenecked
+    if features.node_count > 1 and network.effective_bandwidth_gbps > 0:
+        total_comm_bytes = (
+            features.cross_node_dp_bytes
+            + features.cross_node_tp_bytes
+            + features.cross_node_pp_bytes
+        )
+        exposed_comm_bytes = total_comm_bytes * features.communication_share
+        comm_time_s = exposed_comm_bytes / max(
+            network.effective_bandwidth_gbps * 1_000_000_000.0 * max(fingerprint.network_efficiency, 1e-9),
+            1e-9,
+        )
+        communication_limit = features.tokens_per_step / max(comm_time_s, 1e-9)
+
+    # --- Power: from fingerprint (calibrated, NOT derived from TDP) ---
+    static_power = fingerprint.static_power_w
+    dynamic_power = fingerprint.dynamic_power_w
+
+    # --- Communication penalty from transport type ---
+    communication_penalty = _TRANSPORT_PENALTY.get(network.transport_type.lower(), 0.30)
+
+    return CalibrationParams(
+        compute_limit_at_max_tokens_per_s=compute_limit,
+        memory_limit_tokens_per_s=memory_limit,
+        communication_limit_tokens_per_s=communication_limit,
+        communication_penalty=communication_penalty,
+        static_power_w=static_power,
+        dynamic_power_w=dynamic_power,
+        dynamic_power_exponent=fingerprint.dynamic_power_exponent or 1.5,
+        power_utilization_exponent=fingerprint.power_utilization_exponent or 1.0,
+        throughput_saturation_ratio=1.0,
+        thermal_throttle_threshold=fingerprint.thermal_throttle_threshold,
+        thermal_throttle_coefficient=fingerprint.thermal_throttle_coefficient,
+        reference_total_gpu_count=hardware.gpu_count,
+        reference_gpus_per_node=features.gpus_per_node,
+        reference_pipeline_parallel_efficiency=features.pipeline_parallel_efficiency,
+        cross_node_reference_bandwidth_gbps=network.effective_bandwidth_gbps,
+    )
 
 
 def _base_compute_frequency_ratio(frequency_ratio: float, params: CalibrationParams) -> float:
@@ -789,19 +894,49 @@ def _predict_base_throughput_tokens_per_s(
     return throughput
 
 
+def _thermal_throttle_factor(
+    frequency_ratio: float,
+    params: CalibrationParams,
+) -> float:
+    threshold = params.thermal_throttle_threshold
+    if threshold >= 1.0 or frequency_ratio <= threshold:
+        return 1.0
+    overshoot = frequency_ratio - threshold
+    max_overshoot = 1.0 - threshold
+    if max_overshoot <= 1e-9:
+        return 1.0
+    thermal_drop = params.thermal_throttle_coefficient * (overshoot / max_overshoot) ** 2
+    return max(0.5, 1.0 - thermal_drop)
+
+
 def predict_throughput_tokens_per_s(
     frequency_mhz: float,
     hardware: HardwareFeatures,
     features: DerivedModelFeatures,
     params: CalibrationParams,
+    mode: str = "static",
 ) -> float:
+    """Predict throughput at a given frequency.
+
+    Args:
+        mode: "static" for fixed-frequency prediction (no thermal throttling),
+              "baseline" for dynamic-boost prediction (with thermal throttling).
+    """
     base_throughput = _predict_base_throughput_tokens_per_s(frequency_mhz, hardware, features, params)
     cross_node_penalty_s = estimate_cross_node_time_penalty_s(frequency_mhz, hardware, features, params)
     if cross_node_penalty_s <= 0.0:
-        return base_throughput
-    base_step_time_s = features.tokens_per_step / max(base_throughput, 1e-9)
-    corrected_step_time_s = base_step_time_s + cross_node_penalty_s
-    return features.tokens_per_step / max(corrected_step_time_s, 1e-9)
+        throughput = base_throughput
+    else:
+        base_step_time_s = features.tokens_per_step / max(base_throughput, 1e-9)
+        corrected_step_time_s = base_step_time_s + cross_node_penalty_s
+        throughput = features.tokens_per_step / max(corrected_step_time_s, 1e-9)
+    max_frequency = float(hardware.max_frequency_mhz or frequency_mhz or 1.0)
+    frequency_ratio = _clamp(float(frequency_mhz) / max_frequency, 0.05, 1.0)
+    # Thermal throttling only applies to baseline (dynamic boost) mode.
+    # Static locking eliminates thermal throttling because temperature stabilizes.
+    if mode == "baseline":
+        throughput *= _thermal_throttle_factor(frequency_ratio, params)
+    return throughput
 
 
 
@@ -827,14 +962,22 @@ def predict_power_w(
     hardware: HardwareFeatures,
     features: DerivedModelFeatures,
     params: CalibrationParams,
+    mode: str = "static",
 ) -> float:
+    """Predict average power at a given frequency.
+
+    Args:
+        mode: "static" for fixed-frequency prediction (no thermal throttling),
+              "baseline" for dynamic-boost prediction (with thermal throttling).
+    """
     max_frequency = float(hardware.max_frequency_mhz or frequency_mhz or 1.0)
     frequency_ratio = _clamp(float(frequency_mhz) / max_frequency, 0.05, 1.0)
     compute_frequency_ratio = _compute_frequency_ratio(frequency_ratio, params, features)
     compute_limit = max(params.compute_limit_at_max_tokens_per_s * compute_frequency_ratio, 1e-9)
-    throughput = predict_throughput_tokens_per_s(frequency_mhz, hardware, features, params)
+    throughput = predict_throughput_tokens_per_s(frequency_mhz, hardware, features, params, mode=mode)
     utilization = _clamp(throughput / compute_limit, 0.05, 1.2)
-    dynamic = params.dynamic_power_w * utilization * (frequency_ratio ** params.dynamic_power_exponent)
+    utilization_factor = utilization ** params.power_utilization_exponent
+    dynamic = params.dynamic_power_w * utilization_factor * (frequency_ratio ** params.dynamic_power_exponent)
     power_w = params.static_power_w + dynamic
     power_w *= _topology_power_scale(features, params)
     power_w *= _local_gpu_count_power_scale(features, params)
@@ -848,13 +991,20 @@ def predict_point(
     hardware: HardwareFeatures,
     features: DerivedModelFeatures,
     params: CalibrationParams,
+    mode: str = "static",
 ) -> PredictionPoint:
+    """Predict a single point.
+
+    Args:
+        mode: "static" for fixed-frequency prediction (no thermal throttling),
+              "baseline" for dynamic-boost prediction (with thermal throttling).
+    """
     max_frequency = float(hardware.max_frequency_mhz or frequency_mhz or 1.0)
     frequency_ratio = _clamp(float(frequency_mhz) / max_frequency, 0.05, 1.0)
     compute_frequency_ratio = _compute_frequency_ratio(frequency_ratio, params, features)
-    throughput_tokens_per_s = predict_throughput_tokens_per_s(frequency_mhz, hardware, features, params)
+    throughput_tokens_per_s = predict_throughput_tokens_per_s(frequency_mhz, hardware, features, params, mode=mode)
     throughput_samples_per_s = throughput_tokens_per_s / max(features.tokens_per_step / max(features.samples_per_step, 1e-9), 1e-9)
-    power_w = predict_power_w(frequency_mhz, hardware, features, params)
+    power_w = predict_power_w(frequency_mhz, hardware, features, params, mode=mode)
     step_time_s = features.tokens_per_step / max(throughput_tokens_per_s, 1e-9)
     tokens_per_j = throughput_tokens_per_s / max(power_w, 1e-9)
     tokens_per_wh = tokens_per_j * 3600.0
@@ -887,8 +1037,15 @@ def sweep_prediction_points(
     hardware: HardwareFeatures,
     features: DerivedModelFeatures,
     params: CalibrationParams,
+    mode: str = "static",
 ) -> List[PredictionPoint]:
-    return [predict_point(freq, hardware, features, params) for freq in frequencies_mhz]
+    """Sweep prediction over a range of frequencies.
+
+    Args:
+        mode: "static" for fixed-frequency prediction (no thermal throttling),
+              "baseline" for dynamic-boost prediction (with thermal throttling).
+    """
+    return [predict_point(freq, hardware, features, params, mode=mode) for freq in frequencies_mhz]
 
 
 def select_metric_value(point: PredictionPoint, metric: str) -> float:

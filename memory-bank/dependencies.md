@@ -1,5 +1,8 @@
 # Dependencies
 
+## Hardware / Runtime Inventory Notes
+- [2026-04-28] `user@sd-1` 与 `user@sd-2` 当前登录环境均暴露 `2 × AMD EPYC 7K62`（`96` 物理核 / `192` 线程），但内存由 cgroup 限为 `100 GiB`。`sd-1` 容器 rootfs 容量约 `5.3T`，同时可见额外 `2 × 21.8T HDD` 与 `2 × 1.8T NVMe`；`sd-2` 当前登录环境只可见约 `1.7T` rootfs 磁盘。
+
 ## Core Dependencies
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -40,6 +43,12 @@
 | `nvidia-smi` | system | GPU inspection and validation |
 
 ## Version Constraints
+- [2026-04-24] `DGX2-1` 上用户新建的 `conda` 环境 `megatron-bridge`（Python `3.12`）目前至少缺少 `transformer_engine`，Bridge 导入会在 `/home/sd/Megatron-Bridge/src/megatron/bridge/peft/lora_layers.py` 处报 `ModuleNotFoundError: No module named 'transformer_engine'`。
+- [2026-04-24] 同一个 `megatron-bridge` Python `3.12` 环境当前拿到的 `torch` wheel 已不支持 V100 (`CC 7.0`)；`torch.cuda` 会明确警告该 wheel 仅支持 `sm75+ / sm80+ / sm86+ / sm90+ / sm100+ / sm120+`。这意味着即便补齐 `transformer_engine`，现有 wheel 也不应被视为 `DGX2-1` 上的稳定 V100 运行时。
+- [2026-04-21] On `sd@v100x16-2`, successful real-checkpoint bring-up now depends on the local-workspace version of `megatron/tokenizer/tokenizer.py`, not only on the flat tokenizer files. Without that code sync, `HFTokenizer` still reports the smaller Qwen tokenizer vocab and stage-1 `LMHeadPipe` is built with `75904` rows instead of the checkpoint's `76032`.
+- [2026-04-21] The V100 real-checkpoint smoke currently depends on per-dataset `index-cache` hashes being present on **both** DGX2 nodes. For the current `qwen_data_text_document` smoke, `DGX2-2` needed `e652788a584bd8acc28746e4a39bd45b_{doc,sample,shuffle}_idx.npy` synced from `DGX2-1`; otherwise startup fails during `GPTDataset` initialization with `FileNotFoundError`.
+- [2026-04-20] Fresh `DGX2-1` validation confirms the live `/usr/bin/python3` runtime can still import `torch 2.9.1+cu128` and `deepspeed 0.18.3`, so current V100 conversion bring-up is not blocked by missing core Python packages.
+- [2026-04-20] On `sd@v100x16-1`, `hf2megads` can rely on the already-synced core conversion files (`tools/hf2megads_weight_converter.py`, `megatron/arguments.py`, `megatron/training.py`, `pretrain_gpt.py`, `scripts/experiment_utils.sh`), but the newer helper scripts `scripts/activate_runtime_env.sh` and `scripts/setup_python_env.sh` are not present in the live tree yet. For clean-shell runs, either sync those scripts first or export equivalent cache/JIT env vars manually.
 - [2026-04-10] On `sd@v100x16-{1,2}`, live communication benchmarking currently depends on the local-workspace version of `.context/torch_nccl_comm_bench.py`; the remote copy can lag behind and fail on newer flags such as `--warmup-iters` / `--iters`. Sync the local script to `/home/sd/Megatron-DeepSpeed/.context/` before short-form DGX2 benchmarks.
 - [2026-04-10] The DGX2 `.local` training runtime currently needs a `psutil` sanity check before fresh bring-up if DeepSpeed starts failing during model build: on `DGX2-2`, `deepspeed.runtime.utils.see_memory_usage()` hit `AttributeError: module 'psutil' has no attribute 'virtual_memory'` even though `import psutil` succeeded. The immediate cause is a broken user-site `psutil` tree under `/home/sd/.local/lib/python3.10/site-packages/psutil/` that contains only `__pycache__/` and `tests/`, so Python imports it as an empty namespace package. Reconfirm `python3 -c "import psutil; print(psutil, getattr(psutil, '__file__', None), hasattr(psutil, 'virtual_memory'))"` in the active remote shell before formal reruns if this reproduces.
 - [2026-03-26] Same-transport communication probing uses `/usr/bin/python3 -m torch.distributed.run` from the same `.local` user-site PyTorch environment as training; no external `nccl-tests` binary is required for this benchmark path.

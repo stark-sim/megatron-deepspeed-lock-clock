@@ -13,6 +13,47 @@ class HardwareSpec:
 
 
 @dataclass(frozen=True)
+class HardwareFingerprint:
+    """Hardware-level calibration artifact — calibrated once per platform.
+
+    The fingerprint contains:
+      * Efficiency factors for limits that CAN be derived from specs but need
+        a hardware-specific scaling factor (compute_efficiency, memory_efficiency,
+        network_efficiency).
+      * Power-model parameters that CANNOT be derived from specs and must be
+        calibrated from observed power data (static_power_w, dynamic_power_w,
+        dynamic_power_exponent, power_utilization_exponent).
+
+    All values are per-hardware-platform, NOT per-model.  Changing the model
+    or topology only changes the DerivedModelFeatures passed to
+    derive_calibration_params(); the fingerprint stays constant.
+
+    Default values of 0.0 mean "no effect / disabled" for backward
+    compatibility when the derivation layer is not used.
+    """
+
+    # --- Limits: derived from specs, scaled by efficiency ---
+    compute_efficiency: float = 0.0      # Roofline actual compute util vs peak
+    memory_efficiency: float = 0.0       # Memory bandwidth util
+    network_efficiency: float = 0.0      # Network bandwidth util (multi-node)
+
+    # --- Power: calibrated from data, NOT derived from TDP ---
+    # GPU training power is typically far below TDP; these are aggregate
+    # per-cluster values fitted from observed power-frequency curves.
+    static_power_w: float = 0.0
+    dynamic_power_w: float = 0.0
+    dynamic_power_exponent: float = 0.0  # P ~ f^exp voltage-frequency exponent
+    power_utilization_exponent: float = 0.0  # Power-throughput coupling (0=decoupled)
+
+    # --- Thermal: hardware-specific散热特性 ---
+    thermal_throttle_threshold: float = 1.0
+    thermal_throttle_coefficient: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class HardwareFeatures:
     gpu_name: str
     gpu_count: int
@@ -41,6 +82,12 @@ class HardwareFeatures:
 
 
 KNOWN_GPU_SPECS: Dict[str, HardwareSpec] = {
+    "nvidia geforce rtx 4080 super": HardwareSpec(
+        peak_fp16_tensor_tflops_per_gpu=50.0,
+        peak_fp32_tflops_per_gpu=25.0,
+        memory_bandwidth_gbps_per_gpu=736.0,
+        board_power_w_per_gpu=320.0,
+    ),
     "tesla v100-sxm3-32gb": HardwareSpec(
         peak_fp16_tensor_tflops_per_gpu=125.0,
         peak_fp32_tflops_per_gpu=15.7,
